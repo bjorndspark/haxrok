@@ -1,0 +1,261 @@
+"""The debug feature's contract: what the user sends, what the model must
+return, what the backend returns after checking it, and the SSE events.
+
+Two layers of output models:
+
+- ``Analysis[Claim]`` is what the model returns. Its JSON schema is sent as a
+  strict ``response_format``, so every model here forbids extra fields and has
+  no defaults (strict mode requires every property to be present; optional
+  values are ``X | None``).
+- ``CheckedAnalysis`` is what the UI gets. ``evidence.check`` builds it: each
+  claim keeps its evidence label only if every reference resolves against the
+  parsed design, otherwise it drops to ``none`` with ``downgraded=True``.
+
+The evidence label says what *kind* of evidence a claim rests on, not that its
+conclusion was verified. The UI words it accordingly ("Based on your
+schematic", not "Confirmed").
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+# --- shared vocabulary ---------------------------------------------------------
+
+Evidence = Literal["schematic", "erc", "datasheet", "measurement", "none"]
+"""schematic: the netlist. erc: a KiCad ERC entry. datasheet: the hand-written
+pin table. measurement: a value the user entered. none: no direct evidence."""
+
+CiteKind = Literal["pin_on_net", "pin_name", "erc", "pin_function", "measurement"]
+
+# Which citation kinds back which evidence label. pin_name is the pin's name
+# as the netlist gives it (U2.9 is "L2"); pin_function is what the pin does,
+# from the hand-written pin table.
+EVIDENCE_CITE_KINDS: dict[Evidence, frozenset[CiteKind]] = {
+    "schematic": frozenset({"pin_on_net", "pin_name"}),
+    "erc": frozenset({"erc"}),
+    "datasheet": frozenset({"pin_function"}),
+    "measurement": frozenset({"measurement"}),
+    "none": frozenset(),
+}
+
+
+class _Strict(BaseModel):
+    """Base for model-output types: unknown fields are an error, and the
+    generated JSON schema says ``additionalProperties: false``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+# --- model output ----------------------------------------------------------------
+
+
+class Cite(_Strict):
+    """One reference a claim rests on. Flat rather than a tagged union: strict
+    structured output handles flat objects more reliably."""
+
+    kind: CiteKind = Field(
+        description="pin_on_net: the pin is on that net in the netlist. pin_name: the pin's "
+        "name as the netlist gives it, e.g. U2.9(L2). erc: an ERC entry. pin_function: what "
+        "the pin does, from the pin table. measurement: a value the user entered."
+    )
+    pin: str | None = Field(
+        description='Pin as REF.PIN, e.g. "U2.9". Required for pin_on_net, pin_name and '
+        "pin_function."
+    )
+    net: str | None = Field(description="Net name exactly as in the netlist. For pin_on_net.")
+    id: str | None = Field(description='ERC entry id ("erc-3") or measurement id ("m1").')
+
+
+class Claim(_Strict):
+    """A single fact. One fact per claim, so each can be checked on its own."""
+
+    text: str = Field(description="One fact, in plain words a hobbyist understands.")
+    evidence: Evidence
+    cites: list[Cite] = Field(description="Every pin, net, ERC entry or measurement the text uses.")
+
+
+class SetupChange(_Strict):
+    """A connection change to make before a test is powered up."""
+
+    action: Literal["disconnect", "connect"]
+    pin: str = Field(description="REF.PIN being changed.")
+    net: str | None = Field(description="disconnect: the net it leaves. connect: a net it joins.")
+    to_pin: str | None = Field(description="connect: a REF.PIN it is wired to, instead of a net.")
+
+
+class Reading(_Strict):
+    """One possible outcome of a confirm step and what it would mean."""
+
+    reading: str = Field(description='What the user sees, e.g. "Board boots, +3V3 ≈ 3.3 V".')
+    establishes: str = Field(
+        description="What this outcome shows, including when it shows nothing."
+    )
+    supports: list[str] = Field(description="Hypothesis ids this outcome supports.")
+    rules_out: list[str] = Field(description="Hypothesis ids this outcome rules out.")
+
+
+class ConfirmStep(_Strict):
+    """A bench test. A step that changes the board must leave the circuit in a
+    complete, intended configuration (``setup``), or its result means nothing."""
+
+    id: str = Field(description='Unique, e.g. "h1-c1".')
+    purpose: Literal["test_cause", "check_board_matches_schematic"]
+    instruction: str
+    setup: list[SetupChange] = Field(description="Changes to make before power. Empty if none.")
+    tool: Literal["multimeter", "scope", "look", "other"]
+    power: Literal["off", "on"]
+    practical: bool = Field(description="False if a hobbyist can't do it by hand (e.g. QFN pins).")
+    practical_note: str | None
+    readings: list[Reading]
+
+
+class ReworkStep(_Strict):
+    """Physical rework, at pin and part level only. The input has no PCB, so
+    never traces or vias. Always unverified."""
+
+    text: str
+    practical: bool
+    practical_note: str | None
+
+
+class Fix(_Strict):
+    schematic: list[str] = Field(description="Changes for the next revision of the schematic.")
+    rework: list[ReworkStep] = Field(description="Bodges for the board on the bench.")
+
+
+class Hypothesis[C: Claim](_Strict):
+    id: str = Field(description='Unique, e.g. "h1".')
+    rank: int = Field(description="1 is the most likely cause.")
+    title: str
+    summary: str = Field(description="The mechanism in plain words, 2-4 sentences.")
+    claims: list[C]
+    explains: list[str] = Field(description="Symptom ids this hypothesis explains.")
+    does_not_explain: list[str] = Field(description="Symptom ids it can't explain.")
+    confirm: list[ConfirmStep]
+    fix: Fix
+
+
+class OpenQuestion(_Strict):
+    text: str
+    suggested_check: str | None
+
+
+class GlossaryEntry(_Strict):
+    term: str
+    definition: str
+
+
+class Analysis[C: Claim](_Strict):
+    """The full answer. ``Analysis[Claim]`` is the model's output schema."""
+
+    hypotheses: list[Hypothesis[C]]
+    open_questions: list[OpenQuestion] = Field(description="What the input can't answer.")
+    glossary: list[GlossaryEntry] = Field(description="Jargon used above, defined plainly.")
+
+
+# --- checked output ----------------------------------------------------------------
+
+
+class CheckedClaim(Claim):
+    """A claim after ``evidence.check``. When ``downgraded`` is true,
+    ``evidence`` is ``none`` and ``claimed_evidence`` holds the model's label."""
+
+    downgraded: bool = False
+    claimed_evidence: Evidence | None = None
+    reason: str | None = Field(None, description="Why it was downgraded, for the UI.")
+
+
+class Problem(BaseModel):
+    """A reference the checker removed or couldn't resolve outside a claim,
+    e.g. an unknown symptom id in ``explains``. ``where`` is a hypothesis or
+    confirm-step id, so the UI can show it in place."""
+
+    where: str
+    message: str
+
+
+class CheckedAnalysis(Analysis[CheckedClaim]):
+    problems: list[Problem] = []
+
+
+# --- design summary (first SSE event) ----------------------------------------------
+
+
+class IcSummary(BaseModel):
+    ref: str
+    value: str
+    footprint: str
+    pin_data: bool
+
+
+class ErcEntry(BaseModel):
+    """One KiCad ERC violation. ``id`` is what claims cite."""
+
+    id: str
+    sheet: str
+    rule: str
+    severity: str
+    message: str
+    items: list[str]
+
+
+class Symptom(BaseModel):
+    id: str
+    text: str
+
+
+class Measurement(BaseModel):
+    id: str
+    step_id: str | None
+    value: str
+
+
+class DesignSummary(BaseModel):
+    """Parsed input, shown before the model call: lets the user check the
+    parse, and shows which ICs have pin data."""
+
+    parts: int
+    ics: list[IcSummary]
+    erc: list[ErcEntry]
+    symptoms: list[Symptom]
+    measurements: list[Measurement]
+
+
+# --- input ----------------------------------------------------------------------
+
+
+class SymptomsInput(BaseModel):
+    """The symptom template. The backend numbers each non-empty line as a
+    symptom (s1, s2, …) so hypotheses can cite them."""
+
+    powered_by: str = Field("", max_length=2000)
+    works: str = Field("", max_length=4000)
+    fails: str = Field("", max_length=4000)
+    measured: str = Field("", max_length=4000)
+    hot: str = Field("", max_length=2000)
+    notes: str = Field("", max_length=4000)
+
+
+class MeasurementInput(BaseModel):
+    """A value the user entered under a confirm step, sent on re-runs."""
+
+    step_id: str | None = Field(None, max_length=50)
+    value: str = Field(..., min_length=1, max_length=500)
+
+
+# --- SSE events -------------------------------------------------------------------
+#
+# Order: design_summary, then any number of progress, then exactly one terminal
+# event, result or error.
+
+ProgressStage = Literal["parsing", "erc", "pin_lookup", "reasoning", "checking"]
+
+
+class ProgressEvent(BaseModel):
+    stage: ProgressStage
+    message: str
+
+
+class ErrorEvent(BaseModel):
+    message: str

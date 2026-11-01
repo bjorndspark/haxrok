@@ -40,6 +40,9 @@ services:
       - ./backend/scripts:/app/scripts
       - ./docs:/docs
       - ./mkdocs.yml:/mkdocs.yml:ro
+      # Eval cases double as test fixtures (tests/test_debug.py). At /evals,
+      # tests/../../evals resolves the same here as in a CI checkout.
+      - ./evals:/evals:ro
       - uv_cache:/uv-cache
     extra_hosts:
       # Lets AI_BASE_URL reach a gateway running on the host machine.
