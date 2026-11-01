@@ -9,6 +9,29 @@ it leaves out, and the other ideas that were weighed against it. The
 constraint is a small scope that must use the Meta model, so the MVP is the
 smallest thing that demos the real bug end to end.
 
+## Who it's for
+
+Hobbyists who design their own boards in KiCad, have a board on the bench
+that misbehaves, and own a multimeter but often no scope. This drives the
+prompt as much as the UI:
+
+- **The mechanism is explained in plain words by default.** Nets and
+  pins are still shown, as a detail line under the explanation.
+- **Confirm steps assume a multimeter.** A step that needs a scope is
+  marked as such and gets a multimeter alternative where one exists.
+  Each step says what reading means what ("~0 Ω means shorted, which
+  confirms this").
+- **Fix steps describe real rework** (cut this trace, bodge-wire that
+  pin) as well as the schematic fix for the next revision.
+- **Jargon gets a hover definition** (ERC, buck-boost, back-feed).
+- **The symptom box asks concrete questions**: what powers the board,
+  what works, what doesn't, what you measured, whether anything gets hot.
+- **Source labels use plain names**: "From your schematic", "From KiCad's
+  checker", "From the datasheet", "From your measurement", "Best guess".
+
+Pro tools such as Flux aim at engineers. A debugger that explains *why* is
+also the clearer pitch.
+
 ## Go/no-go result
 
 `evals/gonogo.py` on a real bug from one of our own boards, model
@@ -62,15 +85,28 @@ One feature, `debug`, named the same on both sides
      recommends (no libraries). Its `kicad-cli` must be at least as new
      as the user's KiCad, because older versions can't open newer
      files.
-2. **One model call.** It uses the `gonogo.py` prompt through
-   `app/core/ai/` with `AI_CHAT_MODEL`.
+2. **One model call.** It starts from the `gonogo.py` prompt, reworded
+   for hobbyists (see "Who it's for"), through `app/core/ai/` with
+   `AI_CHAT_MODEL`. It returns structured JSON, not markdown, so the UI
+   can render it and the backend can check it.
 3. **Pin-function lookup.** For each IC on the board it gives the model
    the real pin names and functions, so it stops inventing them. This is
-   the fix for the biggest weakness, so it's in the MVP.
+   the fix for the biggest weakness, so it's in the MVP. The MVP source is
+   a hand-written table for a handful of ICs. Datasheet extraction comes later. The board summary
+   shows which ICs have pin data and which don't.
 4. **Output.** Ranked hypotheses showing the nets and pins involved, how to
-   confirm, and the fix. Every claim carries a source label: netlist,
-   ERC, datasheet or inferred. Anything that can't be traced to an input
-   is shown as inferred.
+   confirm, and the fix, followed by open questions the input can't
+   answer. Every claim carries a source label: netlist, ERC, datasheet,
+   bench (a measurement the user entered) or inferred. The backend
+   checks each cited net, pin and ERC entry against the parsed input and
+   downgrades anything it can't trace to inferred, so the label comes
+   from code, not from the model. Progress and results stream over SSE,
+   because a run takes about two minutes.
+5. **Add a measurement and re-run** (once 1–4 work). Under each confirm
+   step the user can enter what they measured. It's added to the input
+   as a bench source and the analysis runs again, with the earlier runs
+   kept on the page. This is one more call with more input, not the
+   agent loop.
 
 Done means: a real bug's KiCad project runs from the UI and ranks the
 fault #1.
