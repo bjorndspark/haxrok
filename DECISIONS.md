@@ -274,3 +274,29 @@ checks via branch protection, which this private repo's plan lacks.
 left open means a major bump to review or a red check to fix. Lockfiles are
 frozen everywhere (Dockerfiles, entrypoints, `make install`, CI), so a
 stale lock fails loudly instead of being silently re-resolved.
+
+## Evidence labels are checked references, not verified conclusions
+
+**Decision:** every claim in a debug answer is one fact with an evidence
+label (schematic, ERC, datasheet pin table, measurement, or none) and the
+references it rests on. `features/debug/evidence.py` keeps the label only
+if every reference resolves against the parsed input: the pin is on that
+net, the pin has that name, the ERC entry id exists, the pin is in the pin
+table, the measurement was entered. It also checks that every pin and net
+the text names is cited. Otherwise the claim drops to `none` with
+`downgraded` and a reason the UI shows. The UI words labels as "Based on
+your schematic", never "Confirmed".
+
+**Alternatives rejected:** letting the model label its own claims
+CONFIRMED/INFERRED (the go/no-go prompt). It labelled a DMM reading it was
+never given as CONFIRMED. A second model call to judge whether each claim
+follows from its references: twice the cost and latency on a call that
+already takes ~2 minutes, and it is the same kind of judgement that failed.
+
+**Consequence:** a kept label promises the cited facts exist, not that the
+reasoning from them is right. A wrong conclusion drawn from true facts
+keeps its label, so claims are kept to one fact each to keep that gap
+small, and the evals measure the rest. Free text outside claims (rework
+steps, summaries) isn't checked; the prompt carries those rules. The
+checker is text matching over refs like `U2.9` and net names, so prose
+like "pins 7 and 8" slips past it.

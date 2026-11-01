@@ -26,8 +26,10 @@ prompt as much as the UI:
 - **Jargon gets a hover definition** (ERC, buck-boost, back-feed).
 - **The symptom box asks concrete questions**: what powers the board,
   what works, what doesn't, what you measured, whether anything gets hot.
-- **Source labels use plain names**: "From your schematic", "From KiCad's
-  checker", "From the datasheet", "From your measurement", "Best guess".
+- **Evidence labels use plain names** and say what a claim rests on, not
+  that it was verified: "Based on your schematic", "Based on KiCad's
+  checker", "Based on the datasheet pin table", "Based on your
+  measurement", "No direct evidence".
 
 Pro tools such as Flux aim at engineers. A debugger that explains *why* is
 also the clearer pitch.
@@ -96,12 +98,27 @@ One feature, `debug`, named the same on both sides
    shows which ICs have pin data and which don't.
 4. **Output.** Ranked hypotheses showing the nets and pins involved, how to
    confirm, and the fix, followed by open questions the input can't
-   answer. Every claim carries a source label: netlist, ERC, datasheet,
-   bench (a measurement the user entered) or inferred. The backend
-   checks each cited net, pin and ERC entry against the parsed input and
-   downgrades anything it can't trace to inferred, so the label comes
-   from code, not from the model. Progress and results stream over SSE,
-   because a run takes about two minutes.
+   answer. Every claim is one fact with an evidence label: schematic, ERC,
+   datasheet (the pin table), measurement (a value the user entered) or
+   none. The backend resolves every citation against the parsed input and
+   drops a claim to none when one fails or when the text names a pin or
+   net it doesn't cite. See `DECISIONS.md`, "Evidence labels are checked
+   references, not verified conclusions". The contract is
+   `backend/app/features/debug/schemas.py`, and the checker is
+   `evidence.py`.
+   - Confirm steps say whether they test the cause or only check that the
+     board matches the schematic. A step that changes the board lists the
+     full intended rewiring (`setup`) and what each reading establishes.
+   - Rework stays at pin and part level, since there's no PCB data.
+   - The run takes about two minutes, and the model streams nothing for
+     the first ~90 s (no reasoning text comes through the gateway). So
+     the SSE stream sends the design summary at once, then our own stage
+     updates, then the result. The UI shows elapsed time. Cards don't
+     arrive one by one. The debug call needs its own timeout, longer
+     than `AI_TIMEOUT_S` (120 s per read), because a go/no-go run took
+     130 s.
+   - Each numbered symptom keeps its template field ("Fails: battery"). A
+     test run without the fields couldn't tell which supplies passed.
 5. **Add a measurement and re-run** (once 1–4 work). Under each confirm
    step the user can enter what they measured. It's added to the input
    as a bench source and the analysis runs again, with the earlier runs
@@ -176,8 +193,9 @@ apart from linters that run before fab.
 ## Product risks
 
 - **Trust.** One confident wrong claim and engineers stop believing it.
-  The source labels and pin lookup are the mitigation, which is why both
-  are in the MVP.
+  The evidence labels and pin lookup are the mitigation, which is why both
+  are in the MVP. The labels only prove the cited facts exist; a wrong
+  conclusion drawn from true facts still gets through.
 - **A narrow slice.** Many bring-up faults aren't in the schematic.
   Position it accordingly.
 - **Thin evidence.** One case. Fix that before claiming anything in the
