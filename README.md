@@ -1,48 +1,82 @@
 # Häxrök
 
-A lean full-stack template: FastAPI + React + Postgres, with all AI concerns
-delegated to an external OpenAI-compatible gateway (e.g.
-[Bifrost](https://github.com/maximhq/bifrost)). The repo builds the application
-layer — features, not infrastructure.
+*Hunt down the fault before the magic smoke escapes.*
 
-Extracted from Fulcrum's structure with the ceremony removed. The rules that
-survived live in `AGENTS.md`; the reasoning lives in `DECISIONS.md`.
+Häxrök (Swedish for "witch smoke") is a schematic debugger. You give it your
+KiCad netlist and describe the symptom you see on the bench. It ranks root-cause
+hypotheses and labels every claim *confirmed* (follows from the netlist, ERC
+or the part's datasheet pins) or *inferred*. The next step, planned, is to
+**check the top hypothesis with an ngspice simulation**.
+
+Most AI schematic tools are linters that run before fab. Häxrök works the other
+way round, starting from a board that already misbehaves.
+
+Built for the Meta Global AI Developer Hackathon (2026).
+
+## Status
+
+Work in progress.
+
+Scope, the go/no-go result and the ideas weighed against this one are in
+[`docs/plans/001-100/001-mvp-scope.md`](docs/plans/001-100/001-mvp-scope.md).
+
+- [x] Eval harness and the first real case (`evals/`)
+- [x] Go/no-go: does the model find the bug? It found it #1 from the
+      netlist alone, so it's a go (`evals/README.md`)
+- [ ] MVP debug feature: netlist and ERC upload, symptom box, pin-function
+      lookup, ranked hypotheses with source labels
+- [ ] Stretch: ngspice check with waveforms, agent loop, pre-fab review
+      mode
+
+The app code is still the template it was started from (a FastAPI,
+React and Postgres template). The seed chat, voice and image features are
+still there and will be replaced by the debug feature.
 
 ## Quick start
 
 ```sh
-make dev        # generates .env, starts shared infra, creates this copy's DB,
+make dev        # generates .env, starts shared infra, creates the DB,
                 # then starts backend + frontend
 ```
 
 Then open the printed frontend port (default http://localhost:5173).
 
-PostgreSQL (and Redis) are shared per machine via `docker-compose.infra.yml`
-(`make infra` is a no-op once running); each copy gets its own database.
+### Model gateway
 
-### Pointing at a gateway
+All model calls go through an OpenAI-compatible gateway
+([Bifrost](https://github.com/maximhq/bifrost)). Set these in `.env`:
 
-The app talks to any OpenAI-compatible endpoint via `AI_BASE_URL` in `.env`:
+```
+AI_BASE_URL=http://<bifrost-host>:<port>/v1
+AI_API_KEY=<Bifrost virtual key>
+AI_CHAT_MODEL=meta/muse-spark-1.3-contributor
+```
 
-- **Bifrost** (recommended): run it separately, then set
-  `AI_BASE_URL=http://host.docker.internal:8080/v1` and `AI_API_KEY` to a
-  Bifrost virtual key. Provider keys, routing, budgets, and observability
-  are configured in Bifrost — not here.
-- **Direct**: leave `AI_BASE_URL` empty and set `AI_API_KEY` to an OpenAI key.
+Provider keys and routing are configured in Bifrost, not here. To switch
+models or providers, change the gateway config or these variables. No code
+changes are needed.
+
+## Evals
+
+```sh
+python3 -I evals/gonogo.py --model meta/muse-spark-1.3-contributor
+```
+
+`evals/README.md` explains the cases, how to add one and how to read the
+results.
 
 ## Layout
 
 ```
 backend/app/
   main.py            # composition root
-  core/              # config, db, clock, logging, errors, responses,
-                     # middleware, storage, ai/ (the ONLY place AI is touched)
-  features/chat/     # feature: models, schemas, repository, service, router
-  features/speech/   # feature: push-to-talk transcribe + read-aloud synthesize
+  core/              # config, db, logging, errors, ai/ (the only place AI is called)
+  features/          # one package per feature
 frontend/src/
-  app/               # shell: main.tsx, App.tsx (routes), index.css
-  features/chat/     # index.ts is the public API
-  shared/            # ui/, api client (envelope unwrap), lib/
+  app/               # shell: routes, index.css
+  features/          # index.ts is each feature's public API
+  shared/            # ui/, api client, lib/
+evals/               # known-bug cases and the go/no-go harness
 ```
 
 ## Commands
@@ -50,28 +84,5 @@ frontend/src/
 `make dev` · `make lint` · `make test` · `make migrate` · `make revision m='…'` ·
 `make docs` · `make down` · `make purge`
 
-New here? `docs/operations/onboarding.md` is the cheat sheet. `make docs`
-regenerates `docs/architecture/` (schema, ER diagram, route inventory).
-
-`make issues` lists open GitHub issues; `make fix-issue n=<num> [agent=devin]`
-hands one to an agent CLI (`scripts/agent/fix-issue.sh`; devin, opencode, or
-claude — non-interactive, commits to `main` and closes the issue).
-
 Dependencies: `./scripts/docker/uv.sh add <pkg>` / `./scripts/docker/pnpm.sh add <pkg>`
-(run inside the containers, against the pinned lockfiles).
-
-## Seed feature
-
-Chat with voice input (mic → transcribe), voice output (read-aloud on
-assistant replies), and image generation (image-mode toggle in the composer).
-It exists to establish the patterns — replace it with whatever you're building.
-
-## Using it as a template
-
-The app name is config, not code:
-
-- `PROJECT_NAME` in `.env` is the display name — API title, startup log,
-  browser tab, docs site. `make dev` seeds it from the directory name, so
-  renaming the clone's directory does most of the work. The DB name
-  (`POSTGRES_DB`) and compose project name follow the directory the same way.
-- What's left is prose: this README, `AGENTS.md`, `docs/`.
+(they run inside the containers, against the pinned lockfiles).
