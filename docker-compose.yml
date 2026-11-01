@@ -1,0 +1,89 @@
+# App containers — one set per project copy.
+#
+# Rules for editing this file:
+#   - Do NOT add PostgreSQL or Redis here; they live in docker-compose.infra.yml
+#     and are shared across every copy on this machine.
+#   - Do NOT hardcode host ports. They come from .env, which scripts/setup/env.sh
+#     generates with non-conflicting values so several copies can run at once.
+#   - Postgres is reached via the shared infra_default network using the compose
+#     service name (postgres) as hostname. The per-copy database
+#     (POSTGRES_DB in .env) is created by scripts/db/create.sh on `make dev`.
+#   - The AI gateway is NOT a service here. The app talks to any
+#     OpenAI-compatible endpoint via AI_BASE_URL; where that endpoint lives
+#     (Bifrost, a cloud provider, ...) is deployment config, not repo code.
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Internal DSN — reaches the shared infra postgres by service name on
+      # the infra_default network. POSTGRES_DB is this copy's database.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app}
+      # Internal URL — shared infra redis by service name on infra_default.
+      REDIS_URL: redis://redis:6379/0
+      BACKEND_CORS_ORIGINS: http://localhost:${FRONTEND_HOST_PORT:-5173}
+    ports:
+      - "${BACKEND_HOST_PORT:-8000}:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+      - ./backend/tests:/app/tests
+      - ./backend/pyproject.toml:/app/pyproject.toml
+      - ./backend/uv.lock:/app/uv.lock
+      - ./backend/docker-entrypoint.sh:/app/docker-entrypoint.sh
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # `make docs` runs /app/scripts/docs/generate.py, which writes into /docs.
+      # `make docs-serve` runs mkdocs with config at /mkdocs.yml over /docs.
+      - ./backend/scripts:/app/scripts
+      - ./docs:/docs
+      - ./mkdocs.yml:/mkdocs.yml:ro
+      - uv_cache:/uv-cache
+    extra_hosts:
+      # Lets AI_BASE_URL reach a gateway running on the host machine.
+      - "host.docker.internal:host-gateway"
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+    networks:
+      - default
+      - infra_default
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      VITE_API_URL: http://localhost:${BACKEND_HOST_PORT:-8000}
+      # PROJECT_NAME is the single display-name knob; vite needs the VITE_
+      # prefix to expose it to the client (browser tab title).
+      VITE_APP_NAME: ${PROJECT_NAME:-App}
+    ports:
+      - "${FRONTEND_HOST_PORT:-5173}:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/pnpm-lock.yaml:/app/pnpm-lock.yaml
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+      - ./frontend/components.json:/app/components.json
+      - ./frontend/eslint.config.js:/app/eslint.config.js
+      - ./frontend/docker-entrypoint.sh:/app/docker-entrypoint.sh
+      - pnpm_store:/pnpm/store
+    depends_on:
+      - backend
+    command: pnpm dev --host 0.0.0.0
+
+networks:
+  infra_default:
+    external: true
+
+volumes:
+  uv_cache:
+  pnpm_store:

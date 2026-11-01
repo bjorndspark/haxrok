@@ -1,0 +1,52 @@
+# MkDocs config — served by `make docs-serve` inside the backend container,
+# which bind-mounts this file at /mkdocs.yml and ./docs at /docs (docs_dir is
+# resolved relative to this file, so `docs` is correct in both places).
+# site_name follows PROJECT_NAME from .env — `make docs-serve` runs mkdocs in
+# the backend container, which has .env injected via env_file.
+site_name: !ENV [PROJECT_NAME, "App"]
+site_description: Operations, architecture, and process docs
+docs_dir: docs
+site_dir: /tmp/mkdocs-site
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.action.view
+
+# No `nav` — MkDocs builds navigation from the file tree, so new plans,
+# postmortems, and runbooks show up without editing this file.
+# awesome-nav reads .nav.yml in a directory to override its section title
+# (e.g. `title: API` instead of the auto-derived "Api").
+plugins:
+  - search
+  - awesome-nav
+
+# Pan/zoom controls for Mermaid diagrams (paths are relative to docs_dir).
+extra_javascript:
+  - assets/diagram-zoom.js
+extra_css:
+  - assets/diagram-zoom.css
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

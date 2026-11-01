@@ -1,0 +1,64 @@
+name: dependabot-automerge
+
+# Squash-merge Dependabot PRs once their checks pass — minor/patch bumps
+# only; majors stay open for human review. A PR whose checks fail stays
+# open (this job exits red).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v3
+
+      - name: Leave major updates for review
+        # update-type is the highest semver change in the PR (groups too).
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        run: echo "Major update — PR #${{ github.event.pull_request.number }} stays open for review."
+
+      - name: Wait for checks, then squash-merge
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Path-filtered workflows register their checks some seconds after
+          # the PR event, so "no checks yet" doesn't mean "no checks". The
+          # old version merged inside that window and landed red PRs. Poll
+          # this PR's checks (minus this job) for a grace period, then until
+          # every one has finished.
+          grace=90
+          deadline=3600
+          while :; do
+            rollup="$(gh pr view "$PR" --json statusCheckRollup --jq \
+              '[.statusCheckRollup[] | select(.workflowName != "dependabot-automerge")]')"
+            total=$(jq length <<<"$rollup")
+            pending=$(jq '[.[] | select(.status != "COMPLETED")] | length' <<<"$rollup")
+            failed=$(jq '[.[] | select(.status == "COMPLETED"
+              and (.conclusion | IN("SUCCESS", "SKIPPED", "NEUTRAL") | not))] | length' <<<"$rollup")
+            if [ "$failed" -gt 0 ]; then
+              echo "Checks failed — leaving PR #$PR open."
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$grace" ] && [ "$pending" -eq 0 ]; then
+              # total=0: the PR touches no gated path — nothing to wait on.
+              echo "$total check(s) passed."
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "Timed out waiting for checks."
+              exit 1
+            fi
+            sleep 15
+          done
+          gh pr merge "$PR" --squash --delete-branch

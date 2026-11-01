@@ -1,0 +1,41 @@
+version: 2
+updates:
+  # GitHub Actions — the workflow `uses:` pins (checkout, setup-uv,
+  # setup-node, pnpm/action-setup) across backend.yml / frontend.yml.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Frontend — Dependabot reads frontend/pnpm-lock.yaml.
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Backend — Dependabot reads backend/uv.lock (uv ecosystem).
+  - package-ecosystem: "uv"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    groups:
+      uv-minor-patch:
+        update-types: ["minor", "patch"]

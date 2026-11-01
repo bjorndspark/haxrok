@@ -1,0 +1,68 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "FastAPI backend behind an OpenAI-compatible gateway"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.142.2",
+    "uvicorn[standard]>=0.54.0",
+    # [asyncio]: 2.1 no longer installs greenlet by default, and the async
+    # engine can't import without it.
+    "sqlalchemy[asyncio]>=2.1.1",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.3.6",
+    "asyncpg>=0.30",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "python-multipart>=0.0.12",
+    "openai>=3.22.1",
+    "sse-starlette>=3.5.0",
+    "httpx>=0.27",
+    "redis>=8.1.0",
+]
+
+[project.optional-dependencies]
+# VOICE_ECHO_CANCELLER=webrtc (pulls numpy). Optional: the code degrades to
+# browser-only AEC when it's missing. Dev/CI install it so its tests run;
+# images opt in with the UV_EXTRAS build arg.
+webrtc = [
+    "pywebrtc-audio>=0.2.0",
+]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "aiosqlite>=0.20",
+    "ruff>=0.16.10",
+    "mypy>=2.4.0",
+    "mkdocs-material>=9.7.7",
+    "mkdocs-awesome-nav>=3.3.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+# G = flake8-logging-format (no f-strings in log calls), N = pep8-naming.
+select = ["E", "F", "I", "UP", "B", "SIM", "G", "N"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["N806"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# The async engine/sessionmaker is module-global; share one event loop across
+# the whole session so pooled connections aren't reused across per-test loops.
+asyncio_default_test_loop_scope = "session"
+asyncio_default_fixture_loop_scope = "session"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]

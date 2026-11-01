@@ -1,0 +1,50 @@
+/* Pan/zoom viewport for Mermaid diagrams — see diagram-zoom.js. */
+.md-typeset .diagram-zoom {
+  position: relative;
+  overflow: hidden;
+  margin: 1em 0;
+  border: 0.05rem solid var(--md-default-fg-color--lightest);
+  border-radius: 0.2rem;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.md-typeset .diagram-zoom--dragging {
+  cursor: grabbing;
+}
+
+/* Out of flow so the host shrink-wraps the SVG (its natural size), and
+   transformed from the top-left corner so the pan/zoom math stays simple. */
+.md-typeset .diagram-zoom__content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  transform-origin: 0 0;
+}
+
+.md-typeset .diagram-zoom__controls {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: flex;
+  gap: 0.2rem;
+}
+
+.md-typeset .diagram-zoom__controls button {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 0.05rem solid var(--md-default-fg-color--lightest);
+  border-radius: 0.2rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color--light);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.md-typeset .diagram-zoom__controls button:hover {
+  color: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+}

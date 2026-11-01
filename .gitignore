@@ -1,0 +1,32 @@
+# Secrets — .env.example is the only env file that should be committed
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+test.db
+.uv-sync-stamp
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+.pnpm-install-stamp
+
+# Runtime artifacts (dirs stay, contents ignored)
+data/*
+!data/.gitkeep
+logs/*
+!logs/.gitkeep
+!logs/backend/
+logs/backend/*
+!logs/backend/.gitkeep
+!logs/frontend/
+logs/frontend/*
+!logs/frontend/.gitkeep

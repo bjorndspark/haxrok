@@ -1,0 +1,50 @@
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths: [backend/**, .github/workflows/backend.yml]
+  pull_request:
+    paths: [backend/**, .github/workflows/backend.yml]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --frozen --extra dev --extra webrtc
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy app
+      - run: uv run pytest
+
+  # Unit tests run on SQLite; this is the one place migrations meet a real
+  # Postgres: they must apply from scratch and match the models exactly.
+  migrations:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --frozen
+      - run: uv run alembic upgrade head
+      - run: uv run alembic check
