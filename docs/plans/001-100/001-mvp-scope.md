@@ -43,9 +43,25 @@ accuracy. See the next steps below.
 One feature, `debug`, named the same on both sides
 (`backend/app/features/debug/`, `frontend/src/features/debug/`).
 
-1. **Input.** Upload a KiCad `.net` and, optionally, the ERC report, and
-   type the bench symptoms. The backend compacts the netlist with the
-   `evals/compact_netlist.py` logic (moved into the feature).
+1. **Input.** Drop the KiCad project folder onto the page (or pick it
+   with a folder button), and type the bench symptoms. The user doesn't
+   export anything by hand.
+   - The frontend sends only the `.kicad_pro` and `*.kicad_sch` files,
+     so the PCB, backups and 3D models stay on the user's machine. A
+     single `.kicad_sch` also works for a flat, one-sheet project.
+   - The backend finds the root sheet (the one named after the
+     `.kicad_pro`) and checks that every sub-sheet it references was
+     sent. If one is missing, it names the file instead of running.
+   - It runs `kicad-cli sch export netlist` and `kicad-cli sch erc`,
+     with a timeout, and drops ERC warnings caused only by missing
+     symbol libraries. The schematics embed their symbols, so the
+     libraries aren't needed.
+   - It compacts the netlist with the `evals/compact_netlist.py` logic
+     (moved into the feature).
+   - The backend image installs Debian's `kicad` package without
+     recommends (no libraries). Its `kicad-cli` must be at least as new
+     as the user's KiCad, because older versions can't open newer
+     files.
 2. **One model call.** It uses the `gonogo.py` prompt through
    `app/core/ai/` with `AI_CHAT_MODEL`.
 3. **Pin-function lookup.** For each IC on the board it gives the model

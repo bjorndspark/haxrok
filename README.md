@@ -23,7 +23,8 @@ Scope, the go/no-go result and the ideas weighed against this one are in
 - [x] Eval harness and the first real case (`evals/`)
 - [x] Go/no-go: does the model find the bug? It found it #1 from the
       netlist alone, so it's a go (`evals/README.md`)
-- [ ] MVP debug feature: netlist and ERC upload, symptom box, pin-function
+- [ ] MVP debug feature: KiCad project folder drop (netlist and ERC are
+      extracted by the backend), symptom box, pin-function
       lookup, ranked hypotheses with source labels
 - [ ] Stretch: ngspice check with waveforms, agent loop, pre-fab review
       mode
