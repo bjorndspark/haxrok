@@ -1,0 +1,125 @@
+ERC report
+
+***** Sheet /
+[lib_symbol_issues]: Symbol '+3V3' has been modified in library 'power'
+    ; warning
+    @(99.0600 mm, 38.1000 mm): Symbol #PWR010 [+3V3]
+[lib_symbol_issues]: Symbol '+1V1' has been modified in library 'power'
+    ; warning
+    @(83.8200 mm, 38.1000 mm): Symbol #PWR08 [+1V1]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(88.9000 mm, 133.3500 mm): Symbol U1 Pin 57 [GND, Power input, Line]
+[lib_symbol_issues]: Symbol 'RP2040' has been modified in library 'MCU_RaspberryPi'
+    ; warning
+    @(88.9000 mm, 87.6300 mm): Symbol U1 [RP2040]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(63.5000 mm, 125.7300 mm): Symbol #PWR07 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(88.9000 mm, 133.3500 mm): Symbol #PWR09 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(55.8800 mm, 100.3300 mm): Symbol #PWR06 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(27.9400 mm, 180.3400 mm): Symbol #PWR05 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(30.4800 mm, 100.3300 mm): Symbol #PWR01 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(27.9400 mm, 157.4800 mm): Symbol #PWR03 [GND]
+[lib_symbol_issues]: Symbol '+3V3' has been modified in library 'power'
+    ; warning
+    @(27.9400 mm, 172.7200 mm): Symbol #PWR04 [+3V3]
+[lib_symbol_issues]: Symbol '+1V1' has been modified in library 'power'
+    ; warning
+    @(27.9400 mm, 149.8600 mm): Symbol #PWR02 [+1V1]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(199.3900 mm, 33.0200 mm): Symbol #PWR019 [GND]
+[lib_symbol_issues]: Symbol '+5V' has been modified in library 'power'
+    ; warning
+    @(219.7100 mm, 40.6400 mm): Symbol #PWR021 [+5V]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(237.4900 mm, 50.8000 mm): Symbol #PWR024 [GND]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(176.5300 mm, 26.6700 mm): Symbol #PWR014 Hidden pin 1 [VBUS, Power input, Line]
+[lib_symbol_issues]: Symbol 'VBUS' has been modified in library 'power'
+    ; warning
+    @(176.5300 mm, 26.6700 mm): Symbol #PWR014 [VBUS]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(199.3900 mm, 26.6700 mm): Symbol #PWR018 Hidden pin 1 [+5V, Power input, Line]
+[lib_symbol_issues]: Symbol '+5V' has been modified in library 'power'
+    ; warning
+    @(199.3900 mm, 26.6700 mm): Symbol #PWR018 [+5V]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(151.1300 mm, 180.3400 mm): Symbol #PWR011 [GND]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(242.5700 mm, 40.6400 mm): Symbol U3 Pin 1 [VIN, Power input, Line]
+[lib_symbol_issues]: Symbol '+3V3' has been modified in library 'power'
+    ; warning
+    @(264.1600 mm, 40.6400 mm): Symbol #PWR031 [+3V3]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(251.4600 mm, 50.8000 mm): Symbol #PWR028 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(264.1600 mm, 50.8000 mm): Symbol #PWR032 [GND]
+[lib_symbol_issues]: Symbol 'USB_C_Receptacle_USB2.0' not found in symbol library 'Connector'
+    ; warning
+    @(160.0200 mm, 41.9100 mm): Symbol J1 [USB_C_Receptacle_USB2.0]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(160.0200 mm, 64.7700 mm): Symbol #PWR013 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(152.4000 mm, 64.7700 mm): Symbol #PWR012 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(214.6300 mm, 146.0500 mm): Symbol #PWR020 [GND]
+[lib_symbol_issues]: Symbol 'SW_Push' has been modified in library 'Switch'
+    ; warning
+    @(214.6300 mm, 140.9700 mm): Symbol SW1 [SW_Push]
+[lib_symbol_issues]: Symbol '+3V3' has been modified in library 'power'
+    ; warning
+    @(261.6200 mm, 85.0900 mm): Symbol #PWR029 [+3V3]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(220.9800 mm, 99.0600 mm): Symbol #PWR023 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(261.6200 mm, 92.7100 mm): Symbol #PWR030 [GND]
+[lib_symbol_issues]: Symbol '+3V3' has been modified in library 'power'
+    ; warning
+    @(232.4100 mm, 125.7300 mm): Symbol #PWR025 [+3V3]
+[lib_symbol_issues]: Symbol '+3V3' has been modified in library 'power'
+    ; warning
+    @(186.6900 mm, 128.2700 mm): Symbol #PWR017 [+3V3]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(186.6900 mm, 123.1900 mm): Symbol #PWR016 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(232.4100 mm, 146.0500 mm): Symbol #PWR026 [GND]
+[lib_symbol_issues]: Symbol 'SW_Push' has been modified in library 'Switch'
+    ; warning
+    @(232.4100 mm, 140.9700 mm): Symbol SW2 [SW_Push]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(247.6500 mm, 146.0500 mm): Symbol #PWR027 [GND]
+[lib_symbol_issues]: Symbol '+3V3' has been modified in library 'power'
+    ; warning
+    @(177.8000 mm, 81.2800 mm): Symbol #PWR015 [+3V3]
+[lib_symbol_issues]: Symbol '+3V3' has been modified in library 'power'
+    ; warning
+    @(220.9800 mm, 78.7400 mm): Symbol #PWR022 [+3V3]
+
+ ** ERC messages: 40  Errors 4  Warnings 36

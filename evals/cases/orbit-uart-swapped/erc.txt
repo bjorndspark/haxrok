@@ -1,0 +1,363 @@
+ERC report
+
+***** Sheet /
+[lib_symbol_issues]: Symbol 'STM32F030C8Tx' has been modified in library 'MCU_ST_STM32F0'
+    ; warning
+    @(118.1100 mm, 82.5500 mm): Symbol U16 [STM32F030C8Tx]
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(49.5300 mm, 81.2800 mm): Symbol #PWR019 [+3.3V]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(27.9400 mm, 95.2500 mm): Symbol #PWR026 [GND]
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(21.5900 mm, 111.7600 mm): Symbol #PWR027 [+3.3V]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(59.6900 mm, 36.8300 mm): Symbol #PWR07 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(48.2600 mm, 86.3600 mm): Symbol #PWR023 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(71.1200 mm, 133.3500 mm): Symbol #PWR031 [GND]
+[lib_symbol_issues]: The current configuration does not include the library 'Korean Hroparts Elec SPDT'
+    ; warning
+    @(49.5300 mm, 49.5300 mm): Symbol BOOT0 [K3-1270L-F1]
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(29.2100 mm, 81.2800 mm): Symbol #PWR018 [+3.3V]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(115.5700 mm, 41.9100 mm): Symbol U16 Pin 1 [VDD, Power input, Line]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(120.6500 mm, 33.0200 mm): Symbol #PWR05 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(96.5200 mm, 33.0200 mm): Symbol #PWR04 [GND]
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(64.7700 mm, 36.8300 mm): Symbol #PWR08 [+3.3V]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(85.0900 mm, 33.0200 mm): Symbol #PWR03 [GND]
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(115.5700 mm, 21.5900 mm): Symbol #PWR01 [+3.3V]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(71.1200 mm, 73.6600 mm): Symbol #PWR016 [GND]
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(86.3600 mm, 85.0900 mm): Symbol #PWR022 [+3.3V]
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(77.4700 mm, 85.0900 mm): Symbol #PWR021 [+3.3V]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(81.2800 mm, 73.6600 mm): Symbol #PWR017 [GND]
+[pin_to_pin]: Pins of type Bidirectional and Power output are connected
+    ; warning
+    @(237.4900 mm, 133.3500 mm): Symbol U22 Pin 3 [GND, Bidirectional, Line]
+    @(199.3900 mm, 146.0500 mm): Symbol USB1 Pin 5 [GND, Power output, Line]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(222.2500 mm, 127.0000 mm): Symbol #PWR029 [GND]
+[lib_symbol_issues]: The current configuration does not include the library 'CP2102-GMR'
+    ; warning
+    @(257.8100 mm, 135.8900 mm): Symbol U22 [INTERFACE-CP2102-GMR_QFN28_]
+[pin_to_pin]: Pins of type Bidirectional and Power output are connected
+    ; warning
+    @(247.6500 mm, 115.5700 mm): Symbol U22 Pin 29 [GND@1, Bidirectional, Line]
+    @(199.3900 mm, 146.0500 mm): Symbol USB1 Pin 5 [GND, Power output, Line]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(247.6500 mm, 114.3000 mm): Symbol #PWR038 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(213.3600 mm, 127.0000 mm): Symbol #PWR028 [GND]
+[lib_symbol_issues]: The current configuration does not include the library 'Korean Hroparts Elec SPDT'
+    ; warning
+    @(257.8100 mm, 22.6060 mm): Symbol PWR1 [K3-1270L-F1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(255.2700 mm, 14.9860 mm): Vertical Wire, length 1.2700 mm
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(239.2680 mm, 35.5600 mm): Symbol #PWR06 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(260.3500 mm, 27.6860 mm): Vertical Wire, length 7.8740 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(260.3500 mm, 27.6860 mm): Symbol PWR1 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(260.3500 mm, 14.9860 mm): Vertical Wire, length 1.2700 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(255.2700 mm, 27.6860 mm): Vertical Wire, length 1.5240 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(192.2780 mm, 29.2100 mm): Horizontal Wire, length 2.7940 mm
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(260.6040 mm, 43.1800 mm): Symbol #PWR010 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(260.6040 mm, 38.1000 mm): Vertical Wire, length 5.0800 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(260.6040 mm, 38.1000 mm): Horizontal Wire, length 11.1760 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(260.6040 mm, 43.1800 mm): Symbol #PWR010 Hidden pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(199.3900 mm, 149.8600 mm): Symbol #PWR032 [GND]
+[pin_to_pin]: Pins of type Bidirectional and Power output are connected
+    ; warning
+    @(237.4900 mm, 143.5100 mm): Symbol U22 Pin 7 [REGIN, Bidirectional, Line]
+    @(205.7400 mm, 130.8100 mm): Symbol USB1 Pin 1 [VBUS, Power output, Line]
+[pin_to_pin]: Pins of type Bidirectional and Power output are connected
+    ; warning
+    @(250.1900 mm, 156.2100 mm): Symbol U22 Pin 8 [VBUS, Bidirectional, Line]
+    @(205.7400 mm, 130.8100 mm): Symbol USB1 Pin 1 [VBUS, Power output, Line]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(213.3600 mm, 152.4000 mm): Symbol #PWR034 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(222.2500 mm, 152.4000 mm): Symbol #PWR033 [GND]
+[lib_symbol_issues]: Symbol '+BATT' has been modified in library 'power'
+    ; warning
+    @(200.6600 mm, 71.1200 mm): Symbol #PWR013 [+BATT]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(200.6600 mm, 72.6440 mm): Vertical Wire, length 2.5400 mm
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(264.9220 mm, 70.3580 mm): Symbol #PWR012 [+3.3V]
+[lib_symbol_issues]: The current configuration does not include the library 'DFE201612E-2R2M_P2'
+    ; warning
+    @(228.6000 mm, 60.9600 mm): Symbol L1 [DFE201612E-2R2M=P2]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(213.3600 mm, 94.4880 mm): Symbol #PWR024 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(200.6600 mm, 82.2960 mm): Symbol #PWR020 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(200.6600 mm, 80.2640 mm): Vertical Wire, length 2.0320 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(200.6600 mm, 71.1200 mm): Vertical Wire, length 1.5240 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(200.6600 mm, 72.6440 mm): Horizontal Wire, length 8.8900 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(200.6600 mm, 75.1840 mm): Symbol C14 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(200.6600 mm, 82.2960 mm): Symbol #PWR020 Hidden pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(209.5500 mm, 72.6440 mm): Horizontal Wire, length 3.8100 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(220.9800 mm, 60.9600 mm): Vertical Wire, length 1.5240 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(236.2200 mm, 60.9600 mm): Vertical Wire, length 1.5240 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(256.0320 mm, 72.6440 mm): Horizontal Wire, length 8.8900 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(256.0320 mm, 72.6440 mm): Symbol R7 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(213.3600 mm, 77.7240 mm): Horizontal Wire, length 3.8100 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(213.3600 mm, 82.8040 mm): Vertical Wire, length 10.1600 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(213.3600 mm, 92.9640 mm): Vertical Wire, length 1.5240 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(213.3600 mm, 77.7240 mm): Symbol U15 Pin 1 [EN, Input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(213.3600 mm, 94.4880 mm): Symbol #PWR024 Hidden pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(209.5500 mm, 77.7240 mm): Vertical Wire, length 5.0800 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(243.8400 mm, 80.2640 mm): Horizontal Wire, length 4.5720 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(243.8400 mm, 72.6440 mm): Horizontal Wire, length 4.5720 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(248.4120 mm, 72.6440 mm): Horizontal Wire, length 7.6200 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(248.4120 mm, 72.6440 mm): Symbol R6 Pin 1 [Passive, Line]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(231.6480 mm, 47.4980 mm): Symbol #PWR011 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.6480 mm, 46.9900 mm): Vertical Wire, length 0.5080 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.6480 mm, 47.4980 mm): Symbol #PWR011 Hidden pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(228.0920 mm, 46.9900 mm): Horizontal Wire, length 3.5560 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(228.0920 mm, 38.1000 mm): Horizontal Wire, length 3.5560 mm
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(228.0920 mm, 29.2100 mm): Symbol U1 Pin 3 [VBAT, Input, Line]
+[lib_symbol_issues]: Symbol '+BATT' has been modified in library 'power'
+    ; warning
+    @(239.2680 mm, 27.4320 mm): Symbol #PWR02 [+BATT]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(228.0920 mm, 29.2100 mm): Horizontal Wire, length 11.1760 mm
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(195.0720 mm, 38.3540 mm): Symbol #PWR09 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(206.5020 mm, 37.5920 mm): Vertical Wire, length 0.5080 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(195.0720 mm, 37.3380 mm): Vertical Wire, length 1.0160 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(195.0720 mm, 38.3540 mm): Symbol #PWR09 Hidden pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(206.5020 mm, 29.2100 mm): Horizontal Wire, length 11.4300 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(195.0720 mm, 29.2100 mm): Vertical Wire, length 3.0480 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(206.5020 mm, 29.2100 mm): Vertical Wire, length 0.7620 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(206.5020 mm, 29.2100 mm): Horizontal Wire, length 3.8100 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(206.5020 mm, 29.9720 mm): Symbol R1 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(195.0720 mm, 32.2580 mm): Symbol C8 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.6480 mm, 46.2280 mm): Symbol R3 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.6480 mm, 46.2280 mm): Vertical Wire, length 0.7620 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.6480 mm, 38.1000 mm): Vertical Wire, length 0.5080 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(206.5020 mm, 46.9900 mm): Horizontal Wire, length 3.8100 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(206.5020 mm, 46.9900 mm): Vertical Wire, length 1.2700 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(210.3120 mm, 46.9900 mm): Symbol U1 Pin 1 [STAT, Input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(206.5020 mm, 45.7200 mm): Symbol D1 Pin 1 [K, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(239.2680 mm, 34.2900 mm): Vertical Wire, length 1.2700 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(239.2680 mm, 35.5600 mm): Symbol #PWR06 Hidden pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(239.2680 mm, 29.2100 mm): Horizontal Wire, length 16.0020 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(239.2680 mm, 27.4320 mm): Symbol #PWR02 Hidden pin 1 [+BATT, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(239.2680 mm, 29.2100 mm): Symbol C7 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(239.2680 mm, 27.4320 mm): Vertical Wire, length 1.7780 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(243.8400 mm, 92.9640 mm): Horizontal Wire, length 12.1920 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(243.8400 mm, 85.3440 mm): Horizontal Wire, length 12.1920 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(264.9220 mm, 92.9640 mm): Vertical Wire, length 2.0320 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(264.9220 mm, 79.2480 mm): Vertical Wire, length 13.7160 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(256.0320 mm, 80.2640 mm): Vertical Wire, length 5.0800 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(264.9220 mm, 72.6440 mm): Vertical Wire, length 1.5240 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(264.9220 mm, 70.3580 mm): Vertical Wire, length 2.2860 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(264.9220 mm, 70.3580 mm): Symbol #PWR012 Hidden pin 1 [+3.3V, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(264.9220 mm, 74.1680 mm): Symbol C13 Pin 1 [Passive, Line]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(264.9220 mm, 94.9960 mm): Symbol #PWR025 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(256.0320 mm, 92.9640 mm): Horizontal Wire, length 8.8900 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(264.9220 mm, 94.9960 mm): Symbol #PWR025 Hidden pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(256.0320 mm, 85.3440 mm): Symbol R8 Pin 1 [Passive, Line]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(55.8800 mm, 173.9900 mm): Symbol #PWR035 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(80.0100 mm, 173.9900 mm): Symbol #PWR036 [GND]
+[lib_symbol_issues]: Symbol '+3.3V' has been modified in library 'power'
+    ; warning
+    @(55.8800 mm, 191.7700 mm): Symbol #PWR037 [+3.3V]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(118.1100 mm, 127.0000 mm): Symbol #PWR030 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(146.0500 mm, 72.3900 mm): Symbol #PWR015 [GND]
+[lib_symbol_issues]: Symbol 'GND' has been modified in library 'power'
+    ; warning
+    @(138.4300 mm, 72.3900 mm): Symbol #PWR014 [GND]
+
+ ** ERC messages: 118  Errors 2  Warnings 116
