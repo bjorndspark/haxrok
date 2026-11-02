@@ -26,7 +26,18 @@ SYSTEM = (
     "Give your top 3 root-cause hypotheses, ranked. For each: the exact nets/pins "
     "involved, the mechanism that produces the observed symptoms, how to confirm it "
     "(measurement or simulation), and the fix. Mark each claim as CONFIRMED (follows "
-    "directly from the netlist/ERC given) or INFERRED."
+    "directly from the netlist/ERC given) or INFERRED.\n\n"
+    # Rule against invented design faults: the model recalls part specs from memory,
+    # and in the no-fault eval it called a correct part an error and told the user
+    # to rework it. See DECISIONS.md, "Datasheet facts come from memory until retrieval".
+    "Part facts you recall rather than read in the input (thresholds, reference "
+    "voltages, absolute maximums, internal pull-ups, recommended circuits, option "
+    "bits) are UNVERIFIED: say so each time, and name the datasheet section that would "
+    "settle it. Never call part of the design an error, or recommend reworking it, on "
+    "the strength of an unverified fact: make checking that fact the first confirm "
+    "step, and say no rework until it is checked. If the schematic looks correct for "
+    "the symptoms, say so plainly and rank causes outside the schematic (cable, solder, "
+    "damaged or wrong part, firmware, settings) instead of inventing a design fault."
 )
 
 

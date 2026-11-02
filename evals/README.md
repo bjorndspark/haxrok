@@ -93,6 +93,27 @@ failure the case exists to catch. Hallucinated part facts showed up in 3
 of 12 answers; this is the gap the pin-function lookup in plan 001 is
 meant to close.
 
+### With the unverified-facts rule
+
+The system prompt now says recalled part facts are UNVERIFIED, must name
+the datasheet section that settles them, and can't on their own justify
+calling the design wrong or recommending rework (see `DECISIONS.md`,
+"Datasheet facts come from memory until retrieval"). Same model, one run
+each:
+
+| Case | netlist | netlist+erc | Notes |
+|---|---|---|---|
+| `rust-board-fb-swapped` | #1 | #1 | The fix now waits on checking the SY8088 FB reference |
+| `rust-board-i2c-vbus` | #1 | #1 | |
+| `orbit-uart-swapped` | #1 | #1 | |
+| `orbit-boot0-high` | #1 | #1 | The made-up `BOOT_SEL` option byte is back at #2, but marked UNVERIFIED with RM0091 named to check it |
+| `rp-micro-ldo-en` | #1 | #1 | No made-up EN threshold numbers this time |
+| `rp-micro-no-fault` | MISS (cable #1) | PASS | netlist: #2 still calls the 1k R3 on XOUT "an anomaly" and proposes shorting it, though only after a datasheet check. netlist+erc: opens with "schematic looks correct" and ranks cable, solder and crystal assembly; R3's value stays an open question with no rework |
+
+Runs also got faster: 52–90 s, against 71–166 s before. The rule stopped
+unconditional rework of correct parts, but not the model suspecting them.
+One pass in two on the no-fault case is not a fix, and it's one run each.
+
 ## Reading the result
 
 | Outcome | Meaning |
