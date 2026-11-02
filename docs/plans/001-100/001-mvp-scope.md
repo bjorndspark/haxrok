@@ -64,6 +64,23 @@ Weaknesses seen, which the MVP has to address:
 This is one case, run once. That's enough to start building, not to claim
 accuracy. See the next steps below.
 
+### Planted-fault cases (2026-11-02)
+
+Five faults planted in three open-source boards, plus one unmodified board
+whose real cause is a charge-only USB cable. Per-case results are in
+`evals/README.md`. All five planted causes ranked #1 in both conditions.
+Planted faults are cleaner than real bugs, so this shows the reasoning
+carries across boards and fault kinds, not accuracy on real boards.
+
+New weakness:
+
+- **Invented design faults.** On the fault-free board, both runs put the
+  cable first but then called a correct part (the 1k series resistor on
+  the crystal, as in the Pico reference design) a design error and told
+  the user to rework it. Hallucinated part facts showed up in 3 of 12
+  answers. See `DECISIONS.md`, "Datasheet facts come from memory until
+  retrieval".
+
 ## MVP (in scope)
 
 One feature, `debug`, named the same on both sides
@@ -91,7 +108,10 @@ One feature, `debug`, named the same on both sides
 2. **One model call.** It starts from the `gonogo.py` prompt, reworded
    for hobbyists (see "Who it's for"), through `app/core/ai/` with
    `AI_CHAT_MODEL`. It returns structured JSON, not markdown, so the UI
-   can render it and the backend can check it.
+   can render it and the backend can check it. It carries the
+   `gonogo.py` rule on recalled part facts: they are unverified, and an
+   unverified fact alone never justifies calling the design wrong or
+   recommending rework.
 3. **Pin-function lookup.** For each IC on the board it gives the model
    the real pin names and functions, so it stops inventing them. This is
    the fix for the biggest weakness, so it's in the MVP. The MVP source is
@@ -201,16 +221,25 @@ apart from linters that run before fab.
   conclusion drawn from true facts still gets through.
 - **A narrow slice.** Many bring-up faults aren't in the schematic.
   Position it accordingly.
-- **Thin evidence.** One case. Fix that before claiming anything in the
-  pitch.
+- **Thin evidence.** One real case (private, not in the
+  repo) and six planted ones, each run once.
+  Planted cases aren't accuracy on real boards; don't pitch them as that.
 - **Market after the hackathon.** KiCad users spend less, so the paying
   segment is likely small hardware teams and consultancies.
 
 ## Next steps
 
 1. Rerun `gonogo.py` 2–3 times to check the ranking is stable.
-2. Add a second real-bug case, and one fault-free board to check it doesn't
-   invent a fault. Public KiCad repos with fix commits are a source of
-   labelled cases.
+2. Add a second real-bug case. Public KiCad repos with fix commits are a
+   source of labelled cases. (The fault-free board is done:
+   `rp-micro-no-fault`.)
 3. Build the MVP, then replace the template's seed chat, voice and image
    features.
+
+## After the hackathon
+
+- **Per-part datasheet retrieval.** For the ICs the top hypotheses rest
+  on: part number → datasheet PDF → pin table, key specs and reference
+  circuit, cited by page, with a drop-in PDF when lookup fails. It
+  replaces the hand-written pin table. See `DECISIONS.md`, "Datasheet
+  facts come from memory until retrieval".

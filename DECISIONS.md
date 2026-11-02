@@ -300,3 +300,40 @@ small, and the evals measure the rest. Free text outside claims (rework
 steps, summaries) isn't checked; the prompt carries those rules. The
 checker is text matching over refs like `U2.9` and net names, so prose
 like "pins 7 and 8" slips past it.
+
+## Datasheet facts come from memory until retrieval
+
+**Decision:** for the hackathon MVP, nothing fetches or reads datasheets.
+The model recalls part facts (reference voltages, thresholds, internal
+pull-ups, recommended circuits) from memory, and the prompt treats every
+recalled fact as unverified: it has to say so, name the datasheet section
+that would settle it, and never call part of the design an error or
+recommend rework on an unverified fact alone. If the schematic looks
+correct for the symptoms, it says so and ranks causes outside the
+schematic. The hand-written pin table (plan 001) still covers pin names
+for a handful of ICs.
+
+**Alternatives rejected:** per-part datasheet retrieval now (part number
+→ PDF → pin table, key specs and reference circuit, cited by page). It's
+the right next feature, but finding the right PDF from a value field
+that often says "LDO" or "~", and the extra latency on a call that
+already takes ~2 minutes, don't fit the hackathon. Checking the whole
+schematic against every datasheet, pin by pin: that's a design-review
+product for engineers before fab (Flux and others), not a debugger for
+a board on the bench.
+
+**Consequence:** the evals found every planted fault from memory alone,
+so retrieval isn't needed to find causes; it's needed for trust. Without
+it the model invents specs (two runs gave the RT9013 two different EN
+thresholds), invents chip features (an STM32F030 option byte that doesn't
+exist), and in the no-fault case called a correct part (the 1k series
+resistor on the RP2040 crystal, as in the Pico reference design) a design
+error and told the user to rework it. The prompt rule limits what
+unverified facts can lead to; it can't make them right. Measured on the
+evals: all five planted faults still ranked #1, the made-up threshold
+numbers went away, the made-up option byte came back marked unverified,
+and the no-fault case passed in one of its two conditions; the other
+still suspected the correct resistor, though it held rework until a
+datasheet check. A pin table only
+fixes pin names, not specs or reference circuits, so retrieval replaces
+it as the next feature after the hackathon.
