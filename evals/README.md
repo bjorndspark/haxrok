@@ -62,6 +62,37 @@ gitignored. The PASS?/MISS? it prints only checks the keywords on the
 must all match, `|` between alternatives; `none` prints READ), so read
 each answer to judge it.
 
+## Results: planted cases, 2026-11-02
+
+`meta/muse-spark-1.3-contributor`, one run per case and condition, each
+answer read by hand. Planted faults are cleaner than real bugs: one edit,
+honest symptoms written knowing the cause. This shows the model can reason
+across different boards and fault kinds, not how accurate it is on real
+boards.
+
+| Case | Condition | Rank of real cause | Time | Notes |
+|---|---|---|---|---|
+| `rust-board-fb-swapped` | netlist | #1 | 166 s | Computed 0.6 × (1 + 22.1/100) = 0.73 V and matched it to the measurement |
+| `rust-board-fb-swapped` | netlist+erc | #1 | 120 s | Same |
+| `rust-board-i2c-vbus` | netlist | #1 | 98 s | Worked out the on-battery idle level (~2.7 V) through R15; explained the 3.7 V clamp on USB |
+| `rust-board-i2c-vbus` | netlist+erc | #1 | 104 s | Same; #3 (VBUS-detect firmware) is a stretch |
+| `orbit-uart-swapped` | netlist | #1 | 93 s | Labelled symptom measurements CONFIRMED (the prompt reserves it for netlist/ERC) |
+| `orbit-uart-swapped` | netlist+erc | #1 | 121 s | Clean |
+| `orbit-boot0-high` | netlist | #1 | 94 s | Explained why it runs under the debugger. #2 suggests an external NRST pull-up (the STM32 has an internal one) |
+| `orbit-boot0-high` | netlist+erc | #1 | 84 s | #2 is an `nBOOT_SEL` option byte, which the STM32F030 doesn't have: hallucinated part fact |
+| `rp-micro-ldo-en` | netlist | #1 | 71 s | Used the bench-supply latch-on to confirm. EN threshold given as 1.2–1.5 V |
+| `rp-micro-ldo-en` | netlist+erc | #1 | 76 s | EN threshold given as 0.9–1.1 V: the two runs disagree, so neither is from a pin table |
+| `rp-micro-no-fault` | netlist | MISS (cable #1) | 83 s | #2 invents a schematic fault: calls the 1k series R3 on XOUT a design error ("remains even with a good cable"). The Pico reference design uses the same 1k |
+| `rp-micro-no-fault` | netlist+erc | MISS (cable #1) | 93 s | Same invented XOUT fault at #2, with a rework to short R3 |
+
+All five planted faults were ranked #1 in both conditions. ERC added
+nothing, as expected for faults chosen to be invisible to it. The no-fault
+case fails in both conditions: the cable is #1, but both runs also call a
+correct part a design error and recommend reworking it, which is the trust
+failure the case exists to catch. Hallucinated part facts showed up in 3
+of 12 answers; this is the gap the pin-function lookup in plan 001 is
+meant to close.
+
 ## Reading the result
 
 | Outcome | Meaning |
