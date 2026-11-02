@@ -120,6 +120,11 @@ class ReworkStep(_Strict):
 
 
 class Fix(_Strict):
+    """A part fact recalled from memory (a threshold, a reference voltage, a
+    recommended circuit) is unverified and never alone makes a part wrong. When
+    the cause depends on one, the hypothesis's first confirm step checks it, and
+    every change here says to make it only after that check."""
+
     schematic: list[str] = Field(description="Changes for the next revision of the schematic.")
     rework: list[ReworkStep] = Field(description="Bodges for the board on the bench.")
 
