@@ -62,12 +62,27 @@ def chat(base_url, api_key, model, prompt):
     return data["choices"][0]["message"]["content"], data.get("usage", {})
 
 
-def looks_like_pass(answer):
-    """Rough auto-check; read the answer to be sure."""
-    top = answer.lower()
-    return "l2" in top and ("vout" in top or "+3v3" in top) and (
-        "short" in top or "same net" in top or "merged" in top or "tied" in top
-    )
+def auto_check(case_dir):
+    """Keyword groups from the 'Auto-check:' line of expected.md, or None.
+
+    Format: groups separated by ';', alternatives within a group by '|'.
+    'Auto-check: none' (no-fault cases) or a missing line means no check.
+    """
+    for line in (case_dir / "expected.md").read_text().splitlines():
+        if line.startswith("Auto-check:"):
+            spec = line.split(":", 1)[1].strip().lower()
+            if spec in ("", "none"):
+                return None
+            return [[alt.strip() for alt in group.split("|")] for group in spec.split(";")]
+    return None
+
+
+def verdict(answer, groups):
+    """Rough keyword check (every group must match); read the answer to be sure."""
+    if groups is None:
+        return "READ "
+    text = answer.lower()
+    return "PASS?" if all(any(alt in text for alt in group) for group in groups) else "MISS?"
 
 
 def main():
@@ -87,8 +102,8 @@ def main():
         answer, usage = chat(base_url, api_key, args.model, build_prompt(case_dir, with_erc))
         elapsed = time.monotonic() - start
         (out_dir / f"{condition}.md").write_text(answer)
-        verdict = "PASS?" if looks_like_pass(answer) else "MISS?"
-        print(f"{args.model:40} {condition:12} {verdict}  {elapsed:5.1f}s  {usage}")
+        mark = verdict(answer, auto_check(case_dir))
+        print(f"{args.case:22} {args.model:40} {condition:12} {mark}  {elapsed:5.1f}s  {usage}")
 
 
 if __name__ == "__main__":

@@ -45,7 +45,9 @@ python3 -I evals/gonogo.py --case rust-board-fb-swapped
 ```
 
 Answers are written to `results/<case>/<model>/<condition>.md`, which is
-gitignored. The PASS?/MISS? it prints only checks for keywords, so read
+gitignored. The PASS?/MISS? it prints only checks the keywords on the
+`Auto-check:` line of the case's `expected.md` (`;` between groups that
+must all match, `|` between alternatives; `none` prints READ), so read
 each answer to judge it.
 
 ## Reading the result
