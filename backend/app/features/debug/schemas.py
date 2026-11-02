@@ -226,15 +226,11 @@ class DesignSummary(BaseModel):
 
 
 class SymptomsInput(BaseModel):
-    """The symptom template. The backend numbers each non-empty line as a
-    symptom (s1, s2, …) so hypotheses can cite them."""
+    """The bench symptoms as one free-text box. The backend numbers each
+    non-empty line as a symptom (s1, s2, …) so hypotheses can cite them, so
+    each line should stand on its own ("Fails on battery", not "battery")."""
 
-    powered_by: str = Field("", max_length=2000)
-    works: str = Field("", max_length=4000)
-    fails: str = Field("", max_length=4000)
-    measured: str = Field("", max_length=4000)
-    hot: str = Field("", max_length=2000)
-    notes: str = Field("", max_length=4000)
+    text: str = Field(..., min_length=1, max_length=8000)
 
 
 class MeasurementInput(BaseModel):

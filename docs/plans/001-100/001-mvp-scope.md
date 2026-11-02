@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-01 | 2026-11-01 | In progress | — | `evals/README.md`, `README.md` |
+| 2026-11-01 | 2026-11-02 | In progress | — | `evals/README.md`, `README.md` |
 
 What Häxrök builds for the Meta Global AI Developer Hackathon (2026), what
 it leaves out, and the other ideas that were weighed against it. The
@@ -24,8 +24,9 @@ prompt as much as the UI:
 - **Fix steps describe real rework** (cut this trace, bodge-wire that
   pin) as well as the schematic fix for the next revision.
 - **Jargon gets a hover definition** (ERC, buck-boost, back-feed).
-- **The symptom box asks concrete questions**: what powers the board,
-  what works, what doesn't, what you measured, whether anything gets hot.
+- **The symptom box is one textarea whose placeholder asks concrete
+  questions**: what powers the board, what works, what doesn't, what you
+  measured, whether anything gets hot.
 - **Evidence labels use plain names** and say what a claim rests on, not
   that it was verified: "Based on your schematic", "Based on KiCad's
   checker", "Based on the datasheet pin table", "Based on your
@@ -117,8 +118,10 @@ One feature, `debug`, named the same on both sides
      arrive one by one. The debug call needs its own timeout, longer
      than `AI_TIMEOUT_S` (120 s per read), because a go/no-go run took
      130 s.
-   - Each numbered symptom keeps its template field ("Fails: battery"). A
-     test run without the fields couldn't tell which supplies passed.
+   - Symptoms are numbered by line, so each line has to stand on its own
+     ("Fails on battery", not "battery"). A test run whose lines lacked
+     that context couldn't tell which supplies passed. The UI nudges for
+     this rather than splitting the input into fields.
 5. **Add a measurement and re-run** (once 1–4 work). Under each confirm
    step the user can enter what they measured. It's added to the input
    as a bench source and the analysis runs again, with the earlier runs
