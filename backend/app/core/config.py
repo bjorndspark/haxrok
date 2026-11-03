@@ -1,6 +1,5 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -37,25 +36,18 @@ class Settings(BaseSettings):
 
     # Any OpenAI-compatible endpoint: Bifrost, LiteLLM, or empty for
     # api.openai.com. Provider keys, routing, and budgets live in the
-    # gateway; fallbacks too, unless an AI_*_FALLBACKS var below overrides
+    # gateway; fallbacks too, unless AI_CHAT_FALLBACKS below overrides
     # them per request.
     AI_BASE_URL: str = ""
     AI_API_KEY: str = ""
     AI_CHAT_MODEL: str = "gpt-4o-mini"
-    AI_IMAGE_MODEL: str = "gpt-image-1-mini"
-    AI_TTS_MODEL: str = "tts-1"
-    AI_STT_MODEL: str = "whisper-1"
-    # Per-operation timeout (connect, each read) for gateway calls. Image
-    # generation is the slowest single read, so keep it well above that.
+    # Per-operation timeout (connect, each read) for gateway calls.
     AI_TIMEOUT_S: float = 120.0
     # Optional comma-separated fallback chains (provider/model form),
-    # forwarded to the gateway as Bifrost's `fallbacks` request field — one
-    # per modality. Setting one overrides the gateway's own VK/routing-rule
-    # fallbacks for that request type; empty = gateway decides.
+    # forwarded to the gateway as Bifrost's `fallbacks` request field.
+    # Setting it overrides the gateway's own VK/routing-rule fallbacks;
+    # empty = gateway decides.
     AI_CHAT_FALLBACKS: str = ""
-    AI_IMAGE_FALLBACKS: str = ""
-    AI_TTS_FALLBACKS: str = ""
-    AI_STT_FALLBACKS: str = ""
 
     # Debug feature. The analysis call streams nothing for ~90 s and a run
     # has taken 130 s, so it gets its own per-read timeout above AI_TIMEOUT_S.
@@ -65,25 +57,6 @@ class Settings(BaseSettings):
     KICAD_TIMEOUT_S: float = 60.0
     DEBUG_MAX_FILES: int = 200
     DEBUG_MAX_UPLOAD_BYTES: int = 20 * 1024 * 1024
-
-    # Generated media, bind-mounted to ./data on the host and served at
-    # /media/files/<name>.
-    MEDIA_DIR: str = "data/media"
-    MEDIA_MAX_BYTES: int = 10 * 1024 * 1024
-
-    # Voice mode: optional server-side echo cancellation behind the
-    # browser's own getUserMedia AEC ("off" = browser AEC only). "speex"
-    # uses libspeexdsp1 in the backend image, "webrtc" uses pywebrtc-audio
-    # (WebRTC AEC3; the optional `webrtc` extra). See app/core/echo.py for
-    # the alignment model.
-    VOICE_ECHO_CANCELLER: Literal["off", "speex", "webrtc"] = "off"
-    # Far-end lag seeded as silence (ms), on top of the playback-buffer
-    # model — covers fixed network/acoustic delay. Under-estimating is
-    # safer than over-estimating: cancellers only look back, not forward.
-    VOICE_EC_DELAY_MS: int = 0
-    # Speex only: adaptive filter tail (ms) — must exceed the residual
-    # delay between the queued reference and the echo in the mic.
-    VOICE_EC_FILTER_MS: int = 256
 
     @field_validator("DATABASE_URL")
     @classmethod

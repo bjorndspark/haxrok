@@ -3,14 +3,12 @@ the AI client is faked — no gateway, no network. Add feature fixtures here."""
 
 from collections.abc import AsyncGenerator
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.db import Base, get_db
-from app.features.chat import service as chat_service
 from app.main import app
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
@@ -32,13 +30,6 @@ async def create_schema() -> AsyncGenerator[None, None]:
         await conn.run_sync(Base.metadata.create_all)
     yield
     await test_engine.dispose()
-
-
-@pytest.fixture(autouse=True)
-def _redirect_owned_sessions(monkeypatch):
-    """Services that bypass request scope (chat's SSE stream opens its own
-    sessions so none is held for the stream's lifetime) get the test DB too."""
-    monkeypatch.setattr(chat_service, "AsyncSessionLocal", TestSessionLocal)
 
 
 @pytest_asyncio.fixture

@@ -1,10 +1,8 @@
 from datetime import datetime
-from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.core.clock import get_clock
@@ -19,11 +17,8 @@ from app.core.errors import (
 from app.core.logging import get_logger, setup_logging
 from app.core.middleware import RequestLoggingMiddleware
 from app.core.responses import SuccessResponse, ok
-from app.core.storage import MEDIA_URL_PREFIX
-from app.features.chat.router import router as chat_router
 from app.features.debug.router import router as debug_router
 from app.features.logs.router import router as logs_router
-from app.features.speech.router import router as speech_router
 
 logger = get_logger(__name__)
 
@@ -75,21 +70,10 @@ def create_app() -> FastAPI:
     app.add_exception_handler(Exception, unhandled_error_handler)
 
     app.include_router(health_router, prefix=settings.API_V1_PREFIX)
-    app.include_router(chat_router, prefix=settings.API_V1_PREFIX)
     app.include_router(debug_router, prefix=settings.API_V1_PREFIX)
     app.include_router(logs_router, prefix=settings.API_V1_PREFIX)
-    app.include_router(speech_router, prefix=settings.API_V1_PREFIX)
-    logger.info(
-        "Routers registered under %s: health, chat, debug, logs, speech", settings.API_V1_PREFIX
-    )
+    logger.info("Routers registered under %s: health, debug, logs", settings.API_V1_PREFIX)
 
-    # Generated media (images, speech) is served straight from MEDIA_DIR.
-    Path(settings.MEDIA_DIR).mkdir(parents=True, exist_ok=True)
-    app.mount(
-        MEDIA_URL_PREFIX,
-        StaticFiles(directory=settings.MEDIA_DIR, check_dir=False),
-        name="media-files",
-    )
     return app
 
 

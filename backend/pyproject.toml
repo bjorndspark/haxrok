@@ -22,12 +22,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# VOICE_ECHO_CANCELLER=webrtc (pulls numpy). Optional: the code degrades to
-# browser-only AEC when it's missing. Dev/CI install it so its tests run;
-# images opt in with the UV_EXTRAS build arg.
-webrtc = [
-    "pywebrtc-audio>=0.2.0",
-]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",

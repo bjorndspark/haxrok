@@ -59,14 +59,14 @@ db-restore:
 dev: db
 	@# Pre-create log/data dirs host-owned so the container (root) doesn't
 	@# leave root-owned files un-deletable from the host.
-	@mkdir -p logs/backend logs/frontend data/media
+	@mkdir -p logs/backend logs/frontend data
 	docker compose up
 
 build: .env
 	docker compose build
 
 install:
-	docker compose exec backend uv sync --frozen --extra dev --extra webrtc
+	docker compose exec backend uv sync --frozen --extra dev
 	docker compose exec frontend pnpm install --frozen-lockfile
 
 migrate:
@@ -146,13 +146,13 @@ fix-issue:
 
 clean:
 	@echo "==> Cleaning dev artifacts (DB and containers untouched)..."
-	@rm -rf logs/backend/* logs/frontend/* data/media/* 2>/dev/null || true
+	@rm -rf logs/backend/* logs/frontend/* 2>/dev/null || true
 	@find backend \( -name __pycache__ -o -name .mypy_cache -o -name .pytest_cache -o -name .ruff_cache \) -prune -exec rm -rf {} + 2>/dev/null || true
 	@rm -f backend/test.db 2>/dev/null || true
 	@rm -rf frontend/dist frontend/node_modules/.vite 2>/dev/null || true
 	@# archive/ subdirs are created by the container (root-owned) and can't be
 	@# removed from the host; surface them instead of silently leaving them.
-	@if find logs/backend logs/frontend data/media -mindepth 1 ! -name '.gitkeep' -print -quit 2>/dev/null | grep -q .; then \
+	@if find logs/backend logs/frontend -mindepth 1 ! -name '.gitkeep' -print -quit 2>/dev/null | grep -q .; then \
 		echo "    Root-owned files remain in logs/ or data/."; \
 		echo "    One-time cleanup: docker compose run --rm backend rm -rf /app/logs /app/data"; \
 	fi

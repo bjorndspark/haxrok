@@ -26,7 +26,7 @@ if [ "${ENVIRONMENT:-}" = "development" ]; then
     # Frozen only: a stale lockfile is an error to fix (`uv.sh lock`), not
     # something to silently re-resolve at boot.
     echo "[dev] Syncing Python deps..."
-    uv sync --frozen --extra dev --extra webrtc
+    uv sync --frozen --extra dev
     sha256sum "$LOCK" 2>/dev/null | cut -d' ' -f1 > "$STAMP"
   fi
 fi

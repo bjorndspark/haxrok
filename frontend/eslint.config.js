@@ -47,11 +47,6 @@ export default tseslint.config(
           allowNever: false,
         },
       ],
-      // TS narrows a flag after `if (cancelled) return` and never widens it
-      // across an await or callback (microsoft/TypeScript#9998), so the
-      // voice code's post-await cancellation re-checks read as "always
-      // false". Those re-checks are the point; the rule can't model them.
-      "@typescript-eslint/no-unnecessary-condition": "off",
     },
   },
   {

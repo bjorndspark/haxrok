@@ -2,10 +2,10 @@
 whatever OpenAI-compatible endpoint AI_BASE_URL names (Bifrost, LiteLLM, or
 api.openai.com when empty). Provider routing, keys, budgets, and fallbacks
 are the gateway's job — this repo only forwards the optional
-AI_*_FALLBACKS lists verbatim via fallbacks_extra_body().
+AI_CHAT_FALLBACKS list verbatim via fallbacks_extra_body().
 
-Features call get_ai_client() (or the helpers in app.core.ai.media) — they never
-construct SDK clients themselves.
+Features call the helpers in app.core.ai (structured.complete_structured) —
+they never construct SDK clients themselves.
 """
 
 from functools import lru_cache
@@ -32,8 +32,7 @@ def get_ai_client() -> AsyncOpenAI:
 
 def fallbacks_extra_body(raw: str) -> dict[str, list[str]] | None:
     """Build the Bifrost ``fallbacks`` request field from a comma-separated
-    ``provider/model`` list. Works on every request type (chat, images,
-    audio, ...). Returns None when unset so nothing extra is sent and the
+    ``provider/model`` list. Returns None when unset so nothing extra is sent and the
     gateway's own VK/routing fallbacks still apply."""
     chain = [m.strip() for m in raw.split(",") if m.strip()]
     return {"fallbacks": chain} if chain else None

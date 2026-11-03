@@ -8,7 +8,6 @@ from alembic import context
 # feature — deliberately explicit, no registry module.
 from app.core.config import settings
 from app.core.db import Base
-from app.features.chat import models as _chat_models  # noqa: F401
 
 config = context.config
 # The runtime DSN is async (asyncpg); Alembic stays sync, so derive a sync
