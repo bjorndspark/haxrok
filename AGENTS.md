@@ -108,6 +108,8 @@ frontend/src/
   when debugging. Each holds the current session only; every backend (re)start
   rotates the previous file into `archive/<date>/`.
 - `make lint` / `make test` / `make migrate` / `make format` — run inside containers
+- `make eval-app case=<name>` — run an `evals/cases/` case through the app's
+  debug prompts (`evals/app_prompts.py`); `evals/README.md` has the rest
 - `make docs` — regenerate `docs/architecture/` (`db/schema.md`, `db/er-diagram.md`,
   `api/routes.md`) from the models and route table; run after changing either
 - CI runs the same checks on GitHub Actions (`.github/workflows/`) on pushes

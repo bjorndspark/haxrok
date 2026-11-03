@@ -43,6 +43,8 @@ services:
       # Eval cases double as test fixtures (tests/test_debug.py). At /evals,
       # tests/../../evals resolves the same here as in a CI checkout.
       - ./evals:/evals:ro
+      # `make eval-app` (evals/app_prompts.py) writes only its answers.
+      - ./evals/results:/evals/results
       # The demo board (tests/test_debug_service.py runs kicad-cli on it);
       # mounted at the path tests/../../frontend/public/examples resolves to.
       - ./frontend/public/examples:/frontend/public/examples:ro

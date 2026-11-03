@@ -124,11 +124,20 @@ One pass in two on the no-fault case is not a fix, and it's one run each.
 
 ## Results: the app's two-step prompts, 2026-11-03
 
-`gonogo.py` doesn't run the app's prompts. These runs sent each case
-through `prompt.DIAGNOSE` and then `prompt.STRUCTURE`
+`gonogo.py` doesn't run the app's prompts. `app_prompts.py` does: it
+sends a case through `prompt.DIAGNOSE` and then `prompt.STRUCTURE`
 (`backend/app/features/debug/prompt.py`, see `DECISIONS.md`, "Debug
-analysis is two model calls"). The netlist and ERC are as above, with no
-pin table. `meta/muse-spark-1.3-contributor`, one run each, three at once.
+analysis is two model calls"), with the netlist and ERC as above and no
+pin table. It runs in the backend container, so it uses the app's
+gateway settings:
+
+```sh
+make eval-app case=rust-board-fb-swapped   # one case; run at most ~3 at once
+```
+
+Answers go to `results/<case>/<model>/app-diagnosis.md` and
+`app-analysis.json`. The rank it prints is where the `Auto-check:`
+keywords first match in the structured hypotheses. `meta/muse-spark-1.3-contributor`, one run each, three at once.
 Ranks are read from the structured answer.
 
 | Case | Rank of real cause | Total time |

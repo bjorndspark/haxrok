@@ -30,4 +30,5 @@ logs/backend/*
 !logs/frontend/
 logs/frontend/*
 !logs/frontend/.gitkeep
-evals/results/
+evals/results/*
+!evals/results/.gitkeep

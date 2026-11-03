@@ -1,7 +1,7 @@
 .PHONY: help infra infra-down infra-logs db dev build install migrate revision \
 	test test-backend test-frontend \
 	lint lint-ruff lint-ruff-format lint-mypy lint-eslint lint-tsc lint-prettier format \
-	down logs clean purge issues fix-issue docs docs-serve
+	down logs clean purge issues fix-issue docs docs-serve eval-app
 
 help:
 	@echo "Usage: make <target>"
@@ -26,6 +26,7 @@ help:
 	@echo "  logs       tail app logs"
 	@echo "  docs       regenerate docs/architecture/ (db/schema.md, db/er-diagram.md, api/routes.md)"
 	@echo "  docs-serve browse docs/ with mkdocs at http://localhost:\$$DOCS_HOST_PORT"
+	@echo "  eval-app   run an eval case through the app's debug prompts: make eval-app case=rust-board-fb-swapped"
 	@echo "  issues     list open GitHub issues"
 	@echo "  fix-issue  hand an issue to an AI agent: make fix-issue n=123 [agent=devin]"
 	@echo "  clean      remove dev artifacts (logs, caches, build output; DB untouched)"
@@ -120,6 +121,12 @@ format:
 docs:
 	docker compose exec --user $(shell id -u):$(shell id -g) -e LOG_FILE= \
 		backend .venv/bin/python /app/scripts/docs/generate.py
+
+# One eval case through the app's two debug prompts (evals/app_prompts.py).
+# --user keeps results host-owned; LOG_FILE= leaves the server's log alone.
+eval-app:
+	docker compose exec --user $(shell id -u):$(shell id -g) -e LOG_FILE= \
+		backend .venv/bin/python /evals/app_prompts.py --case $(or $(case),rust-board-fb-swapped)
 
 # `compose run` (not exec): exec can't publish a port. ENVIRONMENT= skips the
 # entrypoint's dep sync and alembic step — docs don't need the DB. The run
