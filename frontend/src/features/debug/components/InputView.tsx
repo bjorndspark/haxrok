@@ -118,6 +118,9 @@ export function InputView({ actions }: { actions: DebugActions }) {
                 Only the <code className="font-mono">.kicad_pro</code> and{" "}
                 <code className="font-mono">.kicad_sch</code> files are sent. The PCB, backups and
                 3D models stay on your machine. The server runs KiCad&apos;s netlist export and ERC.
+                &ldquo;Choose folder&rdquo; makes your browser ask to upload every file in the
+                folder; it counts them all, but only the schematics are sent. Dropping the folder
+                skips that prompt.
               </p>
 
               {name && (
