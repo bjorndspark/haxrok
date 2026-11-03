@@ -21,7 +21,14 @@ from dataclasses import dataclass
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
 from app.features.debug import calc, diagram, pins, prompt, reference
-from app.features.debug.design import Design, compact, format_erc, parse_erc, parse_netlist
+from app.features.debug.design import (
+    Design,
+    compact,
+    format_erc,
+    parse_erc,
+    parse_labels,
+    parse_netlist,
+)
 from app.features.debug.evidence import EvidenceContext, check
 from app.features.debug.kicad import KicadRunner
 from app.features.debug.project import load_project
@@ -95,7 +102,7 @@ async def prepare(
         erc = parse_erc(output.erc)
     except ValueError as e:
         raise BadRequestError(f"Couldn't parse kicad-cli's output: {e}") from e
-    lookup = pins.lookup(design)
+    lookup = pins.lookup(design, erc, parse_labels(project.files))
     notes = reference.lookup(design)
     calcs = calc.lookup(design)
     numbered = [

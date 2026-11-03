@@ -11,10 +11,12 @@ This is the MVP source of datasheet evidence. Per-part datasheet retrieval
 replaces it (plan 001, "After the hackathon").
 """
 
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
-from app.features.debug.design import Design
-from app.features.debug.schemas import IcSummary, WiringFinding
+from app.features.debug.design import Design, Label, short_net_name
+from app.features.debug.schemas import ErcEntry, IcSummary, WiringFinding
 
 
 @dataclass(frozen=True)
@@ -212,8 +214,9 @@ def is_ic(ref: str) -> bool:
     return head in {"U", "IC"} and head != ref
 
 
-def lookup(design: Design) -> PinLookup:
-    """Match every IC on the board against the pin table."""
+def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label] = ()) -> PinLookup:
+    """Match every IC on the board against the pin table. ``erc`` and
+    ``labels`` let a wiring finding name the label behind it."""
     ics: list[IcSummary] = []
     pin_refs: set[str] = set()
     lines: list[str] = []
@@ -232,7 +235,7 @@ def lookup(design: Design) -> PinLookup:
         )
         if entry is None:
             continue
-        findings += check_wiring(design, part.ref, entry)
+        findings += check_wiring(design, part.ref, entry, erc, labels)
         lines.append(f"{part.ref} ({part.value}), from {entry.source}:")
         for number, (name, function) in sorted(entry.pins.items(), key=lambda kv: int(kv[0])):
             pin_ref = f"{part.ref}.{number}"
@@ -257,9 +260,16 @@ def lookup(design: Design) -> PinLookup:
 _MAX_LISTED = 6
 
 
-def check_wiring(design: Design, ref: str, entry: PartPins) -> list[WiringFinding]:
+def check_wiring(
+    design: Design,
+    ref: str,
+    entry: PartPins,
+    erc: Sequence[ErcEntry] = (),
+    labels: Sequence[Label] = (),
+) -> list[WiringFinding]:
     """Flag each inductor pin of ``ref`` whose net reaches anything but an
-    inductor (or a test point), or no inductor at all.
+    inductor (or a test point), or no inductor at all. When the ERC shows a
+    label merged into that net, the finding names it as the likely cause.
 
     Deterministic, from the netlist and the pin table only, so a finding is
     verified, not the model's reasoning. It exists because the model saw an
@@ -299,10 +309,87 @@ def check_wiring(design: Design, ref: str, entry: PartPins) -> list[WiringFindin
                 text=(
                     f"{pin_ref} ({name}) is an inductor connection ({entry.source}), "
                     f"{problem}. It should connect only to its inductor."
+                    + "".join(
+                        f" {cause}" for cause in label_causes(design, ref, name, net, erc, labels)
+                    )
                 ),
             )
         )
     return findings
+
+
+# "Both +3V3 and SW2 are attached to the same items; +3V3 will be used
+# in the netlist": KiCad's multiple_net_names wording.
+_MERGED = re.compile(r"Both (.+?) and (.+?) are attached to the same items")
+
+
+def label_causes(
+    design: Design,
+    ref: str,
+    pin_name: str,
+    net: str,
+    erc: Sequence[ErcEntry],
+    labels: Sequence[Label],
+) -> list[str]:
+    """Sentences naming each label the ERC reports merged into ``net`` on
+    ``ref``'s sheet, the likely cause of a short there.
+
+    The netlist can't show this: a label joined to a power net takes the
+    power net's name and vanishes. It exists because a private board's L2
+    pin sat on +3V3 through a second L2-node label placed on VOUT, and the
+    model, seeing only the netlist, told the user to rewire the inductor.
+    The ERC said so, but as one of 24 benign-looking warnings.
+    """
+    short = short_net_name(net)
+    sheet = design.parts[ref].sheet if ref in design.parts else ""
+    hits: list[tuple[ErcEntry, str]] = []
+    for e in erc:
+        m = _MERGED.match(e.message)
+        if e.rule != "multiple_net_names" or not m or short not in m.groups():
+            continue
+        if sheet and e.sheet != sheet:
+            continue  # a label on another sheet joined a global net, not this pin's
+        hits.append((e, m.group(2) if m.group(1) == short else m.group(1)))
+    # A label named after the flagged pin (SW_L2 for L2) is the telling
+    # one; when there is one, the rest are naming noise.
+    named = [h for h in hits if _names_pin(h[1], pin_name)]
+    return [_cause(e, merged, short, pin_name, labels) for e, merged in (named or hits)[:3]]
+
+
+def _names_pin(label: str, pin_name: str) -> bool:
+    return pin_name.upper() in re.split(r"[^A-Z0-9]+", label.upper())
+
+
+def _cause(e: ErcEntry, merged: str, short: str, pin_name: str, labels: Sequence[Label]) -> str:
+    label = next((lb for lb in labels if lb.uuid in e.uuids and lb.name == merged), None)
+    if label is None:
+        return (
+            f"Likely cause: {e.id} reports the label {merged} attached to {short} items "
+            f"on sheet {e.sheet}; a misplaced label joins nets without any wire."
+        )
+    # Same-named labels join their wires: local and hierarchical ones within
+    # their sheet, global ones across the whole design.
+    peers = [
+        lb
+        for lb in labels
+        if lb.name == merged
+        and lb.kind == label.kind
+        and lb.uuid != label.uuid
+        and (lb.kind == "global_label" or lb.file == label.file)
+    ]
+    here = f"the {merged} label at ({label.x:g}, {label.y:g}) mm on {label.file}"
+    if not peers:
+        return (
+            f"Likely cause: {e.id} reports {here} attached to {short} items; "
+            "check that the label belongs there."
+        )
+    others = ", ".join(f"({lb.x:g}, {lb.y:g})" for lb in peers)
+    return (
+        f"Likely cause: {e.id} reports {here} attached to {short} items, and another "
+        f"{merged} label sits at {others} mm. Same-named labels join their wires, so if "
+        f"that one is on the {pin_name} node, this label is what shorts it to {short}: "
+        "fix or remove the label, not the wiring."
+    )
 
 
 def format_findings(findings: list[WiringFinding]) -> str:

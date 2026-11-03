@@ -29,6 +29,7 @@ class Part:
     value: str
     lib_part: str
     footprint: str
+    sheet: str = ""  # KiCad's sheet path, e.g. "/Power Management/"; "" if unknown
 
 
 @dataclass(frozen=True)
@@ -138,7 +139,11 @@ def parse_netlist(text: str) -> Design:
             lib = _children(comp, "libsource")
             lib_part = f"{_field(lib[0], 'lib')}:{_field(lib[0], 'part')}" if lib else ""
             ref = _field(comp, "ref")
-            parts[ref] = Part(ref, _field(comp, "value"), lib_part, _field(comp, "footprint"))
+            sheetpath = _children(comp, "sheetpath")
+            sheet = _field(sheetpath[0], "names") if sheetpath else ""
+            parts[ref] = Part(
+                ref, _field(comp, "value"), lib_part, _field(comp, "footprint"), sheet
+            )
     nets: dict[str, list[Node]] = {}
     for net_block in _children(root, "nets"):
         for net in _children(net_block, "net"):
@@ -164,6 +169,55 @@ def compact(design: Design) -> str:
     return "\n".join(lines) + "\n"
 
 
+# --- KiCad schematic labels ---------------------------------------------------------
+
+_LABEL_KINDS = ("label", "global_label", "hierarchical_label")
+
+
+@dataclass(frozen=True)
+class Label:
+    """One net label placed on a schematic sheet. ``x``/``y`` are the
+    label's position in mm, as KiCad's editor shows it. ``uuid`` is what
+    ERC items name it by."""
+
+    name: str
+    kind: str  # label (local to its sheet), global_label or hierarchical_label
+    file: str  # the .kicad_sch it sits on, relative to the project folder
+    x: float
+    y: float
+    uuid: str
+
+
+def parse_labels(files: dict[str, bytes]) -> list[Label]:
+    """Every net label on every uploaded sheet. The netlist resolves labels
+    away (a label merged into a power net leaves no trace there), so this is
+    the only place a wrong label can be seen."""
+    labels: list[Label] = []
+    for path, data in sorted(files.items()):
+        if not path.endswith(".kicad_sch"):
+            continue
+        try:
+            root = _parse_sexpr(data.decode("utf-8", errors="replace"))
+        except ValueError:
+            continue  # kicad-cli opened it, so this is our parser's limit; skip
+        for kind in _LABEL_KINDS:
+            for node in _children(root, kind):
+                at = _children(node, "at")
+                if len(node) < 2 or not at or len(at[0]) < 3:
+                    continue
+                labels.append(
+                    Label(
+                        name=node[1],
+                        kind=kind,
+                        file=path,
+                        x=float(at[0][1]),
+                        y=float(at[0][2]),
+                        uuid=_field(node, "uuid"),
+                    )
+                )
+    return labels
+
+
 # --- KiCad ERC -------------------------------------------------------------------
 
 
@@ -184,6 +238,7 @@ def parse_erc(text: str) -> list[ErcEntry]:
                     severity=v.get("severity", ""),
                     message=v.get("description", ""),
                     items=[i.get("description", "") for i in v.get("items", [])],
+                    uuids=[i.get("uuid", "") for i in v.get("items", [])],
                 )
             )
     return entries

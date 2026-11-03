@@ -10,7 +10,7 @@ import pytest
 
 from app.core.errors import BadRequestError, UpstreamError
 from app.features.debug import diagram, pins, prompt, router, service
-from app.features.debug.design import Design, Node, Part, parse_netlist
+from app.features.debug.design import Design, Label, Node, Part, parse_labels, parse_netlist
 from app.features.debug.evidence import EvidenceContext
 from app.features.debug.kicad import KicadOutput
 from app.features.debug.project import Project, load_project, missing_sheets, normalize_paths
@@ -20,6 +20,7 @@ from app.features.debug.schemas import (
     CheckedClaim,
     Cite,
     Claim,
+    ErcEntry,
     Fix,
     Hypothesis,
     MeasurementInput,
@@ -230,6 +231,78 @@ def test_inductor_pin_without_an_inductor_is_a_finding():
     findings = pins.lookup(parse_netlist(no_inductor)).findings
     assert [f.pin for f in findings] == ["U2.9", "U2.11"]
     assert "no inductor" in findings[1].text
+
+
+# A second SW2 label dropped on VOUT: KiCad merges L2 into +3V3 and the
+# netlist keeps only the power net's name. The ERC entry names the label.
+POWER_SCH = b"""(kicad_sch (version 20231120)
+  (label "SW2" (at 116.84 44.45 0) (uuid "aaaa"))
+  (label "SW2" (at 116.84 48.26 0) (uuid "bbbb"))
+  (global_label "SW2" (at 10 10 0) (uuid "cccc"))
+)"""
+
+
+def _merged(sheet: str, label: str, uuid: str) -> ErcEntry:
+    return ErcEntry(
+        id="erc-3",
+        sheet=sheet,
+        rule="multiple_net_names",
+        severity="warning",
+        message=f"Both +3V3 and {label} are attached to the same items; "
+        "+3V3 will be used in the netlist",
+        items=["Symbol #PWR35 Pin 1 [Power input, Line]", f"Label '{label}'"],
+        uuids=["pwr", uuid],
+    )
+
+
+def _on_sheet(netlist: str, sheet: str) -> Design:
+    design = parse_netlist(netlist)
+    design.parts["U2"] = Part("U2", "TPS63070RNMR", "", "VQFN-15", sheet)
+    return design
+
+
+def test_parse_labels_reads_every_kind_with_position_and_uuid():
+    labels = parse_labels({"power.kicad_sch": POWER_SCH, "board.kicad_pro": b"{}"})
+    assert labels[0] == Label("SW2", "label", "power.kicad_sch", 116.84, 44.45, "aaaa")
+    assert [(lb.kind, lb.uuid) for lb in labels] == [
+        ("label", "aaaa"),
+        ("label", "bbbb"),
+        ("global_label", "cccc"),
+    ]
+
+
+def test_parse_netlist_keeps_the_sheet_path():
+    netlist = NETLIST.replace(
+        '(footprint "VQFN-15")', '(footprint "VQFN-15") (sheetpath (names "/Power/"))'
+    )
+    assert parse_netlist(netlist).parts["U2"].sheet == "/Power/"
+
+
+def test_a_label_merged_into_the_shorted_net_is_named_as_the_cause():
+    labels = parse_labels({"power.kicad_sch": POWER_SCH})
+    erc = [_merged("/Power/", "SW2", "bbbb")]
+    [finding] = pins.lookup(_on_sheet(NETLIST, "/Power/"), erc, labels).findings
+    assert "erc-3 reports the SW2 label at (116.84, 48.26) mm on power.kicad_sch" in finding.text
+    # Only the same-kind, same-sheet label joins it; the global one doesn't.
+    assert "another SW2 label sits at (116.84, 44.45) mm" in finding.text
+    assert "not the wiring" in finding.text
+
+
+def test_label_causes_skip_other_sheets_and_unrelated_names():
+    labels = parse_labels({"power.kicad_sch": POWER_SCH})
+    elsewhere = [_merged("/IMU/", "SW2", "bbbb")]
+    [finding] = pins.lookup(_on_sheet(NETLIST, "/Power/"), elsewhere, labels).findings
+    assert "Likely cause" not in finding.text
+    # Same sheet, but a label named after VDD rather than L2 is noise when
+    # one named after the pin is there too.
+    both = [_merged("/Power/", "IMU_VDD", "x"), _merged("/Power/", "SW_L2", "y")]
+    [finding] = pins.lookup(_on_sheet(NETLIST, "/Power/"), both, labels).findings
+    assert "SW_L2" in finding.text
+    assert "IMU_VDD" not in finding.text
+
+
+def test_erc_item_uuids_stay_on_the_server():
+    assert "uuids" not in _merged("/Power/", "SW2", "bbbb").model_dump()
 
 
 def test_diagram_shows_the_cited_ic_its_nets_and_the_flagged_pin():

@@ -315,6 +315,27 @@ private board (not in the repo): its fault ranked #1 in 2 of 2
 hedging; `rp-micro-no-fault` still claimed no schematic fault. Datasheet
 retrieval (see above) is what widens the check to other parts.
 
+**Label causes (added later):** a short is often a label, not a wire. A
+second same-named label placed on the wrong node joins two nets, the
+power symbol's name wins, and the netlist keeps no trace of the label.
+So when `check_wiring` flags a pin, `pins.label_causes` looks for KiCad
+ERC `multiple_net_names` entries that merged a label into that net on the
+IC's sheet. It prefers a label named after the pin (`SW_L2` for L2),
+then finds the label in the uploaded sheets by the ERC item's uuid
+(`design.parse_labels`) and names its file, its position and any other
+labels with the same name. The prompt says the fix is then that label,
+not rewiring. Rejected: computing connectivity from the schematic's
+geometry (pin positions under rotation and mirroring, wires, junctions),
+which is too much for its value. The cost: this only works when ERC
+reports the merge. That's always true for a label joined to a power net
+or another label, but it isn't when the wrong label is the only name on
+both nets. `make eval-app` cases have no sheet files, so they get no
+label cause. Positions come from the `.kicad_sch` files, because the ERC
+JSON's `pos` is 1/100 of the millimetres it claims (KiCad 8.0.9). Measured on
+a private board (not in the repo): where the finding alone got "remove
+L1.2 from +3V3", the review now ranks the short #1 and its fix is "move
+or remove the misplaced label … do not rewire pins".
+
 ## Review mode reuses the debug pipeline
 
 **Decision:** pre-fab review (`mode=review` on `POST /debug/analyze`) is

@@ -256,6 +256,9 @@ class ErcEntry(BaseModel):
     severity: str
     message: str
     items: list[str]
+    # The items' schematic uuids, to find a label the entry names. Not sent
+    # to the browser.
+    uuids: list[str] = Field(default_factory=list, exclude=True)
 
 
 class WiringFinding(BaseModel):
