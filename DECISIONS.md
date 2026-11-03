@@ -249,7 +249,9 @@ and the no-fault case passed in one of its two conditions; the other
 still suspected the correct resistor, though it held rework until a
 datasheet check. A pin table only
 fixes pin names, not specs or reference circuits, so retrieval replaces
-it as the next feature after the hackathon.
+it as the next feature after the hackathon. Since 2026-11-04 a small
+hand-written reference table covers recommended circuits for four parts;
+see "Reference designs and calculations are verified evidence".
 
 ## Debug analysis is two model calls: diagnose, then structure
 
@@ -288,8 +290,8 @@ inductor or a test point becomes a verified finding (`wf1`, …). It goes
 into the design summary and into the model's input, and the prompt says
 findings are design errors to rank on how well they explain the
 symptoms, never recalled facts. The UI labels each hypothesis by rule,
-not by the model: "Verified wiring fault" when a backed claim cites a
-flagged pin, "Fits the symptoms" when it explains at least half of them
+not by the model: "Verified design fault" when a backed claim cites a
+flagged pin (or a flagged calculation, see below), "Fits the symptoms" when it explains at least half of them
 with a backed claim, "Speculative" otherwise. Beside the label sit two
 counts (symptoms explained, claims backed), never a percentage. A small
 diagram per hypothesis is built from the netlist by the backend
@@ -312,3 +314,60 @@ private board (not in the repo): its fault ranked #1 in 2 of 2
 `make eval-app` runs and in 2 live runs, with the diagnosis calling it a verified design error instead of
 hedging; `rp-micro-no-fault` still claimed no schematic fault. Datasheet
 retrieval (see above) is what widens the check to other parts.
+
+## Review mode reuses the debug pipeline
+
+**Decision:** pre-fab review (`mode=review` on `POST /debug/analyze`) is
+the same upload, parse, two model calls and evidence check as debugging,
+with its own prompt pair (`prompt.REVIEW_DIAGNOSE`, `REVIEW_STRUCTURE`)
+and the same output schema. Symptoms become optional notes on what the
+board is for. Each issue gets a `severity` (will_fail, may_fail,
+improve; null when debugging), confirm steps become checks to settle the
+issue before ordering, and rework stays empty. "No issues found" is a
+valid answer, and the prompt forbids padding the list. In review mode the
+UI never says "Fits the symptoms": only a backend check (wiring finding,
+flagged calculation) makes an issue "Verified"; everything else is
+"Reasoned: check it".
+
+**Alternatives rejected:** a separate feature or schema for review. It
+would duplicate the parser, checker and diagram for one prompt change,
+and break the self-similar naming (one concern, one feature). Labelling
+review issues "backed" when their claims cite real pins: on the review
+evals, the real faults and the false alarm cited the same mix of
+schematic facts, so the label would have meant nothing.
+
+**Consequence:** one endpoint and one UI serve both modes; old runs keep
+their mode in `DesignSummary.mode`. Without symptoms nothing anchors the
+answer, so invented design faults are the main risk; reference notes
+(below) are the mitigation, and `make eval-app mode=review` measures it.
+
+## Reference designs and calculations are verified evidence
+
+**Decision:** `features/debug/reference.py` adds two kinds of verified
+input, both before the model runs. **Notes** (`rd1`, …) are short facts
+copied from the manufacturer's own datasheet, application note or
+hardware design guide, with the section, for RP2040, MCP73831, SY8088 and
+ESP32-C3-MINI-1. **Calculations** (`cf1`, …) apply a datasheet formula to
+resistor values in the netlist: a regulator's output from its feedback
+divider (SY8088: 0.6 V × (1 + R1/R2)), a charger's current from its
+program resistor (MCP73831: 1000 V / R). A regulator output more than 8%
+from the voltage its output net is named for (`+3V3`) is flagged. Claims
+cite either with the evidence label `reference` ("Based on the
+manufacturer's design"), and the prompts say a circuit matching a note is
+correct as designed.
+
+**Alternatives rejected:** letting the model recall reference circuits
+(it called the RP2040's 1 kΩ crystal resistor, the Raspberry Pi design, a
+fault). Letting the model do the divider arithmetic: it usually gets it
+right, but a verified number is what lets the UI say "Verified". Copying
+values from third-party datasheet mirrors: the RT9013 has no notes
+because Richtek's own PDF couldn't be downloaded.
+
+**Consequence:** the table is as narrow as `pins.py`, four parts, and
+every entry has to be read in the source document, so it grows slowly
+until datasheet retrieval replaces both. Measured: review mode on
+`rp-micro-no-fault` went from one false alarm to "no issues", and the
+swapped divider is ranked #1 in both modes as verified, citing the
+calculated 0.73 V. The SY8088 source is an application note (Rev. 0.1),
+not a full datasheet. The named-voltage parse covers names like `+3V3`,
+`5V` and `1.8V`; a rail named `VCC` gets the calculation but no check.

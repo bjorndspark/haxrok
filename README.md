@@ -4,9 +4,11 @@
 
 Häxrök (Swedish for "witch smoke") is a schematic debugger. You give it your
 KiCad netlist and describe the symptom you see on the bench. It ranks root-cause
-hypotheses and labels every claim *confirmed* (follows from the netlist, ERC
-or the part's datasheet pins) or *inferred*. The next step, planned, is to
-**check the top hypothesis with an ngspice simulation**.
+hypotheses and labels every claim with what it rests on: your netlist, KiCad's
+ERC, the part's datasheet pins, the manufacturer's reference design, a value
+calculated from your resistors, or nothing. Before you order boards, the same
+pipeline runs as a **pre-fab review**: no symptoms, just the design mistakes a
+reviewer would flag.
 
 Most AI schematic tools are linters that run before fab. Häxrök works the other
 way round, starting from a board that already misbehaves.
@@ -16,7 +18,8 @@ Built for the Meta Global AI Developer Hackathon (2026).
 ## Status
 
 The MVP is built: a KiCad project folder runs end to end from the UI,
-and it ranked a real board's fault #1. The stretch goals are open.
+and it ranked a real board's fault #1. Pre-fab review mode and reference
+designs are built too.
 
 Scope, the go/no-go result and the ideas weighed against this one are in
 [`docs/plans/001-100/001-mvp-scope.md`](docs/plans/001-100/001-mvp-scope.md).
@@ -30,8 +33,13 @@ Scope, the go/no-go result and the ideas weighed against this one are in
       lookup, ranked hypotheses with source labels
 - [x] Pin-table wiring check before the model, a rule-based confidence
       label per hypothesis, and a small wiring diagram per hypothesis
-- [ ] Stretch: ngspice check with waveforms, agent loop, pre-fab review
-      mode
+- [x] Pre-fab review mode: no symptoms, issues ranked by severity
+      (won't work / may fail / improvement), "no issues" allowed
+- [x] Reference designs: notes from the manufacturers' own documents for a
+      few ICs, and values calculated from the netlist with datasheet
+      formulas (regulator output from its feedback divider, charger
+      current), flagged when they contradict the design
+- [ ] Stretch: ngspice check with waveforms, agent loop
 
 The app started from a FastAPI, React and Postgres template. Its
 seed chat, voice and image features have been removed; `debug` is the only

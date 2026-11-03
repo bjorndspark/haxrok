@@ -114,6 +114,31 @@ Runs also got faster: 52–90 s, against 71–166 s before. The rule stopped
 unconditional rework of correct parts, but not the model suspecting them.
 One pass in two on the no-fault case is not a fix, and it's one run each.
 
+## Results: review mode, 2026-11-03 and 2026-11-04
+
+`make eval-app case=<name> mode=review` sends a case with no symptoms
+through the review prompts (see `DECISIONS.md`, "Review mode reuses the
+debug pipeline") and writes `app-review-diagnosis.md` and
+`app-review-analysis.json`. One run each, three at once.
+
+| Case | Rank of real cause | Total time | Notes |
+|---|---|---|---|
+| `rp-micro-ldo-en` | #1 (won't work) | 158 s | |
+| `rust-board-fb-swapped` | #1 (won't work) | 237 s | Also flagged missing crystal load caps and a WS2812 on 3V3 |
+| `rp-micro-no-fault` | FAIL | 218 s | Flagged the correct 1 kΩ crystal resistor (may fail), marked unverified, fix gated on a datasheet check |
+
+### With reference designs, 2026-11-04
+
+After `reference.py` (see `DECISIONS.md`, "Reference designs and
+calculations are verified evidence"): reference notes and calculated
+values in the input.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `rp-micro-no-fault` | review | PASS (no issues) | 69 s | Lists every block checked as matching the Raspberry Pi minimal design |
+| `rust-board-fb-swapped` | review | #1 (won't work) | 198 s | Cites `cf1` (0.73 V); #2 is GPIO2 without the pull-up Espressif recommends |
+| `rust-board-fb-swapped` | debug | #1 | 206 s | "U5 buck programmed to 0.73V" |
+
 ## Reading the result
 
 | Outcome | Meaning |

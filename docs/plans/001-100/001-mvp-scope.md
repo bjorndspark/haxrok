@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-01 | 2026-11-03 | MVP implemented; stretch open | — | `evals/README.md`, `README.md` |
+| 2026-11-01 | 2026-11-04 | MVP implemented; review mode and reference designs built | — | `evals/README.md`, `README.md` |
 
 What Häxrök builds for the Meta Global AI Developer Hackathon (2026), what
 it leaves out, and the other ideas that were weighed against it. The
@@ -166,6 +166,20 @@ source labels over the simulation.
 3. **Pre-fab review mode.** The same pipeline with no symptoms: "review
    before you order". This is the larger market (every board, not only
    broken ones), and the real bug was visible in ERC before fab.
+   **Built 2026-11-03** (`mode=review`). Hobbyists mostly get this review
+   by posting to Reddit and waiting; pros get it from colleagues. Issues
+   carry a severity (won't work as drawn, may fail, improvement), a check
+   to settle each one before ordering, and the schematic fix. Only a
+   backend check (wiring, calculation) verifies an issue; everything else
+   is labelled "Reasoned: check it". Schematic only: layout, footprints
+   and assembly are out of scope as before.
+   - **Reference designs, built 2026-11-04.** Pulled forward from "After
+     the hackathon" in a small form, because review mode's false alarm
+     on the fault-free board was a correct reference circuit.
+     `reference.py` holds notes copied from the manufacturers' documents
+     (RP2040, MCP73831, SY8088, ESP32-C3-MINI-1) and calculates values
+     from the netlist with datasheet formulas. See `DECISIONS.md`,
+     "Reference designs and calculations are verified evidence".
 4. **Basic-part substitutes.** When a part is out of stock or is an
    extended JLCPCB part, suggest a basic part that fits the circuit.
 
