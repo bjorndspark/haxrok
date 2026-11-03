@@ -32,3 +32,6 @@ logs/frontend/*
 !logs/frontend/.gitkeep
 evals/results/*
 !evals/results/.gitkeep
+
+# Local scratch: UI mocks, screenshots
+/tmp/
