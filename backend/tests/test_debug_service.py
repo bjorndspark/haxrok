@@ -351,6 +351,115 @@ def test_pin_table_needs_the_right_package():
     assert not entry.matches("TPS2121YFP", "", "")
 
 
+# --- spice ---------------------------------------------------------------------------------
+
+
+def _rc_wrdata(netlist: str) -> str:
+    """What ngspice's wrdata writes for the deck: v(sda) of an ideal RC."""
+    import math
+
+    values = {}
+    for row in netlist.splitlines():
+        cols = row.split()
+        if cols and cols[0] in {"Vpull", "Rpull", "Cbus"}:
+            values[cols[0]] = float(cols[3] if cols[0] != "Vpull" else cols[4])
+    tau = values["Rpull"] * values["Cbus"]
+    return "\n".join(
+        f" {t:.6e}  {values['Vpull'] * (1 - math.exp(-t / tau)):.6e}"
+        for t in (i * 5 * tau / 200 for i in range(201))
+    )
+
+
+class FakeSpice:
+    """Answers like ngspice for an RC deck, or with ``reply`` when given."""
+
+    def __init__(self, reply: str | None = "rc") -> None:
+        self.reply = reply
+        self.decks: list[str] = []
+
+    async def run(self, netlist: str) -> str | None:
+        self.decks.append(netlist)
+        return _rc_wrdata(netlist) if self.reply == "rc" else self.reply
+
+
+def _vbus_i2c() -> Design:
+    """SDA pulled up to VBUS (5 V) on an MCU and a sensor powered from +3V3;
+    SCL pulled up to +3V3 as it should be."""
+    return _design(
+        {"U1": ("MCU", "x:y"), "U2": ("SENSOR", "x:y")}
+        | {r: ("4k7", "Device:R") for r in ("R1", "R2")},
+        {
+            "VBUS": ["R1.1"],
+            "+3V3": ["R2.1", "U1.1(VDD)", "U2.1(VDD)"],
+            "SDA": ["R1.2", "U1.2(SDA)", "U2.2(SDA)"],
+            "SCL": ["R2.2", "U1.3(SCL)", "U2.3(SCL)"],
+        },
+    )
+
+
+async def test_a_flagged_i2c_line_gets_a_simulated_rise():
+    from app.features.debug import calc, spice
+
+    design = _vbus_i2c()
+    fake = FakeSpice()
+    calcs = await spice.attach(calc.lookup(design), design, fake)
+    sda = next(c for c in calcs if "SDA" in c.text)
+    scl = next(c for c in calcs if "SCL" in c.text)
+    assert sda.flagged and not scl.flagged
+    assert scl.simulation is None and len(fake.decks) == 1  # only the flagged line runs
+
+    deck = fake.decks[0]
+    assert "Vpull rail 0 DC 5" in deck and "Rpull rail sda 4700" in deck
+    assert "Cbus sda 0 3e-11 IC=0" in deck  # 2 IC pins x 10 pF + 10 pF trace
+    assert "tran " in deck and " uic" in deck and "wrdata out.txt v(sda)" in deck
+
+    sim = sda.simulation
+    assert sim is not None and (sim.v_pull, sim.v_supply) == (5.0, 3.3)
+    assert len(sim.t_ns) == len(sim.v) <= 202 and sim.v[0] == 0
+    # 30→70 % of an RC is ln(7/3)·RC = 0.847 × 141 ns.
+    assert sim.rise_ns == pytest.approx(119.5, abs=2)
+    assert "3.6" not in sim.text and "3.3 V supply + 0.3 V" in sim.text
+    # The model's text is unchanged: the simulation is for the UI only.
+    assert calc.format_calculations(calcs) == calc.format_calculations(calc.lookup(design))
+
+
+async def test_no_simulation_when_ngspice_fails_or_answers_garbage():
+    from app.features.debug import calc, spice
+
+    design = _vbus_i2c()
+    for reply in (None, "", "No. of Data Rows : 0"):
+        calcs = await spice.attach(calc.lookup(design), design, FakeSpice(reply))
+        assert all(c.simulation is None for c in calcs)
+
+
+async def test_no_simulation_without_a_pullup_to_size():
+    from app.features.debug import calc, spice
+
+    design = _design({"U1": ("MCU", "x:y")}, {"+3V3": ["U1.1(VDD)"], "SDA": ["U1.2(SDA)"]})
+    fake = FakeSpice()
+    (c,) = await spice.attach(calc.lookup(design), design, fake)
+    assert c.flagged and c.simulation is None and fake.decks == []
+
+
+def _script(tmp_path, body: str) -> str:
+    path = tmp_path / "ngspice"
+    path.write_text("#!/bin/sh\n" + body)
+    path.chmod(0o755)
+    return str(path)
+
+
+async def test_ngspice_runner_reads_wrdata_and_falls_back_to_none(tmp_path):
+    from app.features.debug.spice import Ngspice
+
+    ok = _script(tmp_path, 'test "$1" = -b && test -f "$2" && echo " 0 0" > out.txt\n')
+    assert await Ngspice(binary=ok).run("* deck\n") == " 0 0\n"
+    failing = _script(tmp_path, "echo boom; exit 1\n")
+    assert await Ngspice(binary=failing).run("* deck\n") is None
+    assert await Ngspice(binary=str(tmp_path / "missing")).run("* deck\n") is None
+    slow = _script(tmp_path, "exec sleep 5\n")
+    assert await Ngspice(binary=slow, timeout_s=0.2).run("* deck\n") is None
+
+
 # --- service ---------------------------------------------------------------------------------
 
 
@@ -460,6 +569,7 @@ async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
 @pytest.fixture
 def fake_backends(monkeypatch):
     monkeypatch.setattr(router, "KicadCli", FakeKicad)
+    monkeypatch.setattr(router, "Ngspice", FakeSpice)
 
     monkeypatch.setattr(router, "_diagnose", _diagnose)
     monkeypatch.setattr(router, "_structure", _structure)

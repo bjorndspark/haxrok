@@ -2,6 +2,7 @@
  *  the downloadable Markdown report. Pure functions, no React. */
 import type {
   Calculation,
+  Simulation,
   CheckedAnalysis,
   DesignSummary,
   Diagram,
@@ -307,4 +308,69 @@ export function diagramLayout(d: Diagram): DiagramLayout {
     pins,
     nets,
   }
+}
+
+const PLOT = { width: 440, height: 180, left: 40, right: 96, top: 22, bottom: 28 }
+
+export interface SimulationLayout {
+  width: number
+  height: number
+  /** The plot area: the waveform's box inside the axes. */
+  plot: { x0: number; x1: number; y0: number; y1: number }
+  path: string
+  points: { x: number; y: number; t: number; v: number }[]
+  /** Horizontal reference lines, labelled at the right edge. */
+  levels: { y: number; label: string; danger: boolean }[]
+  xTicks: { x: number; label: string }[]
+  yTicks: { y: number; label: string }[]
+}
+
+/** Where the waveform of a simulated I²C line goes: volts up, nanoseconds
+ *  across, with the pull-up rail and the IC's supply + 0.3 V (its usual
+ *  absolute maximum) as reference lines. */
+export function simulationLayout(sim: Simulation): SimulationLayout {
+  const { width, height, left, right, top, bottom } = PLOT
+  const plot = { x0: left, x1: width - right, y0: height - bottom, y1: top }
+  const tMax = Math.max(...sim.t_ns, 1)
+  const vMax = Math.ceil(Math.max(sim.v_pull, sim.v_supply + 0.3, ...sim.v))
+  const x = (t: number) => plot.x0 + (t / tMax) * (plot.x1 - plot.x0)
+  const y = (v: number) => plot.y0 - (v / vMax) * (plot.y0 - plot.y1)
+  const points = sim.t_ns.map((t, i) => {
+    const v = sim.v[i] ?? 0
+    return { x: x(t), y: y(v), t, v }
+  })
+  const path = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(" ")
+  const abs = Math.round((sim.v_supply + 0.3) * 10) / 10
+  const levels = [
+    { y: y(sim.v_pull), label: `rail ${String(sim.v_pull)} V`, danger: false },
+    { y: y(abs), label: `VDD+0.3 ${String(abs)} V`, danger: true },
+  ]
+  const step = niceStep(tMax / 4)
+  const xTicks = []
+  for (let t = 0; t <= tMax + 1e-9; t += step) {
+    xTicks.push({ x: x(t), label: String(Math.round(t)) })
+  }
+  const yTicks = []
+  for (let v = 0; v <= vMax; v += 1) yTicks.push({ y: y(v), label: String(v) })
+  return { width, height, plot, path, points, levels, xTicks, yTicks }
+}
+
+/** The sample nearest to ``x`` on the plot, for the hover readout. */
+export function nearestPoint(
+  layout: SimulationLayout,
+  x: number,
+): SimulationLayout["points"][0] | null {
+  let best: SimulationLayout["points"][0] | null = null
+  for (const p of layout.points) {
+    if (best === null || Math.abs(p.x - x) < Math.abs(best.x - x)) best = p
+  }
+  return best
+}
+
+function niceStep(raw: number): number {
+  const mag = 10 ** Math.floor(Math.log10(raw))
+  const n = raw / mag
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag
 }

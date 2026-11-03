@@ -37,6 +37,7 @@ import type {
   Severity,
 } from "../types"
 import { GlossaryText } from "./GlossaryText"
+import { SimulationPlot } from "./SimulationPlot"
 import { WiringDiagram } from "./WiringDiagram"
 
 const EVIDENCE_TONE: Record<Evidence, BadgeProps["tone"]> = {
@@ -396,9 +397,12 @@ export function HypothesisCard({
               className="flex gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 leading-relaxed dark:border-emerald-900 dark:bg-emerald-950/30"
             >
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
-              <span>
-                <span className="font-semibold">Backend calculation:</span> {c.text}
-              </span>
+              <div className="min-w-0 flex-1 space-y-2">
+                <p>
+                  <span className="font-semibold">Backend calculation:</span> {c.text}
+                </p>
+                {c.simulation && <SimulationPlot sim={c.simulation} />}
+              </div>
             </div>
           ))}
           {h.claims.map((c, i) => (

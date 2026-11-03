@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 
 import { isSchematicFile, projectName } from "./files"
-import { assess, diagramLayout, splitGlossary } from "./present"
+import { assess, diagramLayout, nearestPoint, simulationLayout, splitGlossary } from "./present"
 import { fragmentLines, symptomHints, symptomLines } from "./symptoms"
-import type { CheckedClaim, DesignSummary, Hypothesis } from "./types"
+import type { CheckedClaim, DesignSummary, Hypothesis, Simulation } from "./types"
 
 describe("symptoms", () => {
   it("numbers non-empty lines the way the backend does", () => {
@@ -121,6 +121,7 @@ describe("assess", () => {
       expected: 3.3,
       flagged: true,
       text: "",
+      simulation: null,
     }
     const review = {
       ...summary,
@@ -212,5 +213,34 @@ describe("diagramLayout box", () => {
     expect(long.box.width).toBeGreaterThanOrEqual("6 GPIO0/ADC1_CH0/XTAL_32K_P".length * 6.7)
     expect(long.busX).toBeGreaterThan(long.box.x + long.box.width)
     expect(long.width).toBeGreaterThan(long.busX)
+  })
+})
+
+describe("simulationLayout", () => {
+  const sim: Simulation = {
+    t_ns: [0, 100, 200, 400, 700],
+    v: [0, 2.5, 3.8, 4.7, 4.97],
+    v_pull: 5,
+    v_supply: 3.3,
+    rise_ns: 120,
+    text: "",
+  }
+
+  it("spans the plot and marks the rail and the IC's limit", () => {
+    const layout = simulationLayout(sim)
+    const first = layout.points[0]
+    const last = layout.points[layout.points.length - 1]
+    expect([first.x, first.y, last.x]).toEqual([layout.plot.x0, layout.plot.y0, layout.plot.x1])
+    expect(layout.path.startsWith("M")).toBe(true)
+    expect(layout.levels.map((l) => l.label)).toEqual(["rail 5 V", "VDD+0.3 3.6 V"])
+    const [rail, limit] = layout.levels.map((l) => l.y)
+    expect(rail).toBeLessThan(limit) // 5 V sits above 3.6 V
+    expect(layout.xTicks.map((t) => t.label)).toEqual(["0", "200", "400", "600"])
+  })
+
+  it("finds the sample under the cursor", () => {
+    const layout = simulationLayout(sim)
+    const third = layout.points[2].x
+    expect(nearestPoint(layout, third + 1)?.v).toBe(3.8)
   })
 })

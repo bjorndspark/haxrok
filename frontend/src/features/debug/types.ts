@@ -162,6 +162,20 @@ export interface ReferenceNote {
 
 /** A value the backend computed from the netlist with a datasheet formula
  *  (cf1, …). `flagged`: it contradicts the design's intent. */
+/** An ngspice transient of a flagged I²C line released from low: pull-up,
+ *  estimated bus capacitance, ideal rail. Drawn on the card only. */
+export interface Simulation {
+  t_ns: number[]
+  v: number[]
+  /** The pull-up rail's named voltage. */
+  v_pull: number
+  /** The lowest supply of an IC on the line. */
+  v_supply: number
+  /** 30% to 70% of v_pull, as the I²C spec times it. */
+  rise_ns: number | null
+  text: string
+}
+
 export interface Calculation {
   id: string
   kind:
@@ -182,6 +196,8 @@ export interface Calculation {
   expected: number | null
   flagged: boolean
   text: string
+  /** Only on a flagged I²C line with a pull-up, and only if ngspice ran. */
+  simulation: Simulation | null
 }
 
 export interface Symptom {

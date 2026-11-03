@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     # kicad-cli must be at least as new as the KiCad that saved the upload.
     KICAD_CLI: str = "kicad-cli"
     KICAD_TIMEOUT_S: float = 60.0
+    # ngspice draws a flagged I²C line; missing or failing, the card has no plot.
+    NGSPICE: str = "ngspice"
+    NGSPICE_TIMEOUT_S: float = 10.0
     DEBUG_MAX_FILES: int = 200
     DEBUG_MAX_UPLOAD_BYTES: int = 20 * 1024 * 1024
 

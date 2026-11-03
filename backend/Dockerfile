@@ -13,8 +13,10 @@ COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /usr/local/bin/uv
 # package without recommends: no symbol/footprint libraries, which the
 # schematics don't need since they embed their symbols. It adds ~800 MB.
 # It must be at least as new as the KiCad that saved the user's files.
+# ngspice (~30 MB) draws a flagged I²C line's rise (spice.py); without it the
+# card just has no plot.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends kicad \
+    && apt-get install -y --no-install-recommends kicad ngspice \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

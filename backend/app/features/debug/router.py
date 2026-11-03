@@ -15,6 +15,7 @@ from app.core.errors import BadRequestError
 from app.features.debug import service
 from app.features.debug.kicad import KicadCli
 from app.features.debug.schemas import Analysis, Claim, MeasurementInput, Mode
+from app.features.debug.spice import Ngspice
 
 router = APIRouter(prefix="/debug", tags=["debug"])
 
@@ -75,7 +76,7 @@ async def analyze(
             )
         raw.append((f.filename or "", data))
 
-    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), mode)
+    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), mode, Ngspice())
     return EventSourceResponse(
         service.stream(prepared, service.Model(diagnose=_diagnose, structure=_structure))
     )

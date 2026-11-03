@@ -286,6 +286,19 @@ class ReferenceNote(BaseModel):
     text: str
 
 
+class Simulation(BaseModel):
+    """An ngspice transient of a flagged I²C line released from low
+    (``spice.py``): pull-up, estimated bus capacitance, ideal rail. For the
+    UI to draw; the model never sees it."""
+
+    t_ns: list[float]
+    v: list[float]
+    v_pull: float = Field(description="The pull-up rail's named voltage.")
+    v_supply: float = Field(description="The lowest supply of an IC on the line.")
+    rise_ns: float | None = Field(description="30% to 70% of v_pull, as the I²C spec times it.")
+    text: str
+
+
 class Calculation(BaseModel):
     """A value the backend computed from part values in the netlist
     (``calc.py``): a regulator's output or headroom, a charge current, an LED current,
@@ -314,6 +327,7 @@ class Calculation(BaseModel):
     expected: float | None = Field(description="The value the net name promises, if any.")
     flagged: bool
     text: str
+    simulation: Simulation | None = None
 
 
 class Symptom(BaseModel):

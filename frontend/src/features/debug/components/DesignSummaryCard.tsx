@@ -5,6 +5,7 @@ import { Badge } from "@/shared/ui/badge"
 import { Card } from "@/shared/ui/card"
 
 import type { DesignSummary } from "../types"
+import { SimulationPlot } from "./SimulationPlot"
 
 /** What the backend parsed, shown before the model answers so the user
  *  can check the parse and see which ICs have pin data. */
@@ -105,7 +106,10 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
                 {c.value === null ? "missing" : `${String(c.value)} ${c.unit}`}
                 {c.expected !== null && (c.flagged ? ` ≠ ${String(c.expected)} V` : " ✓")}
               </Badge>
-              <span className="leading-relaxed">{c.text}</span>
+              <div className="min-w-0 flex-1 space-y-2">
+                <p className="leading-relaxed">{c.text}</p>
+                {c.simulation && <SimulationPlot sim={c.simulation} />}
+              </div>
             </div>
           ))}
           <p className="text-[11px] text-muted-foreground">

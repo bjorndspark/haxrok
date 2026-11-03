@@ -541,6 +541,45 @@ def _i2c(design: Design, net: str, line: str) -> Calculation | None:
     )
 
 
+# I²C spec (UM10204, table 10): at most 10 pF per device pin. Wiring adds
+# some; 10 pF is a short-trace guess. Only the simulation uses it.
+_PIN_PF = 10.0
+_TRACE_PF = 10.0
+
+
+@dataclass(frozen=True)
+class I2cLine:
+    """The RC a flagged I²C line rises through, for ``spice.py``. The bus
+    capacitance is an estimate (10 pF per device pin + 10 pF of trace); the
+    netlist doesn't carry it."""
+
+    net: str
+    r_ohm: float
+    v_pull: float
+    v_supply: float  # the lowest supply of an IC on the line
+    c_farad: float
+
+
+def i2c_line(design: Design, calc: Calculation) -> I2cLine | None:
+    """The circuit behind a flagged ``i2c_pullup`` with a pull-up, or None
+    (unflagged, no pull-up, or a rail without a named voltage)."""
+    if calc.kind != "i2c_pullup" or not calc.flagged or calc.value is None or not calc.pins:
+        return None
+    net = design.net_of(calc.pins[0])
+    if net is None:
+        return None
+    ups = [r for r in _resistors(design, net) if not is_ground(r.other) and r.value > 0]
+    pull_v = max((v for r in ups if (v := named_voltage(r.other)) is not None), default=None)
+    supplies = [
+        s[1] for ref in {n.ref for n in _ic_nodes(design, net)} if (s := _supply(design, ref))
+    ]
+    if pull_v is None or not supplies:
+        return None
+    devices = sum(1 for n in design.nets[net] if _head(n.ref) in {"U", "IC", "J", "P", "CN"})
+    c = (devices * _PIN_PF + _TRACE_PF) * 1e-12
+    return I2cLine(net, calc.value, pull_v, min(supplies), c)
+
+
 _DELAY_PIN = re.compile(r"^~?\{?(EN|CHIP_EN|ENABLE|RUN|N?RST|RESET|N?RESET)\}?$", re.IGNORECASE)
 
 

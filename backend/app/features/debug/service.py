@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
-from app.features.debug import calc, diagram, pins, prompt, reference
+from app.features.debug import calc, diagram, pins, prompt, reference, spice
 from app.features.debug.design import (
     Design,
     compact,
@@ -88,10 +88,12 @@ async def prepare(
     measurements: list[MeasurementInput],
     kicad: KicadRunner,
     mode: Mode = "debug",
+    ngspice: spice.SpiceRunner | None = None,
 ) -> Prepared:
     """Validate the upload, run kicad-cli and parse its output. Raises
     ``AppError`` subclasses with messages the user can act on. In review
-    mode the symptoms are optional notes on what the board is for."""
+    mode the symptoms are optional notes on what the board is for. With
+    ``ngspice``, flagged I²C lines get a simulated waveform for the UI."""
     symptoms = prompt.number_symptoms(symptoms_text)
     if mode == "debug" and not symptoms:
         raise BadRequestError("Describe what you see on the bench first.", field="symptoms")
@@ -105,6 +107,8 @@ async def prepare(
     lookup = pins.lookup(design, erc, parse_labels(project.files))
     notes = reference.lookup(design)
     calcs = calc.lookup(design)
+    if ngspice is not None:
+        calcs = await spice.attach(calcs, design, ngspice)
     numbered = [
         Measurement(id=f"m{i}", step_id=m.step_id, context=m.context, value=m.value)
         for i, m in enumerate(measurements, start=1)
