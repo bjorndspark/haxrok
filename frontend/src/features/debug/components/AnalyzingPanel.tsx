@@ -1,4 +1,4 @@
-import { CircleCheck, Clock, LoaderCircle, Terminal } from "lucide-react"
+import { CircleCheck, Clock, LoaderCircle } from "lucide-react"
 
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
@@ -11,7 +11,8 @@ import { DesignSummaryCard } from "./DesignSummaryCard"
 const STEPS: { key: "upload" | ProgressStage; label: string; detail: string }[] = [
   { key: "upload", label: "Parse + ERC", detail: "kicad-cli netlist export and ERC" },
   { key: "pin_lookup", label: "Pin lookup", detail: "Datasheet pin tables for the ICs" },
-  { key: "reasoning", label: "Reasoning", detail: "The model reads the schematic" },
+  { key: "reasoning", label: "Diagnosis", detail: "The model traces the circuit" },
+  { key: "structuring", label: "Write-up", detail: "Claims, citations and bench steps" },
   { key: "checking", label: "Checking", detail: "Every citation checked against the input" },
 ]
 
@@ -42,7 +43,7 @@ export function AnalyzingPanel({ run, onCancel }: { run: Run; onCancel: () => vo
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Usually about two minutes. The model says nothing until it has finished thinking.
+                Usually four to five minutes: the model says nothing until each step is done.
               </p>
             </div>
           </div>
@@ -51,7 +52,7 @@ export function AnalyzingPanel({ run, onCancel }: { run: Run; onCancel: () => vo
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-6 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 pt-6 sm:grid-cols-3 lg:grid-cols-5">
           {STEPS.map((step, i) => {
             const state = stepState(run, i)
             return (
@@ -82,33 +83,6 @@ export function AnalyzingPanel({ run, onCancel }: { run: Run; onCancel: () => vo
           })}
         </div>
       </Card>
-
-      <div className="overflow-hidden rounded-xl border border-[#273445] bg-[#121720] font-mono text-xs text-slate-200 shadow-inner">
-        <div className="flex items-center justify-between border-b border-[#273445] bg-[#18212e] px-4 py-2.5">
-          <span className="flex items-center gap-2 font-semibold">
-            <Terminal className="h-4 w-4 text-emerald-400" />
-            Run log
-          </span>
-          <span className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400">
-            <span className="h-2 w-2 animate-ping rounded-full bg-emerald-400" />
-            LIVE
-          </span>
-        </div>
-        <div className="max-h-48 space-y-1.5 overflow-y-auto p-4 text-[11px]">
-          <div className="flex gap-2.5">
-            <span className="shrink-0 text-slate-500">[00:00]</span>
-            <span className="text-slate-300">[UPLOAD] {run.trigger}: sending the schematics</span>
-          </div>
-          {run.log.map((line, i) => (
-            <div key={i} className="flex gap-2.5">
-              <span className="shrink-0 text-slate-500">
-                [{formatElapsed(Math.floor((line.at - run.startedAt) / 1000))}]
-              </span>
-              <span className="text-slate-300">{line.text}</span>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {run.summary && <DesignSummaryCard summary={run.summary} />}
     </div>

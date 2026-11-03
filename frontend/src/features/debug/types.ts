@@ -130,7 +130,7 @@ export interface DesignSummary {
   measurements: Measurement[]
 }
 
-export type ProgressStage = "pin_lookup" | "reasoning" | "checking"
+export type ProgressStage = "pin_lookup" | "reasoning" | "structuring" | "checking"
 
 export interface ProgressEvent {
   stage: ProgressStage
@@ -156,7 +156,6 @@ export interface Run {
   startedAt: number
   finishedAt: number | null
   summary: DesignSummary | null
-  log: { at: number; text: string }[]
   stage: ProgressStage | null
   result: CheckedAnalysis | null
   error: string | null

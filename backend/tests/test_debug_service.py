@@ -123,8 +123,16 @@ def _analysis() -> Analysis[Claim]:
     )
 
 
-async def _collect(prepared: service.Prepared, reason: service.Reasoner) -> list[tuple[str, dict]]:
-    return [(e["event"], json.loads(e["data"])) async for e in service.stream(prepared, reason)]
+async def _collect(prepared: service.Prepared, model: service.Model) -> list[tuple[str, dict]]:
+    return [(e["event"], json.loads(e["data"])) async for e in service.stream(prepared, model)]
+
+
+async def _diagnose(system: str, user: str) -> str:
+    return "1. L2 tied to VOUT."
+
+
+async def _structure(system: str, user: str) -> Analysis[Claim]:
+    return _analysis()
 
 
 # --- upload -----------------------------------------------------------------------------
@@ -202,14 +210,21 @@ async def test_stream_sends_summary_progress_then_checked_result():
     )
     assert kicad.projects[0].root == "board.kicad_sch"
     seen: list[str] = []
+    structured: list[str] = []
 
-    async def reason(system: str, user: str) -> Analysis[Claim]:
+    async def diagnose(system: str, user: str) -> str:
         seen.append(user)
+        return "1. L2 tied to VOUT."
+
+    async def structure(system: str, user: str) -> Analysis[Claim]:
+        structured.append(user)
         return _analysis()
 
-    events = await _collect(prepared, reason)
+    events = await _collect(prepared, service.Model(diagnose=diagnose, structure=structure))
     names = [name for name, _ in events]
-    assert names == ["design_summary", "progress", "progress", "progress", "result"]
+    assert names == ["design_summary"] + ["progress"] * 4 + ["result"]
+    stages = [data["stage"] for name, data in events if name == "progress"]
+    assert stages == ["pin_lookup", "reasoning", "structuring", "checking"]
 
     summary = events[0][1]
     assert (summary["project"], summary["sheets"], summary["parts"]) == ("board", 2, 3)
@@ -223,6 +238,10 @@ async def test_stream_sends_summary_progress_then_checked_result():
     assert "erc-1 [multiple_net_names]" in seen[0]
     assert "U2.9 L2:" in seen[0]
 
+    # The structuring call gets the diagnosis, then the same input to cite.
+    assert structured[0].startswith("## Diagnosis\n1. L2 tied to VOUT.")
+    assert seen[0] in structured[0]
+
     claims = events[-1][1]["hypotheses"][0]["claims"]
     assert [c["evidence"] for c in claims] == ["schematic", "datasheet", "none"]
     assert claims[2]["downgraded"] and "m2" in claims[2]["reason"]
@@ -231,11 +250,20 @@ async def test_stream_sends_summary_progress_then_checked_result():
 async def test_model_failure_ends_the_stream_with_an_error_event():
     prepared = await service.prepare(_files(), "Dead board", [], FakeKicad())
 
-    async def reason(system: str, user: str) -> Analysis[Claim]:
+    async def failing_diagnose(system: str, user: str) -> str:
         raise UpstreamError("The model call failed: 503")
 
-    events = await _collect(prepared, reason)
+    async def failing_structure(system: str, user: str) -> Analysis[Claim]:
+        raise UpstreamError("The model's answer didn't match the expected format.")
+
+    events = await _collect(prepared, service.Model(failing_diagnose, _structure))
     assert events[-1] == ("error", {"message": "The model call failed: 503"})
+
+    events = await _collect(prepared, service.Model(_diagnose, failing_structure))
+    assert events[-1] == (
+        "error",
+        {"message": "The model's answer didn't match the expected format."},
+    )
 
 
 async def test_blank_symptoms_are_refused_before_kicad_runs():
@@ -252,10 +280,8 @@ async def test_blank_symptoms_are_refused_before_kicad_runs():
 def fake_backends(monkeypatch):
     monkeypatch.setattr(router, "KicadCli", FakeKicad)
 
-    async def reason(system: str, user: str) -> Analysis[Claim]:
-        return _analysis()
-
-    monkeypatch.setattr(router, "_reason", reason)
+    monkeypatch.setattr(router, "_diagnose", _diagnose)
+    monkeypatch.setattr(router, "_structure", _structure)
 
 
 async def test_analyze_streams_sse(client, fake_backends):

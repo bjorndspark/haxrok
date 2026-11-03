@@ -4,8 +4,9 @@ api.openai.com when empty). Provider routing, keys, budgets, and fallbacks
 are the gateway's job — this repo only forwards the optional
 AI_CHAT_FALLBACKS list verbatim via fallbacks_extra_body().
 
-Features call the helpers in app.core.ai (structured.complete_structured) —
-they never construct SDK clients themselves.
+Features call the helpers in app.core.ai (chat.complete_text,
+structured.complete_structured); they never construct SDK clients
+themselves.
 """
 
 from functools import lru_cache

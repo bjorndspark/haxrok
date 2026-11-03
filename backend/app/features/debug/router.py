@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import TypeAdapter, ValidationError
 from sse_starlette.sse import EventSourceResponse
 
+from app.core.ai.chat import complete_text
 from app.core.ai.structured import complete_structured
 from app.core.config import settings
 from app.core.errors import BadRequestError
@@ -20,7 +21,15 @@ router = APIRouter(prefix="/debug", tags=["debug"])
 _measurements = TypeAdapter(list[MeasurementInput])
 
 
-async def _reason(system: str, user: str) -> Analysis[Claim]:
+async def _diagnose(system: str, user: str) -> str:
+    return await complete_text(
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        name="debug_diagnosis",
+        timeout_s=settings.DEBUG_AI_TIMEOUT_S,
+    )
+
+
+async def _structure(system: str, user: str) -> Analysis[Claim]:
     return await complete_structured(
         Analysis[Claim],
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -63,4 +72,6 @@ async def analyze(
         raw.append((f.filename or "", data))
 
     prepared = await service.prepare(raw, symptoms, parsed, KicadCli())
-    return EventSourceResponse(service.stream(prepared, _reason))
+    return EventSourceResponse(
+        service.stream(prepared, service.Model(diagnose=_diagnose, structure=_structure))
+    )

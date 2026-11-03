@@ -49,7 +49,6 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       startedAt: Date.now(),
       finishedAt: null,
       summary: null,
-      log: [],
       stage: null,
       result: null,
       error: null,

@@ -6,10 +6,12 @@ Two phases, so failures land where the UI can show them:
    kicad-cli, parse the netlist and ERC. A bad folder or a schematic the
    server's KiCad can't open is an ordinary error response.
 2. ``stream`` (the SSE body): design summary at once, then our own stage
-   updates while the model thinks (it streams nothing for ~90 s), then the
-   checked result or an error event.
+   updates while the model thinks (it streams nothing for ~90 s per call),
+   then the checked result or an error event.
 
-The kicad runner and the model call are passed in, so tests fake both.
+The model is called twice (see ``prompt``): a free-text diagnosis, then a
+conversion of it into the structured answer. The kicad runner and both
+model calls are passed in, so tests fake them.
 """
 
 import time
@@ -37,8 +39,20 @@ from app.features.debug.schemas import (
 
 logger = get_logger(__name__)
 
-Reasoner = Callable[[str, str], Awaitable[Analysis[Claim]]]
-"""(system prompt, user message) -> the model's analysis."""
+Diagnoser = Callable[[str, str], Awaitable[str]]
+"""(system prompt, user message) -> the model's free-text diagnosis."""
+
+Structurer = Callable[[str, str], Awaitable[Analysis[Claim]]]
+"""(system prompt, user message) -> the model's structured analysis."""
+
+
+@dataclass(frozen=True)
+class Model:
+    """The two model calls one analysis makes."""
+
+    diagnose: Diagnoser
+    structure: Structurer
+
 
 SseEvent = dict[str, str]
 
@@ -91,7 +105,7 @@ async def prepare(
     return Prepared(summary, design, erc, lookup, symptoms, numbered)
 
 
-async def stream(prepared: Prepared, reason: Reasoner) -> AsyncIterator[SseEvent]:
+async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
     """The SSE body for one analysis run."""
     yield _event("design_summary", prepared.summary.model_dump_json())
     with_data = sum(1 for ic in prepared.summary.ics if ic.pin_data)
@@ -99,7 +113,9 @@ async def stream(prepared: Prepared, reason: Reasoner) -> AsyncIterator[SseEvent
         "pin_lookup",
         f"Pin table found for {with_data} of {len(prepared.summary.ics)} ICs.",
     )
-    yield _progress("reasoning", "The model is reading the schematic. This takes about 2 minutes.")
+    yield _progress(
+        "reasoning", "The model is tracing the circuit against your symptoms. About 2 minutes."
+    )
     user = prompt.build_user_message(
         symptoms=prepared.symptoms,
         measurements=prepared.measurements,
@@ -109,7 +125,19 @@ async def stream(prepared: Prepared, reason: Reasoner) -> AsyncIterator[SseEvent
     )
     start = time.monotonic()
     try:
-        analysis = await reason(prompt.SYSTEM, user)
+        diagnosis = await model.diagnose(prompt.DIAGNOSE, user)
+        # Logged whole: it's the reasoning the structured answer must follow,
+        # and the first thing to read when a result looks wrong.
+        logger.info(
+            "debug diagnosis of %s in %.1fs:\n%s",
+            prepared.summary.project,
+            time.monotonic() - start,
+            diagnosis,
+        )
+        yield _progress("structuring", "Writing the diagnosis up as claims and bench steps.")
+        analysis = await model.structure(
+            prompt.STRUCTURE, prompt.build_structure_message(diagnosis=diagnosis, user=user)
+        )
     except AppError as e:
         yield _event("error", ErrorEvent(message=e.detail).model_dump_json())
         return

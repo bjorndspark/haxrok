@@ -259,7 +259,7 @@ class MeasurementInput(BaseModel):
 # event, result or error. Parsing and ERC run before the stream opens, so their
 # failures come back as an ordinary error response instead.
 
-ProgressStage = Literal["pin_lookup", "reasoning", "checking"]
+ProgressStage = Literal["pin_lookup", "reasoning", "structuring", "checking"]
 
 
 class ProgressEvent(BaseModel):

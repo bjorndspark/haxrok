@@ -13,46 +13,16 @@ import { toMarkdown } from "./present"
 import { useDebugStore } from "./store"
 import type { AnalysisEvent, ConfirmStep, Run } from "./types"
 
-const STAGE_LOG: Record<string, string> = {
-  pin_lookup: "PINS",
-  reasoning: "MODEL",
-  checking: "CHECK",
-}
-
-function applyEvent(run: Run, ev: AnalysisEvent): Partial<Run> {
-  const at = Date.now()
+function applyEvent(ev: AnalysisEvent): Partial<Run> {
   switch (ev.type) {
-    case "design_summary": {
-      const s = ev.summary
-      const withPins = s.ics.filter((ic) => ic.pin_data).length
-      return {
-        summary: s,
-        log: [
-          ...run.log,
-          {
-            at,
-            text: `[NETLIST] ${s.project}: ${String(s.sheets)} sheets, ${String(s.parts)} parts, ${String(s.nets)} nets`,
-          },
-          { at, text: `[ERC] ${String(s.erc.length)} findings after dropping library-only rules` },
-          {
-            at,
-            text: `[INPUT] ${String(s.symptoms.length)} symptoms, ${String(s.measurements.length)} measurements, pin data for ${String(withPins)}/${String(s.ics.length)} ICs`,
-          },
-        ],
-      }
-    }
+    case "design_summary":
+      return { summary: ev.summary }
     case "progress":
-      return {
-        stage: ev.progress.stage,
-        log: [
-          ...run.log,
-          { at, text: `[${STAGE_LOG[ev.progress.stage] ?? "STAGE"}] ${ev.progress.message}` },
-        ],
-      }
+      return { stage: ev.progress.stage }
     case "result":
-      return { result: ev.result, finishedAt: at, stage: null }
+      return { result: ev.result, finishedAt: Date.now(), stage: null }
     case "error":
-      return { error: ev.message, finishedAt: at, stage: null }
+      return { error: ev.message, finishedAt: Date.now(), stage: null }
   }
 }
 
@@ -97,7 +67,7 @@ export function useDebugActions(): DebugActions {
         useDebugStore.getState().measurements,
         controller.signal,
       )) {
-        update(number, (r) => applyEvent(r, ev))
+        update(number, () => applyEvent(ev))
       }
       update(number, (r) =>
         r.finishedAt === null
