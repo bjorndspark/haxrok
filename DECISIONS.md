@@ -337,3 +337,31 @@ still suspected the correct resistor, though it held rework until a
 datasheet check. A pin table only
 fixes pin names, not specs or reference circuits, so retrieval replaces
 it as the next feature after the hackathon.
+
+## Debug analysis is two model calls: diagnose, then structure
+
+**Decision:** `features/debug` calls the model twice. `prompt.DIAGNOSE`
+asks for a free-text diagnosis, worded like the go/no-go prompt.
+`prompt.STRUCTURE` turns that diagnosis into `Analysis[Claim]` (claims,
+citations, confirm steps, fixes) and is told not to diagnose again: keep
+the causes, their order and their conclusions. The diagnosis is logged
+whole. The pin table counts as verified: a fault that follows from the
+netlist, ERC and pin table alone is a design error, not an "unverified"
+one.
+
+**Alternatives rejected:** one structured call, the original design. With
+the real bench notes of a private board (not in the repo) it missed the
+board's wiring fault 2 of 2 times, ranking weak source and overload instead, while the
+plain go/no-go prompt on the same input ranked it #1. Format rules took
+the model's attention away from tracing the circuit. Trimming the format
+rules: the citation checker depends on them.
+
+**Consequence:** an analysis takes two ~90–150 s calls, about 4–6 minutes
+in all, so the UI shows a separate "Write-up" stage. The second call can
+still drift from the diagnosis; on the runs below it didn't. Without the
+pin-table rule, one two-step run saw the short, called it "unverified"
+under the datasheet-facts rule, and ranked it #3. Measured with the final
+prompts: the private board's notes ranked its fault #1 in 2 of 2 runs with no
+downgraded claims, all six planted eval faults ranked #1, and the no-fault
+case passed. `evals/gonogo.py` doesn't run these prompts, so a green
+go/no-go says nothing about the app.

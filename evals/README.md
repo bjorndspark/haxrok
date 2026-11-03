@@ -121,3 +121,28 @@ One pass in two on the no-fault case is not a fix, and it's one run each.
 | Finds it from the netlist alone | The model can reason about circuits, so go ahead |
 | Finds it only with ERC | Still go: connecting ERC warnings to symptoms is a real product |
 | Misses it even with ERC | This model is too weak; try a larger one before deciding |
+
+## Results: the app's two-step prompts, 2026-11-03
+
+`gonogo.py` doesn't run the app's prompts. These runs sent each case
+through `prompt.DIAGNOSE` and then `prompt.STRUCTURE`
+(`backend/app/features/debug/prompt.py`, see `DECISIONS.md`, "Debug
+analysis is two model calls"). The netlist and ERC are as above, with no
+pin table. `meta/muse-spark-1.3-contributor`, one run each, three at once.
+Ranks are read from the structured answer.
+
+| Case | Rank of real cause | Total time |
+|---|---|---|
+| `rust-board-fb-swapped` | #1 | 289 s |
+| `rust-board-i2c-vbus` | #1 | 312 s |
+| `orbit-uart-swapped` | #1 | 343 s |
+| `orbit-boot0-high` | #1 | 311 s |
+| `rp-micro-ldo-en` | #1 | 216 s |
+| `rp-micro-no-fault` | PASS | 295 s |
+
+The no-fault answer opens with "Schematic looks correct", ranks the cable
+#1, and says to leave R3/C3/C4 alone until the crystal section of the
+RP2040 design guide is checked. On a private real board (not in the
+repo), through `POST /api/v1/debug/analyze` with its bench notes, the
+real fault ranked #1 in 2 of 2 runs. The one-call structured prompt
+before this missed it in 2 of 2.
