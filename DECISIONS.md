@@ -373,10 +373,13 @@ resistor values in the netlist: a regulator's output from its feedback
 divider (SY8088: 0.6 V × (1 + R1/R2)), a charger's current from its
 program resistor (MCP73831: 1000 V / R), and generic circuits: LED
 current through its series resistor, the pull-up on each I²C line, RC
-delays on enable and reset pins, dividers into IC pins. Flagged: a
+delays on enable and reset pins, dividers into IC pins, and the CC
+pull-downs on a USB-C receptacle. Flagged: a
 regulator output more than 8% from the voltage its output net is named
 for (`+3V3`), an LED with no resistor, an I²C line with no pull-up on the
-board, or one pulled up above an IC's supply (VBUS counts as 5 V). Claims
+board, or one pulled up above an IC's supply (VBUS counts as 5 V), and
+USB-C CC1/CC2 sharing one pull-down, a CC pin with none, or one outside
+5.1 kΩ ±10% (CC pins wired to an IC, a PD controller, are skipped). Claims
 cite either with the evidence label `reference` ("Based on the
 manufacturer's design"), and the prompts say a circuit matching a note is
 correct as designed.

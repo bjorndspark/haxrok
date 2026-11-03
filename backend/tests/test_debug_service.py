@@ -643,3 +643,55 @@ def test_an_i2c_pullup_above_the_ic_supply_is_flagged():
     )
     (c,) = calc.lookup(design)
     assert c.flagged and "5 V" in c.text and "+3V3" in c.text
+
+
+def _usb_c(cc1: list[str], cc2: list[str], resistors: dict[str, str]) -> Design:
+    """A USB-C receptacle J1 whose CC1/CC2 nets hold the given extra nodes."""
+    parts = {"J1": ("USB_C_Receptacle_USB2.0", "Connector:USB_C_Receptacle_USB2.0")}
+    parts |= {ref: (value, "Device:R") for ref, value in resistors.items()}
+    nets = {"Net-(J1-CC1)": ["J1.A5(CC1)", *cc1], "GND": [f"{r}.2" for r in resistors]}
+    if cc2 is cc1:
+        nets["Net-(J1-CC1)"].append("J1.B5(CC2)")
+    else:
+        nets["Net-(J1-CC2)"] = ["J1.B5(CC2)", *cc2]
+    return _design(parts, nets)
+
+
+def test_usb_c_cc_pulldowns_are_checked():
+    from app.features.debug import calc
+
+    (good,) = calc.lookup(_usb_c(["R6.1"], ["R7.1"], {"R6": "5.1k", "R7": "5k1"}))
+    assert good.kind == "usb_cc" and not good.flagged and "own 5.1 kΩ" in good.text
+
+    shared = ["R6.1"]
+    (c,) = calc.lookup(_usb_c(shared, shared, {"R6": "5.1k"}))
+    assert c.flagged and "tied together" in c.text and "R6.1" in c.pins
+
+    (c,) = calc.lookup(_usb_c(["R6.1"], [], {"R6": "5.1k"}))
+    assert c.flagged and c.value is None and "CC2 (J1.B5) has no resistor" in c.text
+
+    (c,) = calc.lookup(_usb_c(["R6.1"], ["R7.1"], {"R6": "5.1k", "R7": "56k"}))
+    assert c.flagged and c.value == 56000 and "Rp" in c.text
+
+
+def test_usb_c_cc_left_to_a_pd_controller_or_a_source_is_not_flagged():
+    from app.features.debug import calc
+
+    pd = _usb_c(["U1.1(CC1)"], ["U1.2(CC2)"], {})
+    pd.parts["U1"] = Part("U1", "CH224K", "x:y", "")
+    assert calc.lookup(pd) == []
+
+    source = _design(
+        {
+            "J1": ("USB_C_Receptacle", "Connector:USB_C_Receptacle"),
+            "R1": ("56k", "Device:R"),
+            "R2": ("56k", "Device:R"),
+        },
+        {
+            "VBUS": ["R1.1", "R2.1"],
+            "CC1": ["J1.A5(CC1)", "R1.2"],
+            "CC2": ["J1.B5(CC2)", "R2.2"],
+        },
+    )
+    (c,) = calc.lookup(source)
+    assert not c.flagged and "source port" in c.text

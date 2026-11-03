@@ -17,6 +17,9 @@ every such circuit needs:
   capacitor to ground.
 - **divider**: a two-resistor divider into an IC pin: the voltage there, or
   the ratio when the rail's name carries no voltage.
+- **usb_cc**: the Rd pull-downs on a USB-C receptacle's CC1 and CC2. Flagged
+  when the two pins share one resistor, a pin has none, or one isn't
+  5.1 kΩ ±10% (USB Type-C Specification, Rd for a sink).
 
 The formulas for specific parts (feedback, program resistor) were read in
 the named document; see ``reference.py`` for the notes from the same
@@ -522,6 +525,111 @@ def _divider(design: Design, net: str) -> Calculation | None:
     )
 
 
+# USB Type-C Specification, sink pull-down Rd = 5.1 kΩ ±10% on each CC pin.
+_RD, _RD_TOL = 5100.0, 0.10
+_CC_PIN = re.compile(r"^CC([12])$", re.IGNORECASE)
+
+
+def _cc_pins(design: Design, ref: str) -> dict[str, Node]:
+    """{"CC1": node, "CC2": node} for a connector, from its pin names."""
+    found: dict[str, Node] = {}
+    for nodes in design.nets.values():
+        for n in nodes:
+            if n.ref == ref and (m := _CC_PIN.match(n.function)):
+                found.setdefault(f"CC{m.group(1)}", n)
+    return found
+
+
+def _usb_cc(design: Design, ref: str) -> Calculation | None:
+    """A USB-C receptacle's CC pull-downs (Rd). Pins with an IC on their net
+    (a PD controller or a CC logic chip) are left to that IC; a CC pin pulled
+    up instead of down is a source port (Rp), reported without a flag."""
+    cc = _cc_pins(design, ref)
+    if set(cc) != {"CC1", "CC2"}:
+        return None
+    nets = {name: design.net_of(n.pin_ref) or "" for name, n in cc.items()}
+    if any(_ic_nodes(design, net) for net in nets.values()):
+        return None
+    pins = [cc["CC1"].pin_ref, cc["CC2"].pin_ref]
+    rule = "each CC pin needs its own 5.1 kΩ ±10% pull-down (Rd) to ground"
+    if nets["CC1"] == nets["CC2"]:
+        downs = [r for r in _resistors(design, nets["CC1"]) if is_ground(r.other)]
+        value = 1 / sum(1 / r.value for r in downs if r.value > 0) if downs else None
+        by = f" through {', '.join(r.ref for r in downs)}" if downs else ""
+        return Calculation(
+            id="",
+            kind="usb_cc",
+            ic=ref,
+            pins=[*pins, *_pins_of(*downs)],
+            value=round(value) if value else None,
+            unit="Ω",
+            expected=_RD,
+            flagged=True,
+            text=(
+                f"USB-C {ref}: CC1 ({pins[0]}) and CC2 ({pins[1]}) are tied together on "
+                f"{nets['CC1']} and share one pull-down{by}, but {rule}. With them shared, an "
+                "e-marked USB-C to USB-C cable (most 5 A and laptop-charger cables) puts its "
+                "~1 kΩ Ra on the same node, so the charger sees Ra instead of a sink and keeps "
+                "VBUS off. USB-A to USB-C and plain USB-C cables still work, which hides it."
+            ),
+        )
+    parts: list[str] = []
+    problems: list[str] = []
+    used: list[_Two] = []
+    worst: float | None = _RD
+    source = False
+    for name in ("CC1", "CC2"):
+        net = nets[name]
+        resistors = [r for r in _resistors(design, net) if r.value > 0]
+        downs = [r for r in resistors if is_ground(r.other)]
+        ups = [r for r in resistors if not is_ground(r.other)]
+        used += downs + ups
+        if ups and not downs:
+            listed = ", ".join(f"{r.ref} ({format_ohms(r.value)}) to {r.other}" for r in ups)
+            parts.append(f"{name} is pulled up by {listed} (Rp: a source port, not a sink)")
+            source = True
+            continue
+        if not downs:
+            problems.append(f"{name} ({cc[name].pin_ref}) has no resistor to ground")
+            worst = None
+            continue
+        value = 1 / sum(1 / r.value for r in downs)
+        listed = ", ".join(f"{r.ref} ({format_ohms(r.value)})" for r in downs)
+        parts.append(f"{name} has {listed} to ground")
+        if abs(value - _RD) > _RD_TOL * _RD:
+            problems.append(
+                f"{name} sees {format_ohms(round(value))}, outside 4.59–5.61 kΩ"
+                + (
+                    " (56 kΩ, 22 kΩ and 10 kΩ are Rp pull-up values for a source)"
+                    if value > _RD
+                    else ""
+                )
+            )
+            if worst is not None:
+                worst = value
+    flagged = bool(problems)
+    text = f"USB-C {ref}:" + (f" {'; '.join(parts)}." if parts else "")
+    if flagged:
+        text += (
+            f" {'; '.join(problems)}, but {rule}. Without it a USB-C to USB-C "
+            "charger doesn't see a sink and never turns on VBUS; a USB-A to USB-C cable "
+            "still works, which hides the fault."
+        )
+    elif not source:
+        text += " Each CC pin has its own 5.1 kΩ Rd, as a USB-C sink needs."
+    return Calculation(
+        id="",
+        kind="usb_cc",
+        ic=ref,
+        pins=[*pins, *_pins_of(*used)],
+        value=round(worst) if worst is not None else None,
+        unit="Ω",
+        expected=_RD,
+        flagged=flagged,
+        text=text,
+    )
+
+
 # Enough to cover a board's regulators, chargers and buses without drowning
 # the model's input in LED arithmetic.
 _MAX = 16
@@ -543,6 +651,8 @@ def lookup(design: Design) -> list[Calculation]:
                 fb_nets.add(design.net_of(f"{part.ref}.{prog.prog_pin}") or "")
         if _is_led(design, part.ref) and (c := _led(design, part.ref)):
             calcs.append(c)
+        if _head(part.ref) in {"J", "P", "CN", "USB"} and (c := _usb_cc(design, part.ref)):
+            calcs.append(c)
     for net in sorted(design.nets):
         if net in fb_nets:
             continue
@@ -558,5 +668,8 @@ def lookup(design: Design) -> list[Calculation]:
 def format_calculations(calcs: list[Calculation]) -> str:
     """The calculations as the model reads them."""
     if not calcs:
-        return "(none: no regulator divider, charger, LED, I²C, RC or divider circuit recognised)\n"
+        return (
+            "(none: no regulator divider, charger, LED, I²C, RC, divider or USB-C CC "
+            "circuit recognised)\n"
+        )
     return "\n".join(f"{c.id}{' FLAGGED' if c.flagged else ''}: {c.text}" for c in calcs) + "\n"

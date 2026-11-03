@@ -21,6 +21,7 @@ cases/<name>/
 | `orbit-uart-swapped` | STM32 USART1 wired TX-to-TX / RX-to-RX with the CP2102 | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `orbit-boot0-high` | BOOT0 pull-down returned to +3.3V, so it always boots the ROM bootloader | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `rp-micro-ldo-en` | RT9013 LDO enable tied to its own output, so it never starts | Planted (siderakb/rp-micro) |
+| `rp-micro-cc-shared` | USB-C CC1 and CC2 tied together on one 5.1 kΩ pull-down, so e-marked USB-C cables get no VBUS | Planted (siderakb/rp-micro) |
 | `rp-micro-no-fault` | None; the cause is a charge-only USB cable. Pass = no schematic fault claimed at any rank | Unmodified board (siderakb/rp-micro) |
 
 Planted cases take a real open-source board and make one minimal edit that
@@ -149,6 +150,16 @@ evidence"). The I²C check flags `rust-board-i2c-vbus`'s pull-ups to VBUS
 | `rust-board-i2c-vbus` | review | #1 (won't work) | 216 s | #3 calls the 32.768 kHz crystal's DNP load caps "may fail", reasoned only |
 | `rust-board-i2c-vbus` | debug | #1 | 258 s | Calls it a verified design error |
 | `rp-micro-no-fault` | review | PASS (no issues) | 125 s | |
+
+After the USB-C CC check (`usb_cc`: each CC pin needs its own 5.1 kΩ
+±10% to ground). On `rp-micro-cc-shared` the check flags the shared
+pull-down before the model runs; on every other case it stays quiet.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `rp-micro-cc-shared` | review | #1 (may fail) | 157 s | "USB-C CC1/CC2 tied together with one Rd - e-marked cables will keep VBUS off"; #2 compares the 20 pF crystal caps with the reference's 15 pF (improve) |
+| `rp-micro-cc-shared` | debug | #1 | 185 s | Called a verified design error that explains every symptom |
+| `rp-micro-no-fault` | review | PASS (no issues) | 85 s | |
 
 ## Reading the result
 

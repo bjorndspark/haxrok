@@ -165,7 +165,13 @@ export interface ReferenceNote {
 export interface Calculation {
   id: string
   kind:
-    "regulator_output" | "charge_current" | "led_current" | "i2c_pullup" | "rc_delay" | "divider"
+    | "regulator_output"
+    | "charge_current"
+    | "led_current"
+    | "i2c_pullup"
+    | "rc_delay"
+    | "divider"
+    | "usb_cc"
   ic: string
   pins: string[]
   /** Null when the thing to measure is missing (no pull-up, no resistor). */
