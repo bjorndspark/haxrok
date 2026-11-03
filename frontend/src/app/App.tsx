@@ -1,11 +1,11 @@
 import { Route, Routes } from "react-router-dom"
 
-import { ChatPage } from "@/features/chat"
+import { DebugPage } from "@/features/debug"
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<ChatPage />} />
+      <Route path="/" element={<DebugPage />} />
     </Routes>
   )
 }
