@@ -33,7 +33,7 @@ export function Header({ onNewAnalysis, showNew }: HeaderProps) {
           <div>
             <span className="font-mono text-xl font-bold tracking-tight">{APP_NAME}</span>
             <p className="hidden text-xs text-muted-foreground sm:block">
-              Schematic debugger for boards on the bench
+              Schematic debugging and pre-fab review for KiCad boards
             </p>
           </div>
         </div>

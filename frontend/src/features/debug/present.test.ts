@@ -196,3 +196,21 @@ describe("diagramLayout members", () => {
     expect(text.length).toBeLessThanOrEqual(56)
   })
 })
+
+describe("diagramLayout box", () => {
+  it("widens the IC box so a long pin name isn't clipped", () => {
+    const diagram = (name: string) =>
+      diagramLayout({
+        ic: "U3",
+        value: "ESP32-C3-MINI-1",
+        pins: [{ pin: "U3.6", name, net: "IO0", flagged: false }],
+        nets: [{ name: "IO0", members: [], more: 0 }],
+      })
+    const short = diagram("EN")
+    const long = diagram("GPIO0/ADC1_CH0/XTAL_32K_P")
+    expect(short.box.width).toBe(150)
+    expect(long.box.width).toBeGreaterThanOrEqual("6 GPIO0/ADC1_CH0/XTAL_32K_P".length * 6.7)
+    expect(long.busX).toBeGreaterThan(long.box.x + long.box.width)
+    expect(long.width).toBeGreaterThan(long.busX)
+  })
+})

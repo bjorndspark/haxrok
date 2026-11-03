@@ -327,8 +327,8 @@ export function InputView({ actions }: { actions: DebugActions }) {
         <div className="flex flex-col items-center justify-between gap-4 border-t pt-3 sm:flex-row">
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <CircleAlert className="h-4 w-4 shrink-0 text-blue-500" />
-            Uses the netlist, KiCad&apos;s ERC and datasheet pin tables. A run takes about two
-            minutes.
+            Uses the netlist, KiCad&apos;s ERC, datasheet pin tables, reference designs and values
+            calculated from your parts. A run takes about two minutes.
           </p>
           <div className="flex w-full gap-2 sm:w-auto">
             {hasRuns && (

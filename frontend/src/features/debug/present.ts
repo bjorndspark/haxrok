@@ -253,6 +253,9 @@ const GROUP_GAP = 14
 const HEADER = 50
 // Characters of member text that fit right of the bus at 11px mono.
 const MEMBER_CHARS = 44
+// Width of one 11px mono character, and the narrowest the IC box gets.
+const CHAR_W = 6.7
+const MIN_BOX = 150
 
 /** Where everything in a wiring diagram goes: the IC's pins down the right
  *  edge of its box, grouped by net, each group joined by a bus with the
@@ -292,11 +295,15 @@ export function diagramLayout(d: Diagram): DiagramLayout {
     y = Math.max(y, top + 2 * ROW) + GROUP_GAP
   }
   const boxHeight = y - GROUP_GAP - ROW / 2
+  // Long pin names (GPIO0/ADC1_CH0/XTAL_32K_P) widen the box so they aren't clipped.
+  const longest = Math.max(d.ic.length, d.value.length, ...pins.map((p) => p.label.length))
+  const boxWidth = Math.max(MIN_BOX, Math.ceil(longest * CHAR_W) + 20)
+  const busX = boxWidth + 70
   return {
-    width: 560,
+    width: busX + 340,
     height: boxHeight + 8,
-    box: { x: 4, y: 4, width: 150, height: boxHeight - 4 },
-    busX: 220,
+    box: { x: 4, y: 4, width: boxWidth, height: boxHeight - 4 },
+    busX,
     pins,
     nets,
   }

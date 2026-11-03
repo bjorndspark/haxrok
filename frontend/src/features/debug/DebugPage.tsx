@@ -18,8 +18,10 @@ export function DebugPage() {
       </main>
       <footer className="mt-auto border-t bg-card py-4 text-xs text-muted-foreground">
         <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-2 px-4 sm:flex-row sm:px-6">
-          <span>Schematic causes of bench symptoms, for KiCad projects.</span>
-          <span>Every claim is labelled with what it rests on. Check before you rework.</span>
+          <span>Bench debugging and pre-fab review, for KiCad projects.</span>
+          <span>
+            Every claim is labelled with what it rests on. Check it before you rework or order.
+          </span>
         </div>
       </footer>
     </div>
