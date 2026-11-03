@@ -127,8 +127,11 @@ One pass in two on the no-fault case is not a fix, and it's one run each.
 `gonogo.py` doesn't run the app's prompts. `app_prompts.py` does: it
 sends a case through `prompt.DIAGNOSE` and then `prompt.STRUCTURE`
 (`backend/app/features/debug/prompt.py`, see `DECISIONS.md`, "Debug
-analysis is two model calls"), with the netlist and ERC as above and no
-pin table. It runs in the backend container, so it uses the app's
+analysis is two model calls"), with the netlist and ERC as above. Since
+2026-11-03 it also reads the compact netlist back into the app's `Design`
+and adds the pin table and verified wiring findings the app would send
+(`pins.lookup`); no committed case has ICs in the pin table, so none
+gets findings. The results table below predates that. It runs in the backend container, so it uses the app's
 gateway settings:
 
 ```sh
@@ -155,3 +158,13 @@ RP2040 design guide is checked. On a private real board (not in the
 repo), through `POST /api/v1/debug/analyze` with its bench notes, the
 real fault ranked #1 in 2 of 2 runs. The one-call structured prompt
 before this missed it in 2 of 2.
+
+### With the wiring check, 2026-11-03
+
+After `pins.check_wiring` (see `DECISIONS.md`, "Wiring faults the pin
+table proves are found by code"), with the pin table and findings in the
+input. The printed line now names the findings (`findings <pins>`).
+
+| Case | Run | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `rp-micro-no-fault` | 1 | PASS | 221 s | No finding; cable #1, #3 is assembly "despite correct schematic" |

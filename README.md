@@ -27,6 +27,8 @@ Scope, the go/no-go result and the ideas weighed against this one are in
 - [x] MVP debug feature: KiCad project folder drop (netlist and ERC are
       extracted by the backend), symptom box, pin-function
       lookup, ranked hypotheses with source labels
+- [x] Pin-table wiring check before the model, a rule-based confidence
+      label per hypothesis, and a small wiring diagram per hypothesis
 - [ ] Stretch: ngspice check with waveforms, agent loop, pre-fab review
       mode
 

@@ -278,3 +278,37 @@ prompts: the private board's notes ranked its fault #1 in 2 of 2 runs with no
 downgraded claims, all six planted eval faults ranked #1, and the no-fault
 case passed. `evals/gonogo.py` doesn't run these prompts, so a green
 go/no-go says nothing about the app; `make eval-app` does run them.
+
+## Wiring faults the pin table proves are found by code, not the model
+
+**Decision:** before the model runs, `pins.check_wiring` checks the
+netlist against the pin table. A pin the table marks as an inductor
+connection (TPS63070 L1/L2) that shares a net with anything but an
+inductor or a test point becomes a verified finding (`wf1`, …). It goes
+into the design summary and into the model's input, and the prompt says
+findings are design errors to rank on how well they explain the
+symptoms, never recalled facts. The UI labels each hypothesis by rule,
+not by the model: "Verified wiring fault" when a backed claim cites a
+flagged pin, "Fits the symptoms" when it explains at least half of them
+with a backed claim, "Speculative" otherwise. Beside the label sit two
+counts (symptoms explained, claims backed), never a percentage. A small
+diagram per hypothesis is built from the netlist by the backend
+(`diagram.py`), with flagged pins in red.
+
+**Alternatives rejected:** more prompt wording. The pin-table rule only
+fires when the table states a rule ("tie to GND if unused"); on a real
+board the model saw a regulator's L2 pin on its output rail, quoted the
+pin table, then called "L2 must be separate from VOUT" recalled topology
+and ranked the short #2. Model-made confidence percentages: they look precise and mean
+nothing (plan 001, "Trust"). A kicad-cli sheet SVG per hypothesis: whole
+sheets, nothing highlighted, and unreadable at card size.
+
+**Consequence:** the check is only as wide as the pin table: inductor
+pins of the parts listed in `pins.py`, so today one switching regulator.
+No committed eval case has a part in the pin table, so none gets a
+finding and the no-fault case stays quiet by construction rather than by
+test; unit tests cover the check on a synthetic design. Measured on a
+private board (not in the repo): its fault ranked #1 in 2 of 2
+`make eval-app` runs and in 2 live runs, with the diagnosis calling it a verified design error instead of
+hedging; `rp-micro-no-fault` still claimed no schematic fault. Datasheet
+retrieval (see above) is what widens the check to other parts.
