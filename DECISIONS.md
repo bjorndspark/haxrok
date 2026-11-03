@@ -343,15 +343,19 @@ answer, so invented design faults are the main risk; reference notes
 
 ## Reference designs and calculations are verified evidence
 
-**Decision:** `features/debug/reference.py` adds two kinds of verified
-input, both before the model runs. **Notes** (`rd1`, …) are short facts
+**Decision:** `features/debug/reference.py` and `calc.py` add two kinds
+of verified input, both before the model runs. **Notes** (`rd1`, …) are short facts
 copied from the manufacturer's own datasheet, application note or
 hardware design guide, with the section, for RP2040, MCP73831, SY8088 and
 ESP32-C3-MINI-1. **Calculations** (`cf1`, …) apply a datasheet formula to
 resistor values in the netlist: a regulator's output from its feedback
 divider (SY8088: 0.6 V × (1 + R1/R2)), a charger's current from its
-program resistor (MCP73831: 1000 V / R). A regulator output more than 8%
-from the voltage its output net is named for (`+3V3`) is flagged. Claims
+program resistor (MCP73831: 1000 V / R), and generic circuits: LED
+current through its series resistor, the pull-up on each I²C line, RC
+delays on enable and reset pins, dividers into IC pins. Flagged: a
+regulator output more than 8% from the voltage its output net is named
+for (`+3V3`), an LED with no resistor, an I²C line with no pull-up on the
+board, or one pulled up above an IC's supply (VBUS counts as 5 V). Claims
 cite either with the evidence label `reference` ("Based on the
 manufacturer's design"), and the prompts say a circuit matching a note is
 correct as designed.

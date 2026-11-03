@@ -139,6 +139,17 @@ values in the input.
 | `rust-board-fb-swapped` | review | #1 (won't work) | 198 s | Cites `cf1` (0.73 V); #2 is GPIO2 without the pull-up Espressif recommends |
 | `rust-board-fb-swapped` | debug | #1 | 206 s | "U5 buck programmed to 0.73V" |
 
+After `calc.py` (LED currents, I²C pull-ups, RC delays, dividers; see
+`DECISIONS.md`, "Reference designs and calculations are verified
+evidence"). The I²C check flags `rust-board-i2c-vbus`'s pull-ups to VBUS
+(5 V) above the 3.3 V supply of every IC on the bus, before the model runs.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `rust-board-i2c-vbus` | review | #1 (won't work) | 216 s | #3 calls the 32.768 kHz crystal's DNP load caps "may fail", reasoned only |
+| `rust-board-i2c-vbus` | debug | #1 | 258 s | Calls it a verified design error |
+| `rp-micro-no-fault` | review | PASS (no issues) | 125 s | |
+
 ## Reading the result
 
 | Outcome | Meaning |
