@@ -123,45 +123,50 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border">
-        <button
-          type="button"
-          onClick={() => setShowSymptoms(!showSymptoms)}
-          className="flex w-full items-center justify-between bg-background p-3.5 text-left hover:bg-accent"
-        >
-          <span className="text-xs font-bold tracking-wider uppercase">
-            Symptoms{summary.measurements.length > 0 ? " and measurements" : ""}
-          </span>
-          {showSymptoms ? (
-            <ChevronUp className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5" />
+      {(summary.symptoms.length > 0 || summary.measurements.length > 0) && (
+        <div className="overflow-hidden rounded-lg border">
+          <button
+            type="button"
+            onClick={() => setShowSymptoms(!showSymptoms)}
+            className="flex w-full items-center justify-between bg-background p-3.5 text-left hover:bg-accent"
+          >
+            <span className="text-xs font-bold tracking-wider uppercase">
+              {summary.mode === "review" ? "Notes on the board" : "Symptoms"}
+              {summary.measurements.length > 0 ? " and measurements" : ""}
+            </span>
+            {showSymptoms ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+          </button>
+          {showSymptoms && (
+            <ol className="space-y-1 border-t p-4 text-xs">
+              {summary.symptoms.map((s) => (
+                <li key={s.id} className="flex gap-2">
+                  <span className="w-7 shrink-0 font-mono font-semibold text-muted-foreground">
+                    {s.id}
+                  </span>
+                  <span>{s.text}</span>
+                </li>
+              ))}
+              {summary.measurements.map((m) => (
+                <li key={m.id} className="flex gap-2">
+                  <span className="w-7 shrink-0 font-mono font-semibold text-emerald-700 dark:text-emerald-400">
+                    {m.id}
+                  </span>
+                  <span>
+                    {m.value}
+                    {m.step_id && (
+                      <span className="text-muted-foreground"> (step {m.step_id})</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
           )}
-        </button>
-        {showSymptoms && (
-          <ol className="space-y-1 border-t p-4 text-xs">
-            {summary.symptoms.map((s) => (
-              <li key={s.id} className="flex gap-2">
-                <span className="w-7 shrink-0 font-mono font-semibold text-muted-foreground">
-                  {s.id}
-                </span>
-                <span>{s.text}</span>
-              </li>
-            ))}
-            {summary.measurements.map((m) => (
-              <li key={m.id} className="flex gap-2">
-                <span className="w-7 shrink-0 font-mono font-semibold text-emerald-700 dark:text-emerald-400">
-                  {m.id}
-                </span>
-                <span>
-                  {m.value}
-                  {m.step_id && <span className="text-muted-foreground"> (step {m.step_id})</span>}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
+        </div>
+      )}
     </Card>
   )
 }

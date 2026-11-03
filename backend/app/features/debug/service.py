@@ -33,6 +33,7 @@ from app.features.debug.schemas import (
     ErrorEvent,
     Measurement,
     MeasurementInput,
+    Mode,
     ProgressEvent,
     Symptom,
 )
@@ -61,6 +62,7 @@ SseEvent = dict[str, str]
 class Prepared:
     """Everything parsed from the input, ready for the model call."""
 
+    mode: Mode
     summary: DesignSummary
     design: Design
     erc: list[ErcEntry]
@@ -74,11 +76,13 @@ async def prepare(
     symptoms_text: str,
     measurements: list[MeasurementInput],
     kicad: KicadRunner,
+    mode: Mode = "debug",
 ) -> Prepared:
     """Validate the upload, run kicad-cli and parse its output. Raises
-    ``AppError`` subclasses with messages the user can act on."""
+    ``AppError`` subclasses with messages the user can act on. In review
+    mode the symptoms are optional notes on what the board is for."""
     symptoms = prompt.number_symptoms(symptoms_text)
-    if not symptoms:
+    if mode == "debug" and not symptoms:
         raise BadRequestError("Describe what you see on the bench first.", field="symptoms")
     project = load_project(files)
     output = await kicad.export(project)
@@ -93,6 +97,7 @@ async def prepare(
         for i, m in enumerate(measurements, start=1)
     ]
     summary = DesignSummary(
+        mode=mode,
         project=project.name,
         sheets=sum(1 for p in project.files if p.endswith(".kicad_sch")),
         parts=len(design.parts),
@@ -103,7 +108,7 @@ async def prepare(
         symptoms=symptoms,
         measurements=numbered,
     )
-    return Prepared(summary, design, erc, lookup, symptoms, numbered)
+    return Prepared(mode, summary, design, erc, lookup, symptoms, numbered)
 
 
 async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
@@ -117,10 +122,15 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         "pin_lookup",
         f"Pin table found for {with_data} of {len(prepared.summary.ics)} ICs.{found}",
     )
+    review = prepared.mode == "review"
     yield _progress(
-        "reasoning", "The model is tracing the circuit against your symptoms. About 2 minutes."
+        "reasoning",
+        "The model is reviewing the circuit block by block. About 2 minutes."
+        if review
+        else "The model is tracing the circuit against your symptoms. About 2 minutes.",
     )
     user = prompt.build_user_message(
+        mode=prepared.mode,
         symptoms=prepared.symptoms,
         measurements=prepared.measurements,
         netlist=compact(prepared.design),
@@ -130,18 +140,27 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
     )
     start = time.monotonic()
     try:
-        diagnosis = await model.diagnose(prompt.DIAGNOSE, user)
+        diagnosis = await model.diagnose(
+            prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE, user
+        )
         # Logged whole: it's the reasoning the structured answer must follow,
         # and the first thing to read when a result looks wrong.
         logger.info(
-            "debug diagnosis of %s in %.1fs:\n%s",
+            "debug %s of %s in %.1fs:\n%s",
+            "review" if review else "diagnosis",
             prepared.summary.project,
             time.monotonic() - start,
             diagnosis,
         )
-        yield _progress("structuring", "Writing the diagnosis up as claims and bench steps.")
+        yield _progress(
+            "structuring",
+            "Writing the review up as issues, claims and fixes."
+            if review
+            else "Writing the diagnosis up as claims and bench steps.",
+        )
         analysis = await model.structure(
-            prompt.STRUCTURE, prompt.build_structure_message(diagnosis=diagnosis, user=user)
+            prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE,
+            prompt.build_structure_message(diagnosis=diagnosis, user=user),
         )
     except AppError as e:
         yield _event("error", ErrorEvent(message=e.detail).model_dump_json())

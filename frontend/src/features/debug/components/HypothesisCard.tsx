@@ -17,8 +17,10 @@ import { Button } from "@/shared/ui/button"
 
 import {
   assess,
-  CONFIDENCE_LABEL,
+  confidenceLabel,
   EVIDENCE_LABEL,
+  isReview,
+  SEVERITY_LABEL,
   symptomText,
   type Assessment,
   type Confidence,
@@ -32,6 +34,7 @@ import type {
   GlossaryEntry,
   Hypothesis,
   Problem,
+  Severity,
 } from "../types"
 import { GlossaryText } from "./GlossaryText"
 import { WiringDiagram } from "./WiringDiagram"
@@ -48,6 +51,12 @@ const CONFIDENCE_TONE: Record<Confidence, BadgeProps["tone"]> = {
   verified: "green",
   fits: "blue",
   speculative: "neutral",
+}
+
+const SEVERITY_TONE: Record<Severity, BadgeProps["tone"]> = {
+  will_fail: "red",
+  may_fail: "amber",
+  improve: "neutral",
 }
 
 const CONFIDENCE_ICON: Record<Confidence, typeof ShieldCheck> = {
@@ -84,16 +93,16 @@ function Meter({ label, value, of }: { label: string; value: number; of: number 
   )
 }
 
-function ConfidenceLine({ assessment: a }: { assessment: Assessment }) {
+function ConfidenceLine({ assessment: a, review }: { assessment: Assessment; review: boolean }) {
   const Icon = CONFIDENCE_ICON[a.confidence]
   return (
     <div className="mt-3.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
       <Badge tone={CONFIDENCE_TONE[a.confidence]} className="self-start text-xs" title={a.reason}>
         <Icon />
-        {CONFIDENCE_LABEL[a.confidence]}
+        {confidenceLabel(a.confidence, review)}
       </Badge>
       <div className="flex flex-1 gap-5">
-        <Meter label="Explains" value={a.explained} of={a.symptoms} />
+        {!review && <Meter label="Explains" value={a.explained} of={a.symptoms} />}
         <Meter label="Claims backed" value={a.backed} of={a.claims} />
       </div>
     </div>
@@ -168,10 +177,13 @@ function ClaimRow({ claim }: { claim: CheckedClaim }) {
 function StepView({
   step,
   busy,
+  review,
   onRerun,
 }: {
   step: ConfirmStep
   busy: boolean
+  /** No board yet, so no reading to enter. */
+  review: boolean
   onRerun: (step: ConfirmStep, value: string) => void
 }) {
   const [value, setValue] = useState("")
@@ -247,32 +259,34 @@ function StepView({
           </tbody>
         </table>
       )}
-      <form
-        className="flex flex-col gap-2 rounded-lg border bg-background p-3 sm:flex-row sm:items-end"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!value.trim()) return
-          onRerun(step, value.trim())
-          setValue("")
-        }}
-      >
-        <label className="flex-1">
-          <span className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
-            Your reading
-          </span>
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="e.g. 3.28 V at TP11"
-            maxLength={500}
-            className="w-full rounded-md border bg-card px-3 py-1.5 font-mono text-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-          />
-        </label>
-        <Button type="submit" size="sm" disabled={busy || !value.trim()}>
-          <RotateCcw />
-          Re-run with this reading
-        </Button>
-      </form>
+      {!review && (
+        <form
+          className="flex flex-col gap-2 rounded-lg border bg-background p-3 sm:flex-row sm:items-end"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!value.trim()) return
+            onRerun(step, value.trim())
+            setValue("")
+          }}
+        >
+          <label className="flex-1">
+            <span className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+              Your reading
+            </span>
+            <input
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="e.g. 3.28 V at TP11"
+              maxLength={500}
+              className="w-full rounded-md border bg-card px-3 py-1.5 font-mono text-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+            />
+          </label>
+          <Button type="submit" size="sm" disabled={busy || !value.trim()}>
+            <RotateCcw />
+            Re-run with this reading
+          </Button>
+        </form>
+      )}
     </div>
   )
 }
@@ -302,6 +316,7 @@ export function HypothesisCard({
   const stepIds = new Set(h.confirm.map((s) => s.id))
   const ownProblems = problems.filter((p) => p.where === h.id || stepIds.has(p.where))
   const assessment = assess(h, summary)
+  const review = isReview(summary)
   return (
     <div
       className={cn(
@@ -315,12 +330,17 @@ export function HypothesisCard({
           <Badge tone={primary ? "solid" : "neutral"} className="mt-0.5 text-xs">
             #{h.rank}
           </Badge>
+          {h.severity && (
+            <Badge tone={SEVERITY_TONE[h.severity]} className="mt-0.5 shrink-0 text-xs">
+              {SEVERITY_LABEL[h.severity]}
+            </Badge>
+          )}
           <h3 className="text-base font-bold tracking-tight sm:text-lg">{h.title}</h3>
         </div>
         <p className="pt-2 text-sm leading-relaxed text-foreground/90">
           <GlossaryText text={h.summary} glossary={glossary} />
         </p>
-        <ConfidenceLine assessment={assessment} />
+        <ConfidenceLine assessment={assessment} review={review} />
         {diagram && (
           <div className="mt-4 rounded-lg border bg-background p-3">
             <WiringDiagram diagram={diagram} />
@@ -380,21 +400,33 @@ export function HypothesisCard({
 
         {h.confirm.length > 0 && (
           <Disclosure
-            title="Check this with a multimeter"
+            title={review ? "Check before you order" : "Check this with a multimeter"}
             aside={`${String(h.confirm.length)} ${h.confirm.length === 1 ? "step" : "steps"}`}
             defaultOpen={primary && latest}
             accent
           >
             {h.confirm.map((step) => (
-              <StepView key={step.id} step={step} busy={busy || !latest} onRerun={onRerun} />
+              <StepView
+                key={step.id}
+                step={step}
+                busy={busy || !latest}
+                review={review}
+                onRerun={onRerun}
+              />
             ))}
-            {!latest && (
+            {!latest && !review && (
               <p className="text-[11px] text-muted-foreground">Enter readings on the latest run.</p>
             )}
           </Disclosure>
         )}
 
-        <Disclosure title="Fix on the bench and in the next revision">
+        <Disclosure
+          title={
+            review
+              ? "Fix in the schematic before ordering"
+              : "Fix on the bench and in the next revision"
+          }
+        >
           {h.fix.rework.length > 0 && (
             <div className="space-y-1.5 border-l-2 border-amber-400 pl-3">
               <span className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
@@ -419,7 +451,7 @@ export function HypothesisCard({
             <div className="space-y-1.5 border-l-2 border-blue-400 pl-3">
               <span className="flex items-center gap-1.5 font-bold text-blue-800 dark:text-sky-300">
                 <FileCode className="h-3.5 w-3.5" />
-                Next schematic revision
+                {review ? "Schematic change" : "Next schematic revision"}
               </span>
               <ul className="list-disc space-y-1 pl-4 leading-relaxed">
                 {h.fix.schematic.map((s, i) => (
@@ -430,7 +462,9 @@ export function HypothesisCard({
           )}
           <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
             <Gauge className="h-3 w-3" />
-            Rework is unverified: confirm the cause with the steps above first.
+            {review
+              ? "Unverified: settle the issue with the checks above before changing the design."
+              : "Rework is unverified: confirm the cause with the steps above first."}
           </p>
         </Disclosure>
       </div>

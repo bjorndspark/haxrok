@@ -8,9 +8,11 @@
    checks (``schemas.Analysis``), without diagnosing again.
 
 Both are worded for hobbyists with a multimeter (plan 001, "Who it's for").
+Review mode (``REVIEW_DIAGNOSE``, ``REVIEW_STRUCTURE``) is the same pair
+before the board is built: no symptoms, look for design mistakes.
 """
 
-from app.features.debug.schemas import Measurement, Symptom
+from app.features.debug.schemas import Measurement, Mode, Symptom
 
 _INPUT = """\
 Input: numbered symptoms (s1, s2, ...), the compact netlist (one line per \
@@ -65,6 +67,31 @@ measurement) or INFERRED.
 {_UNVERIFIED}
 """
 
+# Shared by both structure prompts: how a claim is labelled and cited.
+_CLAIMS = """\
+Claims (the evidence behind a hypothesis)
+- Each claim states ONE fact and carries an evidence label and citations. \
+The backend checks every citation against the input and downgrades the \
+claim if any fails, so cite exactly.
+- schematic: a fact read from the netlist. Cite pin_on_net (pin as REF.PIN \
+and its net, exactly as written) or pin_name (the pin's name as the netlist \
+gives it, and use that same name in the text).
+- erc: a fact from an ERC entry. Cite its id.
+- datasheet: a pin function from the pin table. Cite pin_function with the \
+pin. Only pins listed in the pin table can be cited. State only what the pin \
+does; put which net it is on in a separate schematic claim.
+- measurement: a value the user entered. Cite its id. Symptom text is not a \
+measurement id; a claim about what the user reported in the symptoms uses \
+evidence none.
+- none: reasoning, recalled knowledge, or anything else. Use it freely; it \
+is honest.
+- Every pin (REF.PIN) and every net named in a claim's text must be cited \
+in that claim. Keep claims short so this is easy.
+
+Keep every caveat the diagnosis gives: a part fact it marks UNVERIFIED stays \
+unverified (evidence none, with the datasheet section to check), and a fix \
+it makes wait on a check still waits on it."""
+
 STRUCTURE = f"""\
 You turn a hardware engineer's diagnosis of a board into a structured answer \
 for a hobbyist with a multimeter. The diagnosis comes first, then the input it \
@@ -89,29 +116,9 @@ terms like ERC, buck-boost, back-feed, strapping pin in the glossary.
 - explains / does_not_explain: symptom ids. Be honest about what a \
 hypothesis can't explain instead of hand-waving (no vague "source sag"); \
 put real gaps in open_questions.
+- severity: null (it is for review mode only).
 
-Claims (the evidence behind a hypothesis)
-- Each claim states ONE fact and carries an evidence label and citations. \
-The backend checks every citation against the input and downgrades the \
-claim if any fails, so cite exactly.
-- schematic: a fact read from the netlist. Cite pin_on_net (pin as REF.PIN \
-and its net, exactly as written) or pin_name (the pin's name as the netlist \
-gives it, and use that same name in the text).
-- erc: a fact from an ERC entry. Cite its id.
-- datasheet: a pin function from the pin table. Cite pin_function with the \
-pin. Only pins listed in the pin table can be cited. State only what the pin \
-does; put which net it is on in a separate schematic claim.
-- measurement: a value the user entered. Cite its id. Symptom text is not a \
-measurement id; a claim about what the user reported in the symptoms uses \
-evidence none.
-- none: reasoning, recalled knowledge, or anything else. Use it freely; it \
-is honest.
-- Every pin (REF.PIN) and every net named in a claim's text must be cited \
-in that claim. Keep claims short so this is easy.
-
-Keep every caveat the diagnosis gives: a part fact it marks UNVERIFIED stays \
-unverified (evidence none, with the datasheet section to check), and a fix \
-it makes wait on a check still waits on it.
+{_CLAIMS}
 
 Confirm steps
 - Assume a multimeter. Mark tool scope only when nothing else works, and \
@@ -137,6 +144,93 @@ PCB data, so never name traces or vias.
 Ids: hypotheses h1, h2, h3; confirm steps h1-c1, h1-c2, ...
 """
 
+# --- review mode -----------------------------------------------------------------
+#
+# The same two calls, before the board exists: no symptoms, so the model
+# looks for design mistakes instead of explaining a failure. The risk the
+# no-fault eval showed (calling a correct part an error) is worse here, since
+# nothing anchors the answer, so the prompt makes "no issues" a valid answer.
+
+_REVIEW_INPUT = """\
+Input: optional notes from the designer on what the board is for (s1, s2, \
+...; supplies, loads, environment), the compact netlist (one line per part, \
+then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
+(erc-1, ...), a pin table copied from datasheets for some ICs, and verified \
+findings (wf1, ...) the backend computed from the netlist and pin table."""
+
+REVIEW_DIAGNOSE = f"""\
+You are an expert hardware engineer reviewing a hobbyist's KiCad schematic \
+before they order boards. Nothing has been built yet. Your review is the one \
+a colleague would give them at a design review.
+
+{_REVIEW_INPUT} Use the part datasheets you know.
+
+Trace the circuit block by block: power entry and protection, regulators \
+(enable, feedback, input/output caps, inductor), reset and boot/strapping \
+pins, clocks, buses (pull-ups, address conflicts), connectors (USB CC and \
+data lines, pin order), unused or floating inputs, back-feed between supplies, \
+polarity, and anything ERC flags. For each block, note whether it looks right.
+
+Then list the real issues, at most 5, most severe first. For each: the exact \
+nets and pins, what goes wrong on the built board and under which conditions, \
+a severity (WILL FAIL: won't work as drawn; MAY FAIL: fails under some \
+supply, load or tolerance; IMPROVE: works, but a cheap change makes it more \
+robust), how to settle it before ordering (which datasheet section to read, \
+or what to check on the first assembled board), and the schematic fix. Mark \
+each claim as CONFIRMED (follows directly from the netlist, ERC or pin table) \
+or INFERRED.
+
+A design that looks correct is a valid and useful answer: say which blocks \
+you checked and that you found no issues. Never pad the list. Style, part \
+choice and layout advice are not issues. An ERC warning that is harmless in \
+this circuit (e.g. a power pin fed through a connector) is not an issue; say \
+why it is harmless.
+
+{_UNVERIFIED}
+"""
+
+REVIEW_STRUCTURE = f"""\
+You turn a hardware engineer's pre-fab review of a schematic into a \
+structured answer for a hobbyist. The review comes first, then the input it \
+was made from. The board has not been built.
+
+Do not review again. Keep the review's issues, in its order, with its \
+mechanisms, severities and conclusions; don't add, drop, merge or re-rank \
+issues. If the review found no issues, return no hypotheses, and put the \
+blocks it checked into one open question whose text says the review found \
+no issues in them. Restate: plain words, one fact per claim, exact citations \
+into the input, checks and fixes in the fields below.
+
+{_REVIEW_INPUT}
+
+Answer: the review's issues as hypotheses (at most 5), most severe first, \
+then open questions the input can't answer, then a glossary.
+
+Hypotheses (each is one design issue)
+- title: the issue, e.g. "EN pin floats, so the regulator may not start".
+- summary: what goes wrong on the built board, and when, in plain words a \
+hobbyist understands, 2-4 sentences. No unexplained jargon; put terms in the \
+glossary.
+- severity: will_fail, may_fail or improve, as the review says.
+- explains / does_not_explain: empty lists (there are no symptoms).
+
+{_CLAIMS}
+
+Confirm steps (how to settle the issue before or at first power-up)
+- At most 2 per issue. A datasheet check is tool look, power off, purpose \
+test_cause, and its instruction names the section. A check on the first \
+assembled board says power off or on and where to put the probes.
+- readings: each possible outcome and what it establishes. supports / \
+rules_out list hypothesis ids.
+- setup: empty. practical: true unless it needs equipment a hobbyist lacks.
+
+Fix
+- schematic: the change to make before ordering.
+- rework: empty (there is no board yet).
+
+Ids: hypotheses h1, h2, ...; confirm steps h1-c1, h1-c2, ...
+"""
+
 
 def number_symptoms(text: str) -> list[Symptom]:
     """Each non-empty line is one symptom, s1, s2, ... Leading list markers
@@ -147,6 +241,7 @@ def number_symptoms(text: str) -> list[Symptom]:
 
 def build_user_message(
     *,
+    mode: Mode = "debug",
     symptoms: list[Symptom],
     measurements: list[Measurement],
     netlist: str,
@@ -154,9 +249,14 @@ def build_user_message(
     pin_table: str,
     findings: str,
 ) -> str:
-    """The user turn: symptoms, measurements, netlist, ERC, pin table,
-    verified findings."""
-    parts = ["## Symptoms\n" + "\n".join(f"{s.id}: {s.text}" for s in symptoms)]
+    """The user turn: symptoms (review: the designer's notes), measurements,
+    netlist, ERC, pin table, verified findings."""
+    parts = []
+    if mode == "debug":
+        parts.append("## Symptoms\n" + "\n".join(f"{s.id}: {s.text}" for s in symptoms))
+    else:
+        notes = "\n".join(f"{s.id}: {s.text}" for s in symptoms) or "(none given)"
+        parts.append("## Designer's notes on what the board is for\n" + notes)
     if measurements:
         lines = [
             f"{m.id}: {m.value}" + (f"  (for the step: {m.context})" if m.context else "")

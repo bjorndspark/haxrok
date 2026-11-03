@@ -5,6 +5,7 @@ import type {
   CheckedAnalysis,
   DesignSummary,
   MeasurementInput,
+  Mode,
   ProgressEvent,
   ProjectFile,
 } from "./types"
@@ -46,9 +47,11 @@ export async function* streamAnalysis(
   files: ProjectFile[],
   symptoms: string,
   measurements: MeasurementInput[],
+  mode: Mode,
   signal: AbortSignal,
 ): AsyncGenerator<AnalysisEvent> {
   const form = new FormData()
+  form.append("mode", mode)
   for (const f of files) form.append("files", f.file, f.path)
   form.append("symptoms", symptoms)
   form.append("measurements", JSON.stringify(measurements))

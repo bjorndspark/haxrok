@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-import type { MeasurementInput, ProjectFile, Run } from "./types"
+import type { MeasurementInput, Mode, ProjectFile, Run } from "./types"
 
 /**
  * Debug UI state. There is no server-side history (plan 001: no accounts),
@@ -9,6 +9,8 @@ import type { MeasurementInput, ProjectFile, Run } from "./types"
  */
 interface DebugState {
   view: "input" | "session"
+  /** Debug a board on the bench, or review one before ordering. */
+  mode: Mode
   files: ProjectFile[]
   symptoms: string
   /** Every measurement entered so far; each re-run sends all of them. */
@@ -18,6 +20,7 @@ interface DebugState {
   /** Aborts the run in flight. */
   controller: AbortController | null
   inputError: string | null
+  setMode: (mode: Mode) => void
   setFiles: (files: ProjectFile[]) => void
   setSymptoms: (text: string) => void
   setInputError: (message: string | null) => void
@@ -31,12 +34,14 @@ interface DebugState {
 
 export const useDebugStore = create<DebugState>((set, get) => ({
   view: "input",
+  mode: "debug",
   files: [],
   symptoms: "",
   measurements: [],
   runs: [],
   controller: null,
   inputError: null,
+  setMode: (mode) => set({ mode, inputError: null }),
   setFiles: (files) => set({ files, inputError: null }),
   setSymptoms: (symptoms) => set({ symptoms }),
   setInputError: (inputError) => set({ inputError }),

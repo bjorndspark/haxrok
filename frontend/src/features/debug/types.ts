@@ -1,5 +1,11 @@
 /** Wire shapes mirroring backend app/features/debug/schemas.py. */
 
+/** debug: bench symptoms -> causes. review: pre-fab design review, no symptoms. */
+export type Mode = "debug" | "review"
+
+/** Review mode only: how badly an issue hurts the board. */
+export type Severity = "will_fail" | "may_fail" | "improve"
+
 export type Evidence = "schematic" | "erc" | "datasheet" | "measurement" | "none"
 export type CiteKind = "pin_on_net" | "pin_name" | "erc" | "pin_function" | "measurement"
 
@@ -54,6 +60,8 @@ export interface ReworkStep {
 export interface Hypothesis {
   id: string
   rank: number
+  /** Null when debugging. */
+  severity: Severity | null
   title: string
   summary: string
   claims: CheckedClaim[]
@@ -162,6 +170,7 @@ export interface MeasurementInput {
 }
 
 export interface DesignSummary {
+  mode: Mode
   project: string
   sheets: number
   parts: number
@@ -169,6 +178,7 @@ export interface DesignSummary {
   ics: IcSummary[]
   erc: ErcEntry[]
   wiring: WiringFinding[]
+  /** Bench symptoms; in review mode, the designer's notes on the board. */
   symptoms: Symptom[]
   measurements: Measurement[]
 }

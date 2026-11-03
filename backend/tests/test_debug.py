@@ -268,6 +268,7 @@ def _hypothesis(
     return Hypothesis[Claim](
         id=hid,
         rank=rank,
+        severity=None,
         title="t",
         summary="s",
         claims=[claim("U2.9 is on +3V3.", "schematic", pin("U2.9", "+3V3"))],

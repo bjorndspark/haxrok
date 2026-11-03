@@ -8,6 +8,7 @@ import type {
   GlossaryEntry,
   Hypothesis,
   Run,
+  Severity,
   WiringFinding,
 } from "./types"
 
@@ -26,6 +27,24 @@ export const CONFIDENCE_LABEL: Record<Confidence, string> = {
   verified: "Verified wiring fault",
   fits: "Fits the symptoms",
   speculative: "Speculative",
+}
+
+/** In review mode there are no symptoms to fit, and the cited pins only
+ *  show the topology, not that it is wrong: in the review evals a real fault
+ *  and a false alarm cited the same mix of facts. So only the backend's
+ *  wiring check verifies an issue; the rest is the model's reasoning. */
+export function confidenceLabel(c: Confidence, review: boolean): string {
+  return review && c === "speculative" ? "Reasoned: check it" : CONFIDENCE_LABEL[c]
+}
+
+export const SEVERITY_LABEL: Record<Severity, string> = {
+  will_fail: "Won't work as drawn",
+  may_fail: "May fail",
+  improve: "Improvement",
+}
+
+export function isReview(summary: DesignSummary | null): boolean {
+  return summary?.mode === "review"
 }
 
 /** How much a hypothesis rests on, counted from the checked result. No
@@ -47,7 +66,7 @@ export interface Assessment {
  *    backend's wiring check flagged. The fault is verified; whether it is
  *    the cause is what the confirm steps test.
  *  - fits: explains at least half the symptoms and at least one claim is
- *    backed by the input.
+ *    backed by the input. Never in review mode (see confidenceLabel).
  *  - speculative: anything else. */
 export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment {
   const backedClaims = h.claims.filter((c) => c.evidence !== "none")
@@ -67,6 +86,14 @@ export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment
       ...base,
       confidence: "verified",
       reason: `The backend's wiring check found ${pins} wired against the datasheet, and this hypothesis cites it.`,
+    }
+  }
+  if (isReview(summary)) {
+    return {
+      ...base,
+      confidence: "speculative",
+      reason:
+        "The pins it cites are in your schematic, but that they are wrong is the model's reasoning. Settle it with the checks below.",
     }
   }
   if (backedClaims.length > 0 && symptoms > 0 && h.explains.length * 2 >= symptoms) {
@@ -125,15 +152,23 @@ export function symptomText(summary: DesignSummary | null, id: string): string {
 
 /** The latest finished run as a Markdown bench report. */
 export function toMarkdown(run: Run, summary: DesignSummary, result: CheckedAnalysis): string {
+  const review = isReview(summary)
   const lines: string[] = [
-    `# Häxrök report: ${summary.project}`,
+    `# Häxrök ${review ? "design review" : "report"}: ${summary.project}`,
     "",
     `Run #${String(run.number)} (${run.trigger}), ${new Date(run.startedAt).toLocaleString()}`,
     `${String(summary.parts)} parts, ${String(summary.nets)} nets, ${String(summary.erc.length)} ERC findings.`,
-    "",
-    "## Symptoms",
-    ...summary.symptoms.map((s) => `- ${s.id}: ${s.text}`),
   ]
+  if (summary.symptoms.length > 0) {
+    lines.push(
+      "",
+      review ? "## Notes on the board" : "## Symptoms",
+      ...summary.symptoms.map((s) => `- ${s.id}: ${s.text}`),
+    )
+  }
+  if (review && result.hypotheses.length === 0) {
+    lines.push("", "No schematic issues found.")
+  }
   if (summary.measurements.length > 0) {
     lines.push("", "## Measurements", ...summary.measurements.map((m) => `- ${m.id}: ${m.value}`))
   }
@@ -143,7 +178,9 @@ export function toMarkdown(run: Run, summary: DesignSummary, result: CheckedAnal
       "",
       `## #${String(h.rank)} ${h.title}`,
       "",
-      `**${CONFIDENCE_LABEL[a.confidence]}** · explains ${String(a.explained)} of ${String(a.symptoms)} symptoms · ${String(a.backed)} of ${String(a.claims)} claims backed`,
+      review
+        ? `**${h.severity ? SEVERITY_LABEL[h.severity] : "Issue"}** · ${confidenceLabel(a.confidence, true)} · ${String(a.backed)} of ${String(a.claims)} claims backed`
+        : `**${CONFIDENCE_LABEL[a.confidence]}** · explains ${String(a.explained)} of ${String(a.symptoms)} symptoms · ${String(a.backed)} of ${String(a.claims)} claims backed`,
       "",
       h.summary,
       "",
@@ -159,7 +196,7 @@ export function toMarkdown(run: Run, summary: DesignSummary, result: CheckedAnal
       const note = c.downgraded && c.reason ? ` (label removed: ${c.reason})` : ""
       lines.push(`- ${c.text} — *${EVIDENCE_LABEL[c.evidence]}*${note}`)
     }
-    lines.push("", "### Confirm")
+    lines.push("", review ? "### Check before ordering" : "### Confirm")
     for (const s of h.confirm) {
       lines.push(`- **${s.id}** (${s.tool}, power ${s.power}): ${s.instruction}`)
       for (const r of s.readings) lines.push(`  - ${r.reading} → ${r.establishes}`)

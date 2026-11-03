@@ -9,7 +9,7 @@ import json
 import pytest
 
 from app.core.errors import BadRequestError, UpstreamError
-from app.features.debug import diagram, pins, router, service
+from app.features.debug import diagram, pins, prompt, router, service
 from app.features.debug.design import parse_netlist
 from app.features.debug.kicad import KicadOutput
 from app.features.debug.project import Project, load_project, missing_sheets, normalize_paths
@@ -108,6 +108,7 @@ def _analysis() -> Analysis[Claim]:
             Hypothesis[Claim](
                 id="h1",
                 rank=1,
+                severity=None,
                 title="L2 is on the output rail",
                 summary="s",
                 claims=[
@@ -258,6 +259,7 @@ def test_no_diagram_without_an_ic_pin():
     h = Hypothesis[CheckedClaim](
         id="h2",
         rank=2,
+        severity=None,
         title="t",
         summary="s",
         claims=[CheckedClaim(text="The cable has no data wires.", evidence="none", cites=[])],
@@ -354,6 +356,28 @@ async def test_blank_symptoms_are_refused_before_kicad_runs():
     with pytest.raises(BadRequestError, match="bench"):
         await service.prepare(_files(), " \n ", [], kicad)
     assert kicad.projects == []
+
+
+async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
+    prepared = await service.prepare(_files(), "", [], FakeKicad(), "review")
+    systems: list[str] = []
+    users: list[str] = []
+
+    async def diagnose(system: str, user: str) -> str:
+        systems.append(system)
+        users.append(user)
+        return "No issues found."
+
+    async def structure(system: str, user: str) -> Analysis[Claim]:
+        systems.append(system)
+        return Analysis[Claim](hypotheses=[], open_questions=[], glossary=[])
+
+    events = await _collect(prepared, service.Model(diagnose=diagnose, structure=structure))
+    assert events[0][1]["mode"] == "review"
+    assert systems == [prompt.REVIEW_DIAGNOSE, prompt.REVIEW_STRUCTURE]
+    assert "## Symptoms" not in users[0]
+    assert "what the board is for\n(none given)" in users[0]
+    assert events[-1][0] == "result" and events[-1][1]["hypotheses"] == []
 
 
 # --- route ------------------------------------------------------------------------------------

@@ -73,6 +73,7 @@ describe("assess", () => {
   const hypothesis = (claims: CheckedClaim[], explains: string[]): Hypothesis => ({
     id: "h1",
     rank: 1,
+    severity: null,
     title: "t",
     summary: "s",
     claims,
@@ -82,6 +83,7 @@ describe("assess", () => {
     fix: { schematic: [], rework: [] },
   })
   const summary = {
+    mode: "debug",
     symptoms: ["s1", "s2", "s3", "s4"].map((id) => ({ id, text: id })),
     wiring: [
       {
@@ -104,6 +106,14 @@ describe("assess", () => {
 
   it("ignores a flagged pin cited only by a downgraded claim", () => {
     expect(assess(hypothesis([claim("none", "U2.9")], ["s1"]), summary).confidence).toBe(
+      "speculative",
+    )
+  })
+
+  it("verifies a review issue only through the wiring check", () => {
+    const review = { ...summary, mode: "review", symptoms: [] } as DesignSummary
+    expect(assess(hypothesis([claim("schematic", "U2.9")], []), review).confidence).toBe("verified")
+    expect(assess(hypothesis([claim("schematic", "U1.2")], []), review).confidence).toBe(
       "speculative",
     )
   })

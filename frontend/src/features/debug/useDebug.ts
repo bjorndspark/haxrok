@@ -51,7 +51,7 @@ export function useDebugActions(): DebugActions {
       store.setInputError("Drop your KiCad project folder first.")
       return
     }
-    if (!store.symptoms.trim()) {
+    if (store.mode === "debug" && !store.symptoms.trim()) {
       store.setInputError("Describe what you see on the bench first.")
       return
     }
@@ -64,6 +64,7 @@ export function useDebugActions(): DebugActions {
         store.files,
         store.symptoms,
         useDebugStore.getState().measurements,
+        store.mode,
         controller.signal,
       )) {
         update(number, () => applyEvent(ev))
@@ -83,7 +84,13 @@ export function useDebugActions(): DebugActions {
     }
   }, [])
 
-  const analyze = useCallback(() => run("Initial analysis"), [run])
+  const analyze = useCallback(
+    () =>
+      run(
+        useDebugStore.getState().mode === "review" ? "Review before ordering" : "Initial analysis",
+      ),
+    [run],
+  )
 
   const rerunWithMeasurement = useCallback(
     async (step: ConfirmStep, value: string) => {

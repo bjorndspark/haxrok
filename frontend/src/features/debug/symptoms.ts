@@ -57,6 +57,12 @@ Fails on battery: the microcontroller does not boot.
 When it fails, the 3.3 V rail measures 2.3 V and the supply draws 400 mA.
 When it fails, the regulator gets warm.`
 
+/** Review mode: optional notes on what the board is for. */
+export const REVIEW_PLACEHOLDER = `Optional. What the board is for, one note per line:
+Powered from a 1S LiPo (3.0-4.2 V) or USB-C 5 V.
+Drives a 12 V, 1 A solenoid.
+Used outdoors, so it may see -10 °C.`
+
 export const SYMPTOM_PROMPTS: { label: string; prefix: string }[] = [
   { label: "Power source", prefix: "Powered from" },
   { label: "What works", prefix: "Works on" },

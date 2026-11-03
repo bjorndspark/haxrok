@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.errors import BadRequestError
 from app.features.debug import service
 from app.features.debug.kicad import KicadCli
-from app.features.debug.schemas import Analysis, Claim, MeasurementInput
+from app.features.debug.schemas import Analysis, Claim, MeasurementInput, Mode
 
 router = APIRouter(prefix="/debug", tags=["debug"])
 
@@ -43,10 +43,14 @@ async def analyze(
     files: Annotated[
         list[UploadFile], File(description="The project's .kicad_pro and .kicad_sch files")
     ],
-    symptoms: Annotated[str, Form(min_length=1, max_length=8000)],
+    symptoms: Annotated[
+        str, Form(max_length=8000, description="Bench symptoms; review: optional board notes")
+    ] = "",
     measurements: Annotated[str, Form(description="JSON list of MeasurementInput")] = "[]",
+    mode: Annotated[Mode, Form(description="debug (bench symptoms) or review (pre-fab)")] = "debug",
 ) -> EventSourceResponse:
-    """Analyze a KiCad project against bench symptoms.
+    """Analyze a KiCad project against bench symptoms, or (``mode=review``)
+    review it for design mistakes before the board is ordered.
 
     Upload errors, missing sub-sheets and kicad-cli failures return the
     error envelope. Otherwise the response is an SSE stream:
@@ -71,7 +75,7 @@ async def analyze(
             )
         raw.append((f.filename or "", data))
 
-    prepared = await service.prepare(raw, symptoms, parsed, KicadCli())
+    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), mode)
     return EventSourceResponse(
         service.stream(prepared, service.Model(diagnose=_diagnose, structure=_structure))
     )

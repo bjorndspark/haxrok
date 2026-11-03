@@ -26,6 +26,16 @@ Evidence = Literal["schematic", "erc", "datasheet", "measurement", "none"]
 """schematic: the netlist. erc: a KiCad ERC entry. datasheet: the hand-written
 pin table. measurement: a value the user entered. none: no direct evidence."""
 
+Mode = Literal["debug", "review"]
+"""debug: find the schematic cause of bench symptoms. review: look for design
+mistakes before the board is ordered; there are no symptoms, only optional
+notes on what the board is for."""
+
+Severity = Literal["will_fail", "may_fail", "improve"]
+"""Review mode only. will_fail: the board won't work as drawn. may_fail: it
+fails under some conditions (a supply, a load, a tolerance). improve: works,
+but a cheap change makes it more robust."""
+
 CiteKind = Literal["pin_on_net", "pin_name", "erc", "pin_function", "measurement"]
 
 # Which citation kinds back which evidence label. pin_name is the pin's name
@@ -131,7 +141,10 @@ class Fix(_Strict):
 
 class Hypothesis[C: Claim](_Strict):
     id: str = Field(description='Unique, e.g. "h1".')
-    rank: int = Field(description="1 is the most likely cause.")
+    rank: int = Field(description="1 is the most likely cause (review: the most severe issue).")
+    severity: Severity | None = Field(
+        description="Review mode only: how badly the issue hurts the board. Null when debugging."
+    )
     title: str
     summary: str = Field(description="The mechanism in plain words, 2-4 sentences.")
     claims: list[C]
@@ -273,6 +286,7 @@ class DesignSummary(BaseModel):
     """Parsed input, shown before the model call: lets the user check the
     parse, and shows which ICs have pin data."""
 
+    mode: Mode
     project: str
     sheets: int
     parts: int
@@ -280,7 +294,9 @@ class DesignSummary(BaseModel):
     ics: list[IcSummary]
     erc: list[ErcEntry]
     wiring: list[WiringFinding]
-    symptoms: list[Symptom]
+    symptoms: list[Symptom] = Field(
+        description="Bench symptoms; in review mode, the user's notes on what the board is for."
+    )
     measurements: list[Measurement]
 
 

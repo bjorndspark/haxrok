@@ -1,10 +1,19 @@
-import { BookOpen, ChevronDown, ChevronUp, CircleHelp, Download, TriangleAlert } from "lucide-react"
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  CircleHelp,
+  Download,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react"
 import { useState } from "react"
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Card } from "@/shared/ui/card"
 
+import { isReview } from "../present"
 import { useDebugStore } from "../store"
 import type { Run } from "../types"
 import { formatElapsed, type DebugActions } from "../useDebug"
@@ -86,9 +95,21 @@ function RunBody({
   const loose = result.problems.filter((p) => !placed.has(p.where))
   return (
     <div className="space-y-5">
-      {result.hypotheses.length === 0 && (
-        <Card className="p-6 text-sm">The model returned no hypotheses for this input.</Card>
-      )}
+      {result.hypotheses.length === 0 &&
+        (isReview(run.summary) ? (
+          <Card className="space-y-2 border-emerald-200 p-6 dark:border-emerald-900">
+            <p className="flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300">
+              <ShieldCheck className="h-4 w-4" />
+              No schematic issues found
+            </p>
+            <p className="text-sm text-muted-foreground">
+              The review traced each block and found nothing to change. It only reads the schematic:
+              layout, footprints and assembly aren&apos;t checked.
+            </p>
+          </Card>
+        ) : (
+          <Card className="p-6 text-sm">The model returned no hypotheses for this input.</Card>
+        ))}
       {result.hypotheses.map((h) => (
         <HypothesisCard
           key={h.id}
@@ -198,9 +219,11 @@ function OlderRun({ run, total, actions }: { run: Run; total: number; actions: D
 export function SessionView({ actions }: { actions: DebugActions }) {
   const runs = useDebugStore((s) => s.runs)
   const editInput = useDebugStore((s) => s.editInput)
+  const mode = useDebugStore((s) => s.mode)
   if (runs.length === 0) return null
   const [latest, ...older] = runs
   const busy = latest.finishedAt === null
+  const review = latest.summary ? isReview(latest.summary) : mode === "review"
   const reportable = runs.find((r) => r.result !== null && r.summary !== null)
 
   return (
@@ -209,13 +232,15 @@ export function SessionView({ actions }: { actions: DebugActions }) {
         <div>
           <div className="flex items-center gap-2">
             <Badge tone="blue" className="font-bold tracking-wider uppercase">
-              {busy ? "Analyzing" : "Diagnosis ready"}
+              {busy ? "Analyzing" : review ? "Review ready" : "Diagnosis ready"}
             </Badge>
             <span className="font-mono text-xs text-muted-foreground">
               {runs.length} {runs.length === 1 ? "run" : "runs, newest first"}
             </span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Ranked hypotheses</h1>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+            {review ? "Design review" : "Ranked hypotheses"}
+          </h1>
         </div>
         <div className="flex flex-wrap gap-2">
           {reportable && (
@@ -225,7 +250,7 @@ export function SessionView({ actions }: { actions: DebugActions }) {
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={editInput}>
-            Edit observations
+            {review ? "Edit input" : "Edit observations"}
           </Button>
         </div>
       </div>

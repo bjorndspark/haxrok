@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  ClipboardCheck,
   ChevronDown,
   ChevronUp,
   CircleAlert,
@@ -7,6 +8,7 @@ import {
   FolderOpen,
   PlusCircle,
   RotateCcw,
+  Stethoscope,
   Upload,
 } from "lucide-react"
 import { useRef, useState } from "react"
@@ -20,15 +22,71 @@ import { Textarea } from "@/shared/ui/textarea"
 import { projectName } from "../files"
 import { useDebugStore } from "../store"
 import {
+  REVIEW_PLACEHOLDER,
   SYMPTOM_PLACEHOLDER,
   SYMPTOM_PROMPTS,
   fragmentLines,
   symptomHints,
   symptomLines,
 } from "../symptoms"
+import type { Mode } from "../types"
 import type { DebugActions } from "../useDebug"
 
+const MODES: { mode: Mode; label: string; detail: string; icon: typeof Stethoscope }[] = [
+  {
+    mode: "debug",
+    label: "Debug a board on the bench",
+    detail: "It's built and misbehaves. Find the cause.",
+    icon: Stethoscope,
+  },
+  {
+    mode: "review",
+    label: "Review before you order",
+    detail: "Catch schematic mistakes before you pay for boards.",
+    icon: ClipboardCheck,
+  },
+]
+
+function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Mode" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {MODES.map((m) => {
+        const Icon = m.icon
+        const active = m.mode === mode
+        return (
+          <button
+            key={m.mode}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(m.mode)}
+            className={cn(
+              "flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent",
+              active &&
+                "border-blue-500 bg-blue-50/60 ring-1 ring-blue-200 hover:bg-blue-50/80 dark:bg-blue-950/30 dark:ring-blue-900/60",
+            )}
+          >
+            <Icon
+              className={cn(
+                "mt-0.5 h-5 w-5 shrink-0",
+                active ? "text-blue-600 dark:text-sky-400" : "text-muted-foreground",
+              )}
+            />
+            <span>
+              <span className="block text-sm font-semibold">{m.label}</span>
+              <span className="block text-xs text-muted-foreground">{m.detail}</span>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function InputView({ actions }: { actions: DebugActions }) {
+  const mode = useDebugStore((s) => s.mode)
+  const setMode = useDebugStore((s) => s.setMode)
+  const review = mode === "review"
   const files = useDebugStore((s) => s.files)
   const symptoms = useDebugStore((s) => s.symptoms)
   const setSymptoms = useDebugStore((s) => s.setSymptoms)
@@ -63,14 +121,19 @@ export function InputView({ actions }: { actions: DebugActions }) {
       <div>
         <div className="mb-1 flex items-center gap-2 font-mono text-xs font-semibold text-blue-600 dark:text-sky-400">
           <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
-          STEP 1: PROJECT AND BENCH NOTES
+          {review ? "STEP 1: PROJECT AND NOTES" : "STEP 1: PROJECT AND BENCH NOTES"}
         </div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Diagnose a board problem</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          {review ? "Review a schematic before you order" : "Diagnose a board problem"}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-          Drop your KiCad project folder and describe what you see on the bench. You get the likely
-          causes in your schematic, ranked, and how to check each one with a multimeter.
+          {review
+            ? "Drop your KiCad project folder. You get the design mistakes a reviewer would flag, most severe first, each with the evidence and the schematic fix."
+            : "Drop your KiCad project folder and describe what you see on the bench. You get the likely causes in your schematic, ranked, and how to check each one with a multimeter."}
         </p>
       </div>
+
+      <ModeSwitch mode={mode} onChange={setMode} />
 
       <Card
         className={cn(
@@ -170,10 +233,18 @@ export function InputView({ actions }: { actions: DebugActions }) {
       <Card className="space-y-4 p-6 sm:p-7">
         <div className="flex items-start justify-between gap-3 border-b pb-3">
           <div>
-            <h2 className="text-base font-bold">What you see on the bench</h2>
+            <h2 className="text-base font-bold">
+              {review ? "What the board is for (optional)" : "What you see on the bench"}
+            </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              One observation per line. Each line becomes a numbered symptom, so make each one stand
-              on its own: &ldquo;Fails on battery&rdquo;, not &ldquo;battery&rdquo;.
+              {review ? (
+                "Supplies, loads and conditions the board must handle. The review checks the design against them."
+              ) : (
+                <>
+                  One observation per line. Each line becomes a numbered symptom, so make each one
+                  stand on its own: &ldquo;Fails on battery&rdquo;, not &ldquo;battery&rdquo;.
+                </>
+              )}
             </p>
           </div>
           <button
@@ -186,59 +257,65 @@ export function InputView({ actions }: { actions: DebugActions }) {
           </button>
         </div>
 
-        <div className="flex flex-col justify-between gap-2 rounded-lg border bg-background p-2.5 text-xs sm:flex-row sm:items-center">
-          <span className="font-mono text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Covered ({hints.filter((h) => h.done).length}/{hints.length})
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {hints.map((h) => (
-              <Badge
-                key={h.key}
-                tone={h.done ? "green" : "neutral"}
-                className={cn(!h.done && "opacity-60")}
-              >
-                {h.done ? "✓" : "○"} {h.label}
-              </Badge>
-            ))}
-          </div>
-        </div>
+        {!review && (
+          <>
+            <div className="flex flex-col justify-between gap-2 rounded-lg border bg-background p-2.5 text-xs sm:flex-row sm:items-center">
+              <span className="font-mono text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                Covered ({hints.filter((h) => h.done).length}/{hints.length})
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {hints.map((h) => (
+                  <Badge
+                    key={h.key}
+                    tone={h.done ? "green" : "neutral"}
+                    className={cn(!h.done && "opacity-60")}
+                  >
+                    {h.done ? "✓" : "○"} {h.label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-medium text-muted-foreground">Start a line:</span>
-          {SYMPTOM_PROMPTS.map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              onClick={() => insertPrompt(p.prefix)}
-              className="flex items-center gap-1 rounded-md border bg-secondary px-2.5 py-1 text-xs text-secondary-foreground transition-colors hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/40 dark:hover:text-sky-300"
-            >
-              <PlusCircle className="h-3 w-3 text-blue-500" />
-              {p.label}
-            </button>
-          ))}
-        </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-medium text-muted-foreground">Start a line:</span>
+              {SYMPTOM_PROMPTS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => insertPrompt(p.prefix)}
+                  className="flex items-center gap-1 rounded-md border bg-secondary px-2.5 py-1 text-xs text-secondary-foreground transition-colors hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950/40 dark:hover:text-sky-300"
+                >
+                  <PlusCircle className="h-3 w-3 text-blue-500" />
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <Textarea
           ref={textareaRef}
           rows={9}
           value={symptoms}
           onChange={(e) => setSymptoms(e.target.value)}
-          placeholder={SYMPTOM_PLACEHOLDER}
+          placeholder={review ? REVIEW_PLACEHOLDER : SYMPTOM_PLACEHOLDER}
           className="bg-background p-3.5 text-sm leading-relaxed sm:p-4"
         />
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span className="font-mono">
-            {lines.length} {lines.length === 1 ? "symptom" : "symptoms"}
-          </span>
-          {fragments.length > 0 && (
-            <span className="text-amber-700 dark:text-amber-300">
-              Short line{fragments.length > 1 ? "s" : ""} &ldquo;
-              {fragments.slice(0, 2).join("”, “")}
-              &rdquo; may not stand on {fragments.length > 1 ? "their" : "its"} own.
+        {!review && (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span className="font-mono">
+              {lines.length} {lines.length === 1 ? "symptom" : "symptoms"}
             </span>
-          )}
-        </div>
+            {fragments.length > 0 && (
+              <span className="text-amber-700 dark:text-amber-300">
+                Short line{fragments.length > 1 ? "s" : ""} &ldquo;
+                {fragments.slice(0, 2).join("”, “")}
+                &rdquo; may not stand on {fragments.length > 1 ? "their" : "its"} own.
+              </span>
+            )}
+          </div>
+        )}
 
         {inputError && (
           <div className="flex items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
@@ -264,7 +341,7 @@ export function InputView({ actions }: { actions: DebugActions }) {
               className="w-full px-6 sm:w-auto"
               onClick={() => void actions.analyze()}
             >
-              Analyze schematic
+              {review ? "Review schematic" : "Analyze schematic"}
               <ArrowRight />
             </Button>
           </div>
