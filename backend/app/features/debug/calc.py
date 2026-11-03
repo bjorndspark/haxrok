@@ -17,6 +17,10 @@ every such circuit needs:
   capacitor to ground.
 - **divider**: a two-resistor divider into an IC pin: the voltage there, or
   the ratio when the rail's name carries no voltage.
+- **decoupling**: the capacitors to ground on each IC's supply rails.
+  Flagged when a rail has none at all; fewer capacitors than the IC has
+  power pins on the rail is reported without a flag (one shared capacitor
+  can be a deliberate trade-off, as in the RP2040 minimal design).
 - **usb_cc**: the Rd pull-downs on a USB-C receptacle's CC1 and CC2. Flagged
   when the two pins share one resistor, a pin has none, or one isn't
   5.1 kΩ ±10% (USB Type-C Specification, Rd for a sink).
@@ -525,6 +529,74 @@ def _divider(design: Design, net: str) -> Calculation | None:
     )
 
 
+# Power-input pin names: VDD, VCC, AVDD, IOVDD, VDDIO, USB_VDD, VIN, VBAT, 3V3…
+# Not VBUS or VS, which are often sense inputs.
+# Not outputs (VOUT, VREG_VOUT) and not reserved or NC pins.
+_POWER_IN = re.compile(
+    r"^(?:\w+_)?(?:[ADP]|IO)?V(?:DD|CC)\w*$|^(?:VIN|VBAT|VREG_IN|3V3|V\+)$",
+    re.IGNORECASE,
+)
+
+
+def _decoupling(design: Design, ref: str) -> Calculation | None:
+    """The capacitors to ground on an IC's supply rails. Flagged when a rail
+    has none; a hint, unflagged, when it has fewer than the IC's power pins
+    on it."""
+    rails: dict[str, list[Node]] = {}
+    for net, nodes in design.nets.items():
+        if is_ground(net) or len(nodes) < 2:
+            continue  # a supply pin alone on its net is unpowered, not undecoupled
+        for n in nodes:
+            if n.ref == ref and _POWER_IN.match(n.function):
+                rails.setdefault(net, []).append(n)
+    if not rails:
+        return None
+    bare: list[str] = []
+    few: list[str] = []
+    pins: list[str] = []
+    caps_used: list[_Two] = []
+    for net, nodes in sorted(rails.items()):
+        caps = [c for c in _capacitors(design, net) if is_ground(c.other)]
+        pins += [n.pin_ref for n in nodes]
+        caps_used += caps
+        names = ", ".join(f"{n.pin_ref} ({n.function})" for n in nodes)
+        if not caps:
+            bare.append(f"{net} (on {names}) has no capacitor to ground anywhere on the rail")
+        elif len(caps) < len(nodes):
+            few.append(
+                f"{net} feeds {len(nodes)} power pins ({names}) and has {len(caps)} "
+                f"capacitor{'s' if len(caps) > 1 else ''} to ground "
+                f"({', '.join(c.ref for c in caps)})"
+            )
+    if not bare and not few:
+        return None
+    part = design.parts[ref].value
+    if bare:
+        text = (
+            f"{ref} ({part}) supply: {'; '.join(bare)}. Every IC needs a bypass capacitor "
+            "(typically 100 nF) from each supply pin to ground, close to the pin; without one "
+            "the rail's noise and the IC's own switching current can make it reset or "
+            "misbehave. Check the datasheet for the value."
+        )
+    else:
+        text = (
+            f"{ref} ({part}) supply: {'; '.join(few)}. Not flagged: a rail with fewer "
+            "capacitors than power pins can be deliberate. Check the datasheet's decoupling "
+            "recommendation, which is often one 100 nF per pin."
+        )
+    return Calculation(
+        id="",
+        kind="decoupling",
+        ic=ref,
+        pins=[*pins, *_pins_of(*caps_used)],
+        value=float(len(caps_used)),
+        unit="capacitors",
+        expected=None,
+        flagged=bool(bare),
+        text=text,
+    )
+
+
 # USB Type-C Specification, sink pull-down Rd = 5.1 kΩ ±10% on each CC pin.
 _RD, _RD_TOL = 5100.0, 0.10
 _CC_PIN = re.compile(r"^CC([12])$", re.IGNORECASE)
@@ -653,6 +725,8 @@ def lookup(design: Design) -> list[Calculation]:
             calcs.append(c)
         if _head(part.ref) in {"J", "P", "CN", "USB"} and (c := _usb_cc(design, part.ref)):
             calcs.append(c)
+        if _head(part.ref) in {"U", "IC"} and (c := _decoupling(design, part.ref)):
+            calcs.append(c)
     for net in sorted(design.nets):
         if net in fb_nets:
             continue
@@ -669,7 +743,7 @@ def format_calculations(calcs: list[Calculation]) -> str:
     """The calculations as the model reads them."""
     if not calcs:
         return (
-            "(none: no regulator divider, charger, LED, I²C, RC, divider or USB-C CC "
-            "circuit recognised)\n"
+            "(none: no regulator divider, charger, LED, I²C, RC, divider, decoupling or "
+            "USB-C CC circuit recognised)\n"
         )
     return "\n".join(f"{c.id}{' FLAGGED' if c.flagged else ''}: {c.text}" for c in calcs) + "\n"

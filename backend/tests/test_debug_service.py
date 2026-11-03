@@ -695,3 +695,33 @@ def test_usb_c_cc_left_to_a_pd_controller_or_a_source_is_not_flagged():
     )
     (c,) = calc.lookup(source)
     assert not c.flagged and "source port" in c.text
+
+
+def test_a_supply_rail_with_no_capacitor_is_flagged():
+    from app.features.debug import calc
+
+    parts = {"U1": ("CH340C", "x:y"), "U2": ("AMS1117-3.3", "x:y"), "C1": ("100n", "Device:C")}
+    bare = _design(
+        parts,
+        {"+5V": ["U1.16(VCC)", "U2.3(VIN)"], "+3V3": ["U2.2(VOUT)", "C1.1"], "GND": ["C1.2"]},
+    )
+    flagged = {c.ic: c for c in calc.lookup(bare)}
+    assert set(flagged) == {"U1", "U2"} and all(c.flagged for c in flagged.values())
+    assert "+5V" in flagged["U1"].text and "no capacitor" in flagged["U1"].text
+
+    decoupled = _design(
+        parts,
+        {"+5V": ["U1.16(VCC)", "U2.3(VIN)", "C1.1"], "+3V3": ["U2.2(VOUT)"], "GND": ["C1.2"]},
+    )
+    assert calc.lookup(decoupled) == []
+
+
+def test_fewer_capacitors_than_power_pins_is_a_hint_not_a_flag():
+    from app.features.debug import calc
+
+    design = _design(
+        {"U1": ("RP2040", "x:y"), "C1": ("100n", "Device:C")},
+        {"+3V3": ["U1.1(IOVDD)", "U1.10(IOVDD)", "U1.48(USB_VDD)", "C1.1"], "GND": ["C1.2"]},
+    )
+    (c,) = calc.lookup(design)
+    assert c.kind == "decoupling" and not c.flagged and "3 power pins" in c.text

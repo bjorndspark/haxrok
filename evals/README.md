@@ -161,6 +161,15 @@ pull-down before the model runs; on every other case it stays quiet.
 | `rp-micro-cc-shared` | debug | #1 | 185 s | Called a verified design error that explains every symptom |
 | `rp-micro-no-fault` | review | PASS (no issues) | 85 s | |
 
+After the decoupling check (`decoupling`: flagged only when an IC's
+supply rail has no capacitor to ground). No case has such a rail, so it
+stays quiet on all of them; unit tests cover the flag.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `rp-micro-no-fault` | review | PASS (no issues) | 71 s | |
+| `rp-micro-cc-shared` | review | #1 (may fail) | 134 s | |
+
 ## Reading the result
 
 | Outcome | Meaning |

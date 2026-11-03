@@ -172,6 +172,7 @@ export interface Calculation {
     | "rc_delay"
     | "divider"
     | "usb_cc"
+    | "decoupling"
   ic: string
   pins: string[]
   /** Null when the thing to measure is missing (no pull-up, no resistor). */
