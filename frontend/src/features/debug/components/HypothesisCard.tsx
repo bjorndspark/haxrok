@@ -188,7 +188,7 @@ function StepView({
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="e.g. 0.2 Ω between L2 and VOUT"
+            placeholder="e.g. 3.28 V at TP11"
             maxLength={500}
             className="w-full rounded-md border bg-card px-3 py-1.5 font-mono text-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
           />
