@@ -284,17 +284,20 @@ class ReferenceNote(BaseModel):
 
 
 class Calculation(BaseModel):
-    """A value the backend computed from netlist resistor values with a
-    datasheet formula: a regulator's output from its feedback divider, a
-    charger's current from its program resistor. Verified arithmetic, not
-    the model's. ``flagged`` means it contradicts the design's own intent
-    (an output net named +3V3 that the divider sets to 0.73 V)."""
+    """A value the backend computed from part values in the netlist
+    (``calc.py``): a regulator's output, a charge current, an LED current,
+    an I²C pull-up, an RC delay, a divider. Verified arithmetic, not the
+    model's. ``flagged`` means the netlist as drawn contradicts itself or
+    misses what every such circuit needs (+3V3 set to 0.73 V, an I²C line
+    with no pull-up)."""
 
     id: str
-    kind: Literal["regulator_output", "charge_current"]
+    kind: Literal[
+        "regulator_output", "charge_current", "led_current", "i2c_pullup", "rc_delay", "divider"
+    ]
     ic: str
     pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")
-    value: float
+    value: float | None = Field(description="None when the thing to measure is missing.")
     unit: str
     expected: float | None = Field(description="The value the net name promises, if any.")
     flagged: bool

@@ -1,29 +1,22 @@
 """Reference designs: what the manufacturer's own documents say a correct
-circuit around a few common ICs looks like, and values the backend
-calculates from the netlist with the datasheet's formulas.
+circuit around a few common ICs looks like.
 
-Two outputs, both verified rather than recalled:
-
-- **Notes** (rd1, …): short facts copied from the manufacturer's datasheet,
-  application note or hardware design guide, each with its section. The
-  model reads them so it stops calling a reference circuit wrong (in the
-  no-fault eval it flagged the RP2040's 1 kΩ crystal resistor, which is the
-  Raspberry Pi design) and can cite them.
-- **Calculations** (cf1, …): a regulator's output voltage from its feedback
-  divider, a charger's current from its program resistor. Deterministic
-  arithmetic on resistor values in the netlist. A regulator whose computed
-  output disagrees with its output net's name ("+3V3") is flagged.
+Each note (rd1, …) is a short fact copied from the manufacturer's
+datasheet, application note or hardware design guide, with its section.
+The model reads them so it stops calling a reference circuit wrong (in the
+no-fault eval it flagged the RP2040's 1 kΩ crystal resistor, which is the
+Raspberry Pi design) and can cite them. Values calculated with the same
+documents' formulas are in ``calc.py``.
 
 Like ``pins.PIN_TABLE`` this is a hand-written MVP source; per-part
 datasheet retrieval replaces it (plan 001, "After the hackathon"). Every
 entry here was read in the named document, not recalled.
 """
 
-import re
 from dataclasses import dataclass
 
 from app.features.debug.design import Design
-from app.features.debug.schemas import Calculation, ReferenceNote
+from app.features.debug.schemas import ReferenceNote
 
 # --- notes -----------------------------------------------------------------------
 
@@ -106,210 +99,27 @@ _ESP32_C3_MINI = PartReference(
 REFERENCES: tuple[PartReference, ...] = (_RP2040, _MCP73831, _SY8088, _ESP32_C3_MINI)
 
 
-# --- calculations ------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class FeedbackRule:
-    """An adjustable regulator: VOUT = vref × (1 + R_top/R_bottom)."""
-
-    value_prefix: str
-    fb_pin: str
-    vref: float
-    source: str
-
-
-@dataclass(frozen=True)
-class ProgramRule:
-    """A charger whose current is ``k / R`` with R in kΩ and the result in mA."""
-
-    value_prefix: str
-    prog_pin: str
-    k: float
-    source: str
-
-
-FEEDBACK_RULES: tuple[FeedbackRule, ...] = (
-    FeedbackRule("SY8088", "5", 0.6, "Silergy AN_SY8088, FB pin: VOUT = 0.6 V × (1 + R1/R2)"),
-)
-
-PROGRAM_RULES: tuple[ProgramRule, ...] = (
-    # SOT-23-5 numbering (the package hobby boards use): PROG is pin 5.
-    ProgramRule(
-        "MCP7383", "5", 1000.0, "Microchip DS20001984H 5.0: IREG (mA) = 1000 V / RPROG (kΩ)"
-    ),
-)
-
-# How far a computed output may sit from the net's named voltage before it
-# is flagged. 1% resistors and a ±2% reference land well inside 8%.
-_TOLERANCE = 0.08
-
-_GROUND = re.compile(r"^(A|D|P)?GND|^VSS|^0V$", re.IGNORECASE)
-
-# "100k", "22k1", "4k7", "470R", "0R", "1M", "2.2k", optionally with R/Ω after.
-_VALUE = re.compile(r"(\d+(?:\.\d+)?)([RKM]?)(\d*)(?:R|Ω|OHMS?)?", re.IGNORECASE)
-_MULT = {"": 1.0, "R": 1.0, "K": 1e3, "M": 1e6}
-
-
-def parse_ohms(value: str) -> float | None:
-    """A resistor's value in ohms, from KiCad's value field ("22k1R 1%").
-    None for anything else (DNP, empty, a part number)."""
-    token = value.strip().split(" ")[0] if value.strip() else ""
-    m = _VALUE.fullmatch(token)
-    if not m:
-        return None
-    whole, mult, frac = m.groups()
-    if frac and "." in whole:
-        return None
-    number = float(f"{whole}.{frac}" if frac else whole)
-    return number * _MULT[mult.upper()]
-
-
-def named_voltage(net: str) -> float | None:
-    """The voltage a net's name promises: "+3V3" → 3.3, "/5V" → 5, "1.8V" → 1.8."""
-    name = net.rstrip("/").split("/")[-1].lstrip("+")
-    m = re.fullmatch(r"(?:V[A-Z_]*)?(\d+)V(\d+)", name, re.IGNORECASE) or re.fullmatch(
-        r"(\d+(?:\.\d+)?)V", name, re.IGNORECASE
-    )
-    if not m:
-        return None
-    return float(".".join(g for g in m.groups() if g))
-
-
-def format_ohms(ohms: float) -> str:
-    if ohms >= 1e6:
-        return f"{ohms / 1e6:g} MΩ"
-    if ohms >= 1e3:
-        return f"{ohms / 1e3:g} kΩ"
-    return f"{ohms:g} Ω"
-
-
-def _resistors_on(design: Design, net: str) -> list[tuple[str, str, float]]:
-    """(resistor ref, the net at its other end, ohms) for each two-pin
-    resistor with a parseable value on ``net``."""
-    found = []
-    for node in design.nets.get(net, []):
-        part = design.parts.get(node.ref)
-        if part is None or node.ref.rstrip("0123456789") != "R":
-            continue
-        ohms = parse_ohms(part.value)
-        other_pin = "2" if node.pin == "1" else "1"
-        other = design.net_of(f"{node.ref}.{other_pin}")
-        if ohms is not None and other is not None:
-            found.append((node.ref, other, ohms))
-    return found
-
-
-def _feedback(design: Design, ref: str, rule: FeedbackRule) -> Calculation | None:
-    fb_ref = f"{ref}.{rule.fb_pin}"
-    fb_net = design.net_of(fb_ref)
-    if fb_net is None:
-        return None
-    resistors = _resistors_on(design, fb_net)
-    bottom = [r for r in resistors if _GROUND.match(r[1].lstrip("/"))]
-    top = [r for r in resistors if not _GROUND.match(r[1].lstrip("/"))]
-    if len(top) != 1 or len(bottom) != 1 or bottom[0][2] == 0:
-        return None  # not a plain two-resistor divider; leave it to the model
-    (top_ref, out_net, r_top), (bottom_ref, _, r_bottom) = top[0], bottom[0]
-    vout = rule.vref * (1 + r_top / r_bottom)
-    expected = named_voltage(out_net)
-    flagged = expected is not None and abs(vout - expected) > _TOLERANCE * expected
-    text = (
-        f"{ref} feedback divider: {top_ref} ({format_ohms(r_top)}) from {out_net} to FB "
-        f"and {bottom_ref} ({format_ohms(r_bottom)}) from FB to ground set the output to "
-        f"{rule.vref:g} V × (1 + {format_ohms(r_top)}/{format_ohms(r_bottom)}) = {vout:.2f} V "
-        f"({rule.source})."
-    )
-    if expected is not None:
-        text += (
-            f" The output net {out_net} is named for {expected:g} V, so the divider is wrong."
-            if flagged
-            else f" That matches the {expected:g} V the net {out_net} is named for."
-        )
-    return Calculation(
-        id="",
-        kind="regulator_output",
-        ic=ref,
-        pins=[fb_ref, f"{top_ref}.1", f"{top_ref}.2", f"{bottom_ref}.1", f"{bottom_ref}.2"],
-        value=round(vout, 3),
-        unit="V",
-        expected=expected,
-        flagged=flagged,
-        text=text,
-    )
-
-
-def _program(design: Design, ref: str, rule: ProgramRule) -> Calculation | None:
-    prog_ref = f"{ref}.{rule.prog_pin}"
-    prog_net = design.net_of(prog_ref)
-    if prog_net is None:
-        return None
-    to_ground = [
-        r for r in _resistors_on(design, prog_net) if _GROUND.match(r[1].lstrip("/")) and r[2] > 0
-    ]
-    if len(to_ground) != 1:
-        return None
-    r_ref, _, ohms = to_ground[0]
-    current = rule.k / (ohms / 1e3)
-    return Calculation(
-        id="",
-        kind="charge_current",
-        ic=ref,
-        pins=[prog_ref, f"{r_ref}.1", f"{r_ref}.2"],
-        value=round(current, 1),
-        unit="mA",
-        expected=None,
-        flagged=False,
-        text=(
-            f"{ref} charge current: {r_ref} ({format_ohms(ohms)}) from PROG to ground sets "
-            f"{rule.k:g} V / {ohms / 1e3:g} kΩ = {current:.0f} mA ({rule.source})."
-        ),
-    )
-
-
-@dataclass(frozen=True)
-class ReferenceLookup:
-    """The reference notes and calculations for one design."""
-
-    notes: list[ReferenceNote]
-    calculations: list[Calculation]
-    text: str  # what the model reads
-
-
-def lookup(design: Design) -> ReferenceLookup:
-    """Match every part against the reference notes and calculation rules."""
+def lookup(design: Design) -> list[ReferenceNote]:
+    """The reference notes for the parts on this board, once per part type
+    (three RP2040s don't need three copies), ids rd1…"""
     notes: list[ReferenceNote] = []
-    calcs: list[Calculation] = []
-    seen_parts: set[str] = set()
+    seen: set[str] = set()
     for part in sorted(design.parts.values(), key=lambda p: p.ref):
-        value = part.value.upper()
-        entry = next((r for r in REFERENCES if r.matches(value)), None)
-        # One set of notes per part type: three RP2040s don't need three copies.
-        if entry is not None and entry.value_prefix not in seen_parts:
-            seen_parts.add(entry.value_prefix)
-            for text in entry.notes:
-                notes.append(
-                    ReferenceNote(
-                        id=f"rd{len(notes) + 1}", part=part.value, source=entry.source, text=text
-                    )
+        entry = next((r for r in REFERENCES if r.matches(part.value)), None)
+        if entry is None or entry.value_prefix in seen:
+            continue
+        seen.add(entry.value_prefix)
+        for text in entry.notes:
+            notes.append(
+                ReferenceNote(
+                    id=f"rd{len(notes) + 1}", part=part.value, source=entry.source, text=text
                 )
-        for fb in FEEDBACK_RULES:
-            if value.startswith(fb.value_prefix) and (c := _feedback(design, part.ref, fb)):
-                calcs.append(c)
-        for prog in PROGRAM_RULES:
-            if value.startswith(prog.value_prefix) and (c := _program(design, part.ref, prog)):
-                calcs.append(c)
-    calcs = [c.model_copy(update={"id": f"cf{i}"}) for i, c in enumerate(calcs, start=1)]
-    return ReferenceLookup(notes=notes, calculations=calcs, text=_format(notes, calcs))
+            )
+    return notes
 
 
-def _format(notes: list[ReferenceNote], calcs: list[Calculation]) -> str:
-    lines = ["### Reference notes (copied from the manufacturer's documents)"]
-    lines += [f"{n.id} [{n.part}, {n.source}]: {n.text}" for n in notes] or [
-        "(none for the parts on this board)"
-    ]
-    lines += ["", "### Calculated from the netlist (verified arithmetic)"]
-    lines += [f"{c.id}{' FLAGGED' if c.flagged else ''}: {c.text}" for c in calcs] or [
-        "(none: no regulator divider or charger program resistor recognised)"
-    ]
-    return "\n".join(lines) + "\n"
+def format_notes(notes: list[ReferenceNote]) -> str:
+    """The notes as the model reads them."""
+    if not notes:
+        return "(none for the parts on this board)\n"
+    return "\n".join(f"{n.id} [{n.part}, {n.source}]: {n.text}" for n in notes) + "\n"

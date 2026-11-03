@@ -102,15 +102,15 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
               }
             >
               <Badge tone={c.flagged ? "red" : "green"} className="shrink-0 self-start font-mono">
-                {c.value} {c.unit}
+                {c.value === null ? "missing" : `${String(c.value)} ${c.unit}`}
                 {c.expected !== null && (c.flagged ? ` ≠ ${String(c.expected)} V` : " ✓")}
               </Badge>
               <span className="leading-relaxed">{c.text}</span>
             </div>
           ))}
           <p className="text-[11px] text-muted-foreground">
-            Exact arithmetic on your resistor values with the datasheet formula, before the model
-            runs.
+            Exact arithmetic on your part values (regulator outputs, charge and LED currents, I²C
+            pull-ups, RC delays, dividers), before the model runs.
           </p>
         </div>
       )}

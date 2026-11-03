@@ -423,7 +423,7 @@ async def test_analyze_rejects_malformed_measurements(client, fake_backends):
 
 
 def test_resistor_values_parse_in_kicad_styles():
-    from app.features.debug.reference import named_voltage, parse_ohms
+    from app.features.debug.calc import named_voltage, parse_farads, parse_ohms
 
     assert parse_ohms("22k1R 1%") == 22100
     assert parse_ohms("4k7") == 4700
@@ -432,7 +432,11 @@ def test_resistor_values_parse_in_kicad_styles():
     assert parse_ohms("DNP") is None
     assert named_voltage("+3V3") == 3.3
     assert named_voltage("/5V") == 5
-    assert named_voltage("VBUS") is None
+    assert named_voltage("VBUS") == 5
+    assert named_voltage("VCC") is None
+    assert parse_farads("4u7") == pytest.approx(4.7e-6)
+    assert parse_farads("100nF") == pytest.approx(1e-7)
+    assert parse_farads("1uF/16V") == pytest.approx(1e-6)
 
 
 def _buck(top: str, bottom: str) -> Design:
@@ -450,14 +454,14 @@ def _buck(top: str, bottom: str) -> Design:
 
 
 def test_a_swapped_feedback_divider_is_flagged():
-    from app.features.debug import reference
+    from app.features.debug import calc, reference
 
-    swapped = reference.lookup(_buck("22k1", "100k")).calculations
+    swapped = calc.lookup(_buck("22k1", "100k"))
     assert len(swapped) == 1 and swapped[0].flagged
     assert swapped[0].value == pytest.approx(0.733, abs=0.01)
-    assert "rd" in reference.lookup(_buck("22k1", "100k")).text  # SY8088 notes included
+    assert reference.lookup(_buck("22k1", "100k"))[0].part == "SY8088"
 
-    right = reference.lookup(_buck("100k", "22k1")).calculations
+    right = calc.lookup(_buck("100k", "22k1"))
     assert not right[0].flagged
     assert right[0].value == pytest.approx(3.31, abs=0.01)
 
@@ -481,3 +485,88 @@ def test_a_reference_cite_must_name_a_known_id():
     bad = good.model_copy(update={"cites": [Cite(kind="reference", pin=None, net=None, id="rd9")]})
     assert not check_claim(good, ctx).downgraded
     assert check_claim(bad, ctx).downgraded
+
+
+def _design(parts: dict[str, tuple[str, str]], nets: dict[str, list[str]]) -> Design:
+    """parts: ref -> (value, lib). nets: name -> ["REF.PIN(FUNC)", ...]."""
+
+    def node(token: str) -> Node:
+        ref_pin, _, func = token.partition("(")
+        ref, _, pin = ref_pin.partition(".")
+        return Node(ref, pin, func.rstrip(")"))
+
+    return Design(
+        {r: Part(r, v, lib, "") for r, (v, lib) in parts.items()},
+        {name: [node(t) for t in tokens] for name, tokens in nets.items()},
+    )
+
+
+def test_led_current_and_a_missing_resistor():
+    from app.features.debug import calc
+
+    led = _design(
+        {"D1": ("LED", "Device:LED"), "R1": ("1k", "Device:R")},
+        {"+3V3": ["R1.1"], "Net-(D1-A)": ["R1.2", "D1.2(A)"], "GND": ["D1.1(K)"]},
+    )
+    (c,) = calc.lookup(led)
+    assert c.kind == "led_current" and not c.flagged
+    assert c.value == pytest.approx(1.5, abs=0.01)  # (3.3 - 1.8) / 1k
+
+    bare = _design({"D1": ("LED", "Device:LED")}, {"+5V": ["D1.2(A)"], "GND": ["D1.1(K)"]})
+    (c,) = calc.lookup(bare)
+    assert c.flagged and "no resistor" in c.text
+
+
+def test_i2c_pullups_are_found_or_flagged_and_qspi_clocks_ignored():
+    from app.features.debug import calc
+
+    parts = {"U1": ("MCU", "x:y"), "U2": ("SENSOR", "x:y"), "R1": ("4k7", "Device:R")}
+    design = _design(
+        parts,
+        {
+            "+3V3": ["R1.1"],
+            "IO8_SCL": ["R1.2", "U1.2(GPIO8)", "U2.1(SCL)"],
+            "IO10_SDA": ["U1.3(GPIO10)", "U2.2(SDA)"],
+            "QSPI_SCLK": ["U1.4(QSPI_SCLK)", "U2.3(CLK)"],
+        },
+    )
+    calcs = calc.lookup(design)
+    by_net = {c.text.split(" net ")[1].split(" ")[0]: c for c in calcs}
+    assert set(by_net) == {"IO8_SCL", "IO10_SDA"}
+    assert by_net["IO10_SDA"].flagged and calcs[0] is by_net["IO10_SDA"]  # flagged first
+    assert by_net["IO8_SCL"].value == 4700
+
+
+def test_rc_delay_and_divider():
+    from app.features.debug import calc
+
+    design = _design(
+        {
+            "U1": ("ESP32-C3-MINI-1", "x:y"),
+            "R1": ("10k", "Device:R"),
+            "C1": ("1u", "Device:C"),
+            "R2": ("100k", "Device:R"),
+            "R3": ("100k", "Device:R"),
+        },
+        {
+            "+3V3": ["R1.1"],
+            "EN": ["R1.2", "C1.1", "U1.8(EN)"],
+            "GND": ["C1.2", "R3.2"],
+            "VBAT": ["R2.1"],
+            "BAT_SENSE": ["R2.2", "R3.1", "U1.5(GPIO2)"],
+        },
+    )
+    kinds = {c.kind: c for c in calc.lookup(design)}
+    assert kinds["rc_delay"].value == pytest.approx(10.0)  # ms
+    assert kinds["divider"].unit == "×" and kinds["divider"].value == pytest.approx(0.5)
+
+
+def test_an_i2c_pullup_above_the_ic_supply_is_flagged():
+    from app.features.debug import calc
+
+    design = _design(
+        {"U1": ("MCU", "x:y"), "R1": ("10k", "Device:R")},
+        {"VBUS": ["R1.1"], "+3V3": ["U1.1(VDD)"], "SDA": ["R1.2", "U1.2(SDA)"]},
+    )
+    (c,) = calc.lookup(design)
+    assert c.flagged and "5 V" in c.text and "+3V3" in c.text

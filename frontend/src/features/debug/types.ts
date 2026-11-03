@@ -164,10 +164,12 @@ export interface ReferenceNote {
  *  (cf1, …). `flagged`: it contradicts the design's intent. */
 export interface Calculation {
   id: string
-  kind: "regulator_output" | "charge_current"
+  kind:
+    "regulator_output" | "charge_current" | "led_current" | "i2c_pullup" | "rc_delay" | "divider"
   ic: string
   pins: string[]
-  value: number
+  /** Null when the thing to measure is missing (no pull-up, no resistor). */
+  value: number | null
   unit: string
   expected: number | null
   flagged: boolean

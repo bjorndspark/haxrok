@@ -20,13 +20,14 @@ from dataclasses import dataclass
 
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
-from app.features.debug import diagram, pins, prompt, reference
+from app.features.debug import calc, diagram, pins, prompt, reference
 from app.features.debug.design import Design, compact, format_erc, parse_erc, parse_netlist
 from app.features.debug.evidence import EvidenceContext, check
 from app.features.debug.kicad import KicadRunner
 from app.features.debug.project import load_project
 from app.features.debug.schemas import (
     Analysis,
+    Calculation,
     Claim,
     DesignSummary,
     ErcEntry,
@@ -35,6 +36,7 @@ from app.features.debug.schemas import (
     MeasurementInput,
     Mode,
     ProgressEvent,
+    ReferenceNote,
     Symptom,
 )
 
@@ -67,7 +69,8 @@ class Prepared:
     design: Design
     erc: list[ErcEntry]
     pin_lookup: pins.PinLookup
-    references: reference.ReferenceLookup
+    references: list[ReferenceNote]
+    calculations: list[Calculation]
     symptoms: list[Symptom]
     measurements: list[Measurement]
 
@@ -93,7 +96,8 @@ async def prepare(
     except ValueError as e:
         raise BadRequestError(f"Couldn't parse kicad-cli's output: {e}") from e
     lookup = pins.lookup(design)
-    refs = reference.lookup(design)
+    notes = reference.lookup(design)
+    calcs = calc.lookup(design)
     numbered = [
         Measurement(id=f"m{i}", step_id=m.step_id, context=m.context, value=m.value)
         for i, m in enumerate(measurements, start=1)
@@ -107,12 +111,12 @@ async def prepare(
         ics=lookup.ics,
         erc=erc,
         wiring=lookup.findings,
-        references=refs.notes,
-        calculations=refs.calculations,
+        references=notes,
+        calculations=calcs,
         symptoms=symptoms,
         measurements=numbered,
     )
-    return Prepared(mode, summary, design, erc, lookup, refs, symptoms, numbered)
+    return Prepared(mode, summary, design, erc, lookup, notes, calcs, symptoms, numbered)
 
 
 async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
@@ -122,15 +126,15 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
     conflicts = len(prepared.pin_lookup.findings)
     plural = "s" if conflicts > 1 else ""
     found = f" {conflicts} pin{plural} wired against the datasheet." if conflicts else ""
-    refs = prepared.references
-    flagged = sum(1 for c in refs.calculations if c.flagged)
+    n_calcs = len(prepared.calculations)
+    flagged = sum(1 for c in prepared.calculations if c.flagged)
     calcs = (
-        f" {len(refs.calculations)} value{'s' if len(refs.calculations) != 1 else ''} "
-        f"calculated from the netlist" + (f", {flagged} wrong." if flagged else ".")
-        if refs.calculations
+        f" {n_calcs} value{'s' if n_calcs != 1 else ''} calculated from the netlist"
+        + (f", {flagged} flagged." if flagged else ".")
+        if n_calcs
         else ""
     )
-    notes = f" {len(refs.notes)} reference-design notes." if refs.notes else ""
+    notes = f" {len(prepared.references)} reference-design notes." if prepared.references else ""
     yield _progress(
         "pin_lookup",
         f"Pin table found for {with_data} of {len(prepared.summary.ics)} ICs.{found}{notes}{calcs}",
@@ -150,7 +154,8 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         erc=format_erc(prepared.erc),
         pin_table=prepared.pin_lookup.text,
         findings=pins.format_findings(prepared.pin_lookup.findings),
-        references=prepared.references.text,
+        references=reference.format_notes(prepared.references),
+        calculations=calc.format_calculations(prepared.calculations),
     )
     start = time.monotonic()
     try:
@@ -193,8 +198,7 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         symptom_ids=frozenset(s.id for s in prepared.symptoms),
         measurement_ids=frozenset(m.id for m in prepared.measurements),
         reference_ids=frozenset(
-            [n.id for n in prepared.references.notes]
-            + [c.id for c in prepared.references.calculations]
+            [n.id for n in prepared.references] + [c.id for c in prepared.calculations]
         ),
     )
     checked = check(analysis, ctx)

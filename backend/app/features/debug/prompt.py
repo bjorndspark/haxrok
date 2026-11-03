@@ -58,9 +58,10 @@ own documents. A circuit that matches a reference note is correct as \
 designed: never call it an error or suggest changing it, and use the note \
 instead of what you recall. A deviation from a note is worth reporting, with \
 its consequence. Calculated values (cf...) are exact arithmetic on the \
-netlist's resistor values; trust them over your own arithmetic. One marked \
-FLAGGED contradicts the design's own intent (an output named +3V3 set to \
-0.73 V): it is a verified design error."""
+netlist's part values; trust them over your own arithmetic. One marked \
+FLAGGED is a verified problem in the netlist as drawn (an output named +3V3 \
+set to 0.73 V, an LED with no resistor, an I²C line with no pull-up); keep \
+any caveat its text gives (a pull-up may sit on a connected module)."""
 
 DIAGNOSE = f"""\
 You are an expert hardware engineer debugging a PCB from its KiCad schematic \
@@ -267,6 +268,7 @@ def build_user_message(
     pin_table: str,
     findings: str,
     references: str = "",
+    calculations: str = "",
 ) -> str:
     """The user turn: symptoms (review: the designer's notes), measurements,
     netlist, ERC, pin table, verified findings."""
@@ -289,7 +291,9 @@ def build_user_message(
         "## Verified findings (netlist checked against the pin table)\n" + findings,
     ]
     if references:
-        parts.append("## Reference designs and calculated values\n" + references)
+        parts.append("## Reference notes (copied from the manufacturers' documents)\n" + references)
+    if calculations:
+        parts.append("## Calculated from the netlist (verified arithmetic)\n" + calculations)
     return "\n\n".join(parts)
 
 

@@ -101,7 +101,7 @@ export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment
     return {
       ...base,
       confidence: "verified",
-      reason: `The backend calculated ${calculations.map((c) => `${c.ic} at ${String(c.value)} ${c.unit}`).join(", ")} from your netlist with the datasheet formula, which contradicts the design, and this hypothesis cites it.`,
+      reason: `The backend's calculation from your netlist flagged ${calculations.map((c) => c.ic).join(", ")}, and this hypothesis cites it.`,
     }
   }
   if (isReview(summary)) {

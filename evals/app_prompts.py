@@ -34,7 +34,7 @@ sys.path.insert(0, "/app")
 from app.core.ai.chat import complete_text  # noqa: E402
 from app.core.ai.structured import complete_structured  # noqa: E402
 from app.core.config import settings  # noqa: E402
-from app.features.debug import pins, prompt, reference  # noqa: E402
+from app.features.debug import calc, pins, prompt, reference  # noqa: E402
 from app.features.debug.design import Design, Node, Part  # noqa: E402
 from app.features.debug.schemas import Analysis, Claim  # noqa: E402
 
@@ -77,7 +77,6 @@ def build_input(
     netlist = (case_dir / "netlist.txt").read_text()
     design = parse_compact(netlist)
     lookup = pins.lookup(design)
-    refs = reference.lookup(design)
     symptoms = (
         []
         if mode == "review"
@@ -91,7 +90,8 @@ def build_input(
         erc=erc.read_text() if erc.exists() else "(none)",
         pin_table=lookup.text,
         findings=pins.format_findings(lookup.findings),
-        references=refs.text,
+        references=reference.format_notes(reference.lookup(design)),
+        calculations=calc.format_calculations(calc.lookup(design)),
     )
     return user, lookup
 
