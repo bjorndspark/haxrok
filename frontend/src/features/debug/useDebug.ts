@@ -1,13 +1,13 @@
 /**
  * Debug behavior behind the components: run an analysis, re-run with a
- * measurement, cancel, load the demo board. Components only render and
- * call these.
+ * measurement, cancel, read a dropped or picked project. Components only
+ * render and call these.
  */
 import { useCallback, useEffect, useState } from "react"
 
 import { errorMessage } from "@/shared/lib/utils"
 
-import { loadExample, streamAnalysis } from "./api"
+import { streamAnalysis } from "./api"
 import { fromDataTransfer, fromFileList } from "./files"
 import { toMarkdown } from "./present"
 import { useDebugStore } from "./store"
@@ -30,7 +30,6 @@ export interface DebugActions {
   analyze: () => Promise<void>
   rerunWithMeasurement: (step: ConfirmStep, value: string) => Promise<void>
   cancel: () => void
-  loadDemo: () => Promise<void>
   pickFiles: (list: FileList) => void
   dropFiles: (dt: DataTransfer) => Promise<void>
   downloadReport: (run: Run) => void
@@ -100,17 +99,6 @@ export function useDebugActions(): DebugActions {
     useDebugStore.getState().controller?.abort()
   }, [])
 
-  const loadDemo = useCallback(async () => {
-    const store = useDebugStore.getState()
-    try {
-      const example = await loadExample("demo")
-      store.setFiles(example.files)
-      store.setSymptoms(example.symptoms)
-    } catch (e) {
-      store.setInputError(errorMessage(e, "Couldn't load the example board."))
-    }
-  }, [])
-
   const pickFiles = useCallback((list: FileList) => {
     setProject(fromFileList(list))
   }, [])
@@ -134,7 +122,7 @@ export function useDebugActions(): DebugActions {
     URL.revokeObjectURL(url)
   }, [])
 
-  return { analyze, rerunWithMeasurement, cancel, loadDemo, pickFiles, dropFiles, downloadReport }
+  return { analyze, rerunWithMeasurement, cancel, pickFiles, dropFiles, downloadReport }
 }
 
 /** Seconds since `startedAt`, ticking until `finishedAt` is set. */

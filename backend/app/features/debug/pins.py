@@ -1,4 +1,4 @@
-"""Hand-written pin table: what each pin of the demo board's ICs does, so
+"""Hand-written pin table: what each pin of a few common ICs does, so
 the model reads real pin functions instead of recalling them.
 
 Each entry was copied from the part's datasheet pin-function table (the
@@ -252,8 +252,8 @@ def lookup(design: Design) -> PinLookup:
     )
 
 
-# How many other pins a finding names before it says "and N more": the
-# shorted rail on the demo board carries 40-odd pins.
+# How many other pins a finding names before it says "and N more": a
+# shorted power rail can carry 40-odd pins.
 _MAX_LISTED = 6
 
 
@@ -262,8 +262,8 @@ def check_wiring(design: Design, ref: str, entry: PartPins) -> list[WiringFindin
     inductor (or a test point), or no inductor at all.
 
     Deterministic, from the netlist and the pin table only, so a finding is
-    verified, not the model's reasoning. It exists because the model saw the
-    demo board's L2 pin on the output rail, but treated "a switch node must
+    verified, not the model's reasoning. It exists because the model saw an
+    L2 pin on the output rail, but treated "a switch node must
     be its own net" as recalled topology and ranked the short low.
     """
     findings: list[WiringFinding] = []

@@ -1,20 +1,17 @@
 """Debug feature, end to end below the model: the upload checks, the pin
 table, the service's event stream and the /debug/analyze route.
 
-kicad-cli and the model are faked, except in the one test that runs the real
-kicad-cli on the demo board (skipped where it isn't installed).
+kicad-cli and the model are faked.
 """
 
 import json
-import shutil
-from pathlib import Path
 
 import pytest
 
 from app.core.errors import BadRequestError, UpstreamError
 from app.features.debug import diagram, pins, router, service
 from app.features.debug.design import parse_netlist
-from app.features.debug.kicad import KicadCli, KicadOutput
+from app.features.debug.kicad import KicadOutput
 from app.features.debug.project import Project, load_project, missing_sheets, normalize_paths
 from app.features.debug.prompt import number_symptoms
 from app.features.debug.schemas import (
@@ -26,9 +23,6 @@ from app.features.debug.schemas import (
     Hypothesis,
     MeasurementInput,
 )
-
-# tests/../../frontend/public/examples: the demo board the UI offers.
-EXAMPLE = Path(__file__).resolve().parents[2] / "frontend" / "public" / "examples" / "rust-board-fb-swapped"
 
 ROOT_SCH = b'(kicad_sch (version 20231120)\n (sheet (property "Sheetfile" "power.kicad_sch"))\n)'
 SUB_SCH = b"(kicad_sch (version 20231120))"
@@ -398,21 +392,3 @@ async def test_analyze_rejects_malformed_measurements(client, fake_backends):
     )
     assert res.status_code == 400
     assert res.json()["error"]["field"] == "measurements"
-
-
-# --- real kicad-cli -------------------------------------------------------------------------
-
-
-@pytest.mark.skipif(shutil.which("kicad-cli") is None, reason="kicad-cli not installed")
-@pytest.mark.skipif(not EXAMPLE.is_dir(), reason="demo board not mounted")
-async def test_kicad_cli_reads_the_demo_board():
-    raw = [(f"demo/{p.name}", p.read_bytes()) for p in sorted(EXAMPLE.glob("*.kicad_*"))]
-    prepared = await service.prepare(raw, "Fails on battery", [], KicadCli())
-    design = prepared.design
-    # The bug the demo is built around: L2 and VOUT on the same net.
-    assert design.net_of("U2.9") == design.net_of("U2.7")
-    assert any(e.rule == "multiple_net_names" for e in prepared.erc)
-    assert not any(e.rule == "lib_symbol_issues" for e in prepared.erc)
-    assert {ic.ref for ic in prepared.summary.ics if ic.pin_data} >= {"U1", "U3", "U4", "U2"}
-    # The wiring check finds it before the model runs; L1 stays quiet.
-    assert [f.pin for f in prepared.pin_lookup.findings] == ["U2.9"]

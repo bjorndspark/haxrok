@@ -7,7 +7,6 @@ import {
   FolderOpen,
   PlusCircle,
   RotateCcw,
-  Sparkles,
   Upload,
 } from "lucide-react"
 import { useRef, useState } from "react"
@@ -154,16 +153,6 @@ export function InputView({ actions }: { actions: DebugActions }) {
                 </div>
               )}
             </div>
-          </div>
-
-          <div className="flex w-full flex-col items-start gap-1.5 sm:w-auto sm:items-end">
-            <span className="hidden font-mono text-xs font-medium tracking-wider text-muted-foreground uppercase sm:block">
-              No board handy?
-            </span>
-            <Button variant="secondary" size="sm" onClick={() => void actions.loadDemo()}>
-              <Sparkles className="text-blue-600 dark:text-sky-400" />
-              Load the demo board
-            </Button>
           </div>
         </div>
 

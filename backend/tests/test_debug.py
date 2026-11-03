@@ -1,12 +1,11 @@
 """Debug feature tests: the KiCad parsers and the evidence checker.
 
-The checker runs against the real netlist of the ``demo`` eval case, so its rules are tested on the bug the demo is
-built around. The case stores the compacted netlist; ``_load_case_design``
-reads that form back into a ``Design``.
+The checker runs against a small synthetic buck-boost design with its L2
+switch node shorted onto the +3V3 output rail, the classic wiring fault the
+checker's rules are written for.
 """
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -33,36 +32,31 @@ from app.features.debug.schemas import (
     SetupChange,
 )
 
-# tests/../../evals: the repo's evals/ in a checkout, /evals in the container.
-CASE = Path(__file__).resolve().parents[2] / "evals" / "cases" / "rust-board-fb-swapped"
 
-
-def _load_case_design() -> Design:
-    """Rebuild a Design from the case's compact netlist ('NET: REF.PIN(FUNC) ...')."""
-    parts: dict[str, Part] = {}
-    nets: dict[str, list[Node]] = {}
-    section = ""
-    for line in (CASE / "netlist.txt").read_text().splitlines():
-        if line.startswith("# "):
-            section = line
-        elif line and section == "# Components":
-            ref, value, *_ = line.split()
-            parts[ref] = Part(ref, value, "", "")
-        elif line and section == "# Nets":
-            name, _, pins = line.partition(": ")
-            nodes = []
-            for tok in pins.split():
-                pin_ref, _, func = tok.partition("(")
-                ref, _, pin = pin_ref.partition(".")
-                nodes.append(Node(ref, pin, func.rstrip(")")))
-            nets[name] = nodes
+def _buck_boost_design() -> Design:
+    """A buck-boost (U2) whose L2 pin sits on +3V3 next to VOUT: the fault."""
+    parts = {
+        "U2": Part("U2", "TPS63070", "", ""),
+        "L1": Part("L1", "1u5", "", ""),
+        "C1": Part("C1", "10u", "", ""),
+    }
+    nets = {
+        "+3V3": [
+            Node("U2", "7", "VOUT"),
+            Node("U2", "8", "VOUT"),
+            Node("U2", "9", "L2"),
+            Node("L1", "2", ""),
+        ],
+        "/Power/SW1": [Node("U2", "11", "L1"), Node("L1", "1", "")],
+        "VDD": [Node("U2", "12", "VIN"), Node("U2", "14", "EN"), Node("C1", "1", "")],
+    }
     return Design(parts, nets)
 
 
 @pytest.fixture(scope="module")
 def ctx() -> EvidenceContext:
-    # Hand-copied from the case's erc.txt (text report); the backend itself
-    # reads kicad-cli's JSON form, covered by test_parse_erc_*.
+    # The text-report form of the entry; the backend itself reads kicad-cli's
+    # JSON form, covered by test_parse_erc_*.
     merged = ErcEntry(
         id="erc-1",
         sheet="/Power/",
@@ -73,7 +67,7 @@ def ctx() -> EvidenceContext:
         items=["Symbol #PWR35 Pin 1 [Power input, Line]", "Label 'SW2'"],
     )
     return EvidenceContext(
-        design=_load_case_design(),
+        design=_buck_boost_design(),
         erc={"erc-1": merged},
         pin_data=frozenset({"U2.9", "U2.7", "U2.11"}),
         symptom_ids=frozenset({"s1", "s2", "s3"}),
@@ -376,7 +370,7 @@ NETLIST = """(export (version "E")
     (net (code "1") (name "+3V3")
       (node (ref "L1") (pin "2") (pintype "passive"))
       (node (ref "U2") (pin "9") (pinfunction "L2") (pintype "passive")))
-    (net (code "2") (name "/Power/SW1")
+    (net (code "2") (name "/Power Management/SW1")
       (node (ref "L1") (pin "1") (pintype "passive"))
       (node (ref "U2") (pin "11") (pinfunction "L1") (pintype "passive")))))
 """
@@ -386,7 +380,7 @@ def test_parse_netlist_reads_parts_and_nets():
     design = parse_netlist(NETLIST)
     assert design.parts["U2"].footprint == "Package_DFN_QFN:Texas_VQFN-15"
     assert design.net_of("U2.9") == "+3V3"
-    assert design.resolve_net("SW1") == "/Power/SW1"
+    assert design.resolve_net("SW1") == "/Power Management/SW1"
     assert design.nets["+3V3"][1].function == "L2"
 
 
@@ -416,7 +410,7 @@ def test_parse_erc_drops_library_noise_and_numbers_the_rest():
         "sheets": [
             {"path": "/", "violations": [_violation("lib_symbol_issues", "Symbol 'GND' modified")]},
             {
-                "path": "/Power/",
+                "path": "/Power Management/",
                 "violations": [
                     _violation("multiple_net_names", "Both +3V3 and SW2 are attached"),
                     _violation("pin_not_driven", "Input pin not driven"),

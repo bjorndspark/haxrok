@@ -3,7 +3,7 @@
 1. ``DIAGNOSE``: a free-text diagnosis, worded like ``evals/gonogo.py``'s
    prompt, which the evals show finds the real bug. Asking for the
    structured answer directly made the model follow format rules instead of
-   tracing the circuit, and it missed the demo board's bug.
+   tracing the circuit, and it missed a real wiring bug.
 2. ``STRUCTURE``: turn that diagnosis into the structured answer the backend
    checks (``schemas.Analysis``), without diagnosing again.
 

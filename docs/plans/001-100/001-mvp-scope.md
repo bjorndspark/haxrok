@@ -117,7 +117,8 @@ One feature, `debug`, named the same on both sides
 3. **Pin-function lookup.** For each IC on the board it gives the model
    the real pin names and functions, so it stops inventing them. This is
    the fix for the biggest weakness, so it's in the MVP. The MVP source is
-   a hand-written table for a handful of ICs. Datasheet extraction comes later. The board summary
+   a hand-written table for a handful of ICs (`pins.py`). Datasheet
+   extraction comes later. The board summary
    shows which ICs have pin data and which don't.
 4. **Output.** Ranked hypotheses showing the nets and pins involved, how to
    confirm, and the fix, followed by open questions the input can't
@@ -224,8 +225,8 @@ apart from linters that run before fab.
   conclusion drawn from true facts still gets through.
 - **A narrow slice.** Many bring-up faults aren't in the schematic.
   Position it accordingly.
-- **Thin evidence.** One real case (private, not in the
-  repo) and six planted ones, each run once.
+- **Thin evidence.** One real case (private, not in the repo) and six
+  planted ones, each run once.
   Planted cases aren't accuracy on real boards; don't pitch them as that.
 - **Market after the hackathon.** KiCad users spend less, so the paying
   segment is likely small hardware teams and consultancies.
@@ -233,7 +234,7 @@ apart from linters that run before fab.
 ## Next steps
 
 1. Rerun `gonogo.py` 2–3 times to check the ranking is stable.
-2. Add a second real-bug case. Public KiCad repos with fix commits are a
+2. Add a real-bug case to the repo. Public KiCad repos with fix commits are a
    source of labelled cases. (The fault-free board is done:
    `rp-micro-no-fault`.)
 3. ~~Build the MVP, then replace the template's seed chat, voice and image

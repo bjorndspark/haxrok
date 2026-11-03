@@ -80,31 +80,3 @@ export async function* streamAnalysis(
       yield { type: "error", message: (JSON.parse(data) as { message: string }).message }
   }
 }
-
-interface ExampleManifest {
-  name: string
-  files: string[]
-  symptoms: string
-}
-
-/** A demo board served from public/examples/<name>/ with its bench notes. */
-export interface Example {
-  name: string
-  files: ProjectFile[]
-  symptoms: string
-}
-
-export async function loadExample(name: string): Promise<Example> {
-  const base = `/examples/${name}`
-  const manifestRes = await fetch(`${base}/manifest.json`)
-  if (!manifestRes.ok) throw new Error(`Example ${name} not found`)
-  const manifest = (await manifestRes.json()) as ExampleManifest
-  const files = await Promise.all(
-    manifest.files.map(async (path) => {
-      const res = await fetch(`${base}/${path}`)
-      if (!res.ok) throw new Error(`Example file ${path} not found`)
-      return { path: `${manifest.name}/${path}`, file: await res.blob() }
-    }),
-  )
-  return { name: manifest.name, files, symptoms: manifest.symptoms }
-}

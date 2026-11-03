@@ -15,15 +15,16 @@ Built for the Meta Global AI Developer Hackathon (2026).
 
 ## Status
 
-The MVP is built: the demo board runs end to end from the UI and ranks
-the real fault #1. The stretch goals are open.
+The MVP is built: a KiCad project folder runs end to end from the UI,
+and it ranked a real board's fault #1. The stretch goals are open.
 
 Scope, the go/no-go result and the ideas weighed against this one are in
 [`docs/plans/001-100/001-mvp-scope.md`](docs/plans/001-100/001-mvp-scope.md).
 
-- [x] Eval harness and the first real case (`evals/`)
-- [x] Go/no-go: does the model find the bug? It found it #1 from the
-      netlist alone, so it's a go (`evals/README.md`)
+- [x] Eval harness and planted-fault cases (`evals/`)
+- [x] Go/no-go: does the model find the bug? On a real bug (a private
+      board, not in the repo) it found it #1 from the netlist alone, so
+      it's a go (`docs/plans/001-100/001-mvp-scope.md`)
 - [x] MVP debug feature: KiCad project folder drop (netlist and ERC are
       extracted by the backend), symptom box, pin-function
       lookup, ranked hypotheses with source labels
