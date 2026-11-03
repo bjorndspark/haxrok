@@ -14,18 +14,21 @@ replaces it (plan 001, "After the hackathon").
 from dataclasses import dataclass
 
 from app.features.debug.design import Design
-from app.features.debug.schemas import IcSummary
+from app.features.debug.schemas import IcSummary, WiringFinding
 
 
 @dataclass(frozen=True)
 class PartPins:
     """One part's pin table. ``pins`` maps pin number to (datasheet name,
-    function)."""
+    function). ``inductor_pins`` are the pins the datasheet says connect
+    only to the power inductor (switch nodes), which ``check_wiring`` holds
+    to that."""
 
     value_prefix: str
     package_hint: str | None
     source: str
     pins: dict[str, tuple[str, str]]
+    inductor_pins: frozenset[str] = frozenset()
 
     def matches(self, value: str, lib_part: str, footprint: str) -> bool:
         if not value.upper().startswith(self.value_prefix):
@@ -68,6 +71,7 @@ _TPS63070 = PartPins(
         "14": ("EN", "Enable input: high enables the device, low disables it."),
         "15": ("VSEL", "Voltage-scaling input: high turns on a transistor pulling FB2 to GND."),
     },
+    inductor_pins=frozenset({"9", "11"}),
 )
 
 _TPS2121 = PartPins(
@@ -199,6 +203,7 @@ class PinLookup:
     ics: list[IcSummary]
     pin_refs: frozenset[str]  # REF.PIN covered by the table, for the checker
     text: str  # what the model reads
+    findings: list[WiringFinding]  # from check_wiring, verified
 
 
 def is_ic(ref: str) -> bool:
@@ -212,6 +217,7 @@ def lookup(design: Design) -> PinLookup:
     ics: list[IcSummary] = []
     pin_refs: set[str] = set()
     lines: list[str] = []
+    findings: list[WiringFinding] = []
     used_pins = {n.pin_ref for nodes in design.nets.values() for n in nodes}
     for part in sorted(design.parts.values(), key=lambda p: _ref_key(p.ref)):
         if not is_ic(part.ref):
@@ -226,6 +232,7 @@ def lookup(design: Design) -> PinLookup:
         )
         if entry is None:
             continue
+        findings += check_wiring(design, part.ref, entry)
         lines.append(f"{part.ref} ({part.value}), from {entry.source}:")
         for number, (name, function) in sorted(entry.pins.items(), key=lambda kv: int(kv[0])):
             pin_ref = f"{part.ref}.{number}"
@@ -236,10 +243,89 @@ def lookup(design: Design) -> PinLookup:
     missing = [ic.ref for ic in ics if not ic.pin_data]
     if missing:
         lines.append(f"No pin table for: {', '.join(missing)}.")
-    return PinLookup(ics=ics, pin_refs=frozenset(pin_refs), text="\n".join(lines) + "\n")
+    findings = [f.model_copy(update={"id": f"wf{i}"}) for i, f in enumerate(findings, start=1)]
+    return PinLookup(
+        ics=ics,
+        pin_refs=frozenset(pin_refs),
+        text="\n".join(lines) + "\n",
+        findings=findings,
+    )
+
+
+# How many other pins a finding names before it says "and N more": the
+# shorted rail on the demo board carries 40-odd pins.
+_MAX_LISTED = 6
+
+
+def check_wiring(design: Design, ref: str, entry: PartPins) -> list[WiringFinding]:
+    """Flag each inductor pin of ``ref`` whose net reaches anything but an
+    inductor (or a test point), or no inductor at all.
+
+    Deterministic, from the netlist and the pin table only, so a finding is
+    verified, not the model's reasoning. It exists because the model saw the
+    demo board's L2 pin on the output rail, but treated "a switch node must
+    be its own net" as recalled topology and ranked the short low.
+    """
+    findings: list[WiringFinding] = []
+    for number in sorted(entry.inductor_pins, key=int):
+        pin_ref = f"{ref}.{number}"
+        net = design.net_of(pin_ref)
+        if net is None:
+            continue  # unconnected: KiCad's ERC reports that
+        others = [n for n in design.nets[net] if n.pin_ref != pin_ref]
+        inductors = [n for n in others if _is_inductor(design, n.ref)]
+        foreign = [
+            n for n in others if not _is_inductor(design, n.ref) and _ref_head(n.ref) != "TP"
+        ]
+        if not foreign and inductors:
+            continue
+        name = entry.pins[number][0]
+        # The IC's own pins first, then other ICs': L2 on VOUT is the
+        # telling part, not the decoupling capacitors.
+        foreign.sort(key=lambda n: (n.ref != ref, not is_ic(n.ref), _ref_key(n.ref), n.pin))
+        listed = [f"{n.pin_ref}({n.function})" if n.function else n.pin_ref for n in foreign]
+        more = len(listed) - _MAX_LISTED
+        shown = ", ".join(listed[:_MAX_LISTED]) + (f" and {more} more pins" if more > 0 else "")
+        if foreign:
+            problem = f"but its net {net} also connects {shown}"
+        else:
+            problem = f"but its net {net} has no inductor on it"
+        findings.append(
+            WiringFinding(
+                id="",
+                pin=pin_ref,
+                pin_name=name,
+                net=net,
+                conflicts=[n.pin_ref for n in foreign],
+                inductors=[n.pin_ref for n in inductors],
+                text=(
+                    f"{pin_ref} ({name}) is an inductor connection ({entry.source}), "
+                    f"{problem}. It should connect only to its inductor."
+                ),
+            )
+        )
+    return findings
+
+
+def format_findings(findings: list[WiringFinding]) -> str:
+    """The findings as the model reads them, with ids."""
+    if not findings:
+        return "(none: no inductor pin in the pin table shares a net with anything else)\n"
+    return "\n".join(f"{f.id}: {f.text}" for f in findings) + "\n"
+
+
+def _is_inductor(design: Design, ref: str) -> bool:
+    """An inductor by designator (L3) or by symbol (Device:L_Small)."""
+    part = design.parts.get(ref)
+    lib_name = part.lib_part.rsplit(":", 1)[-1].upper() if part else ""
+    return _ref_head(ref) == "L" or lib_name == "L" or lib_name.startswith("L_")
+
+
+def _ref_head(ref: str) -> str:
+    return ref.rstrip("0123456789")
 
 
 def _ref_key(ref: str) -> tuple[str, int]:
-    head = ref.rstrip("0123456789")
+    head = _ref_head(ref)
     tail = ref[len(head) :]
     return head, int(tail) if tail else 0

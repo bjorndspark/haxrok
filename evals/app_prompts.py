@@ -4,8 +4,9 @@ The app analyzes in two calls (see DECISIONS.md, "Debug analysis is two
 model calls"): prompt.DIAGNOSE writes a free-text diagnosis, then
 prompt.STRUCTURE turns it into the checked schema. gonogo.py tests neither,
 so a green go/no-go says nothing about the app. This sends each case's
-symptoms, netlist and ERC (no pin table) through both calls with the
-app's own gateway client and AI_CHAT_MODEL.
+symptoms, netlist and ERC, plus the pin table and verified wiring findings
+the app derives from the netlist, through both calls with the app's own
+gateway client and AI_CHAT_MODEL.
 
 Runs inside the backend container, which mounts evals/ at /evals:
   make eval-app case=rust-board-fb-swapped
@@ -31,22 +32,55 @@ sys.path.insert(0, "/app")
 from app.core.ai.chat import complete_text  # noqa: E402
 from app.core.ai.structured import complete_structured  # noqa: E402
 from app.core.config import settings  # noqa: E402
-from app.features.debug import prompt  # noqa: E402
+from app.features.debug import pins, prompt  # noqa: E402
+from app.features.debug.design import Design, Node, Part  # noqa: E402
 from app.features.debug.schemas import Analysis, Claim  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent
 
 
-def build_input(case_dir: pathlib.Path) -> str:
-    """The first call's user message, built as the app builds it."""
+def parse_compact(text: str) -> Design:
+    """Read compact_netlist.py's output back into the app's Design, so the
+    pin table and wiring check run on eval cases as they do on uploads.
+    Footprints aren't in the compact form; no pin-table entry needs one."""
+    parts: dict[str, Part] = {}
+    nets: dict[str, list[Node]] = {}
+    section = None
+    for line in text.splitlines():
+        if line.startswith("# "):
+            section = line[2:].strip()
+        elif not line.strip():
+            continue
+        elif section == "Components":
+            # "REF  VALUE  (lib:part)"; a value may hold single spaces.
+            ref, value, lib = (line.split("  ") + ["", ""])[:3]
+            parts[ref] = Part(ref, value, lib.strip("()"), "")
+        elif section == "Nets":
+            name, _, pins_text = line.partition(": ")
+            nodes = []
+            for token in pins_text.split():
+                pin_ref, _, function = token.partition("(")
+                ref, _, pin = pin_ref.partition(".")
+                nodes.append(Node(ref, pin, function.removesuffix(")")))
+            nets[name.removesuffix(":")] = nodes
+    return Design(parts, nets)
+
+
+def build_input(case_dir: pathlib.Path) -> tuple[str, pins.PinLookup]:
+    """The first call's user message, built as the app builds it, and the
+    pin lookup it includes."""
     erc = case_dir / "erc.txt"
-    return prompt.build_user_message(
+    netlist = (case_dir / "netlist.txt").read_text()
+    lookup = pins.lookup(parse_compact(netlist))
+    user = prompt.build_user_message(
         symptoms=prompt.number_symptoms((case_dir / "symptom.md").read_text()),
         measurements=[],
-        netlist=(case_dir / "netlist.txt").read_text(),
+        netlist=netlist,
         erc=erc.read_text() if erc.exists() else "(none)",
-        pin_table="(none for these ICs)",
+        pin_table=lookup.text,
+        findings=pins.format_findings(lookup.findings),
     )
+    return user, lookup
 
 
 def keyword_rank(analysis: Analysis[Claim], groups: list[list[str]] | None) -> str:
@@ -65,7 +99,7 @@ async def run(case: str, timeout_s: float) -> None:
     case_dir = ROOT / "cases" / case
     out_dir = ROOT / "results" / case / settings.AI_CHAT_MODEL.replace("/", "_")
     out_dir.mkdir(parents=True, exist_ok=True)
-    user = build_input(case_dir)
+    user, lookup = build_input(case_dir)
 
     start = time.monotonic()
     diagnosis = await complete_text(
@@ -91,8 +125,9 @@ async def run(case: str, timeout_s: float) -> None:
 
     mark = keyword_rank(analysis, auto_check(case_dir))
     titles = " | ".join(f"#{h.rank} {h.title}" for h in analysis.hypotheses)
+    findings = ",".join(f.pin for f in lookup.findings) or "-"
     print(
-        f"{case:22} {mark}  diagnose {diagnosed:4.0f}s  "
+        f"{case:22} {mark}  findings {findings}  diagnose {diagnosed:4.0f}s  "
         f"total {time.monotonic() - start:4.0f}s  {titles}"
     )
 

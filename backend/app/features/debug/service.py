@@ -99,6 +99,7 @@ async def prepare(
         nets=len(design.nets),
         ics=lookup.ics,
         erc=erc,
+        wiring=lookup.findings,
         symptoms=symptoms,
         measurements=numbered,
     )
@@ -109,9 +110,12 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
     """The SSE body for one analysis run."""
     yield _event("design_summary", prepared.summary.model_dump_json())
     with_data = sum(1 for ic in prepared.summary.ics if ic.pin_data)
+    conflicts = len(prepared.pin_lookup.findings)
+    plural = "s" if conflicts > 1 else ""
+    found = f" {conflicts} pin{plural} wired against the datasheet." if conflicts else ""
     yield _progress(
         "pin_lookup",
-        f"Pin table found for {with_data} of {len(prepared.summary.ics)} ICs.",
+        f"Pin table found for {with_data} of {len(prepared.summary.ics)} ICs.{found}",
     )
     yield _progress(
         "reasoning", "The model is tracing the circuit against your symptoms. About 2 minutes."
@@ -122,6 +126,7 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         netlist=compact(prepared.design),
         erc=format_erc(prepared.erc),
         pin_table=prepared.pin_lookup.text,
+        findings=pins.format_findings(prepared.pin_lookup.findings),
     )
     start = time.monotonic()
     try:

@@ -50,6 +50,26 @@ NETLIST = """(export (version "E")
       (node (ref "U2") (pin "11") (pinfunction "L1") (pintype "passive")))))
 """
 
+# The same power stage wired as intended: L2 on its own net with the
+# inductor and a test point, VOUT on +3V3.
+FIXED_NETLIST = """(export (version "E")
+  (components
+    (comp (ref "U2") (value "TPS63070RNMR") (footprint "VQFN-15")
+      (libsource (lib "TPS63070RNMR") (part "TPS63070RNMR") (description "")))
+    (comp (ref "L1") (value "1u5") (footprint "L_1210")
+      (libsource (lib "Device") (part "L") (description ""))))
+  (nets
+    (net (code "1") (name "+3V3")
+      (node (ref "U2") (pin "7") (pinfunction "VOUT") (pintype "output")))
+    (net (code "2") (name "/Power/SW1")
+      (node (ref "L1") (pin "1") (pintype "passive"))
+      (node (ref "U2") (pin "11") (pinfunction "L1") (pintype "passive")))
+    (net (code "3") (name "/Power/SW2")
+      (node (ref "L1") (pin "2") (pintype "passive"))
+      (node (ref "TP9") (pin "1") (pintype "passive"))
+      (node (ref "U2") (pin "9") (pinfunction "L2") (pintype "passive")))))
+"""
+
 ERC = json.dumps(
     {
         "sheets": [
@@ -191,6 +211,30 @@ def test_pin_lookup_covers_known_ics_and_names_the_rest():
     assert "No pin table for: U9." in lookup.text
 
 
+def test_inductor_pin_on_the_output_rail_is_a_finding():
+    lookup = pins.lookup(parse_netlist(NETLIST))
+    [finding] = lookup.findings
+    assert (finding.id, finding.pin, finding.pin_name) == ("wf1", "U2.9", "L2")
+    assert finding.net == "+3V3"
+    assert finding.conflicts == ["U2.7"]
+    assert finding.inductors == ["L1.2"]
+    assert "U2.7(VOUT)" in finding.text
+    assert "wf1: U2.9 (L2) is an inductor connection" in pins.format_findings(lookup.findings)
+
+
+def test_inductor_pins_wired_to_their_inductor_are_quiet():
+    lookup = pins.lookup(parse_netlist(FIXED_NETLIST))
+    assert lookup.findings == []
+    assert pins.format_findings([]).startswith("(none")
+
+
+def test_inductor_pin_without_an_inductor_is_a_finding():
+    no_inductor = NETLIST.replace('(node (ref "L1") (pin "1") (pintype "passive"))', "")
+    findings = pins.lookup(parse_netlist(no_inductor)).findings
+    assert [f.pin for f in findings] == ["U2.9", "U2.11"]
+    assert "no inductor" in findings[1].text
+
+
 def test_pin_table_needs_the_right_package():
     entry = next(e for e in pins.PIN_TABLE if e.value_prefix == "TPS2121")
     assert entry.matches("TPS2121RUXR", "", "")
@@ -229,6 +273,8 @@ async def test_stream_sends_summary_progress_then_checked_result():
     summary = events[0][1]
     assert (summary["project"], summary["sheets"], summary["parts"]) == ("board", 2, 3)
     assert summary["erc"][0]["id"] == "erc-1"
+    assert [f["pin"] for f in summary["wiring"]] == ["U2.9"]
+    assert "1 pin wired against the datasheet" in events[1][1]["message"]
 
     # The model reads numbered symptoms, the measurement with its step, the
     # compact netlist, the ERC with ids and the pin table.
@@ -237,6 +283,8 @@ async def test_stream_sends_summary_progress_then_checked_result():
     assert "+3V3: L1.2 U2.7(VOUT) U2.9(L2)" in seen[0]
     assert "erc-1 [multiple_net_names]" in seen[0]
     assert "U2.9 L2:" in seen[0]
+    assert "## Verified findings" in seen[0]
+    assert "wf1: U2.9 (L2) is an inductor connection" in seen[0]
 
     # The structuring call gets the diagnosis, then the same input to cite.
     assert structured[0].startswith("## Diagnosis\n1. L2 tied to VOUT.")
@@ -325,3 +373,5 @@ async def test_kicad_cli_reads_the_demo_board():
     assert any(e.rule == "multiple_net_names" for e in prepared.erc)
     assert not any(e.rule == "lib_symbol_issues" for e in prepared.erc)
     assert {ic.ref for ic in prepared.summary.ics if ic.pin_data} >= {"U1", "U3", "U4", "U2"}
+    # The wiring check finds it before the model runs; L1 stays quiet.
+    assert [f.pin for f in prepared.pin_lookup.findings] == ["U2.9"]

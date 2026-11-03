@@ -15,8 +15,9 @@ from app.features.debug.schemas import Measurement, Symptom
 _INPUT = """\
 Input: numbered symptoms (s1, s2, ...), the compact netlist (one line per \
 part, then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
-(erc-1, ...), a pin table copied from datasheets for some ICs, and sometimes \
-bench measurements the user entered (m1, ...)."""
+(erc-1, ...), a pin table copied from datasheets for some ICs, verified \
+findings (wf1, ...) the backend computed from the netlist and pin table, and \
+sometimes bench measurements the user entered (m1, ...)."""
 
 # The unverified-facts rule: the model recalls part specs from memory, and in
 # the no-fault eval it called a correct part an error and told the user to
@@ -38,7 +39,14 @@ The pin table is not recalled: it is copied from the datasheets, so its pin \
 functions are verified. A fault that follows from the netlist, the ERC and \
 the pin table alone (a pin wired against the function the table lists for \
 it) is a verified design error. Rank it on how well it explains the \
-symptoms; don't demote it for want of a datasheet check."""
+symptoms; don't demote it for want of a datasheet check.
+
+The verified findings are such faults, found by a deterministic check of the \
+netlist against the pin table (e.g. an inductor pin that shares a net with \
+anything but its inductor). They are design errors, not hypotheses: never \
+call one unverified or recalled. Work out which symptoms each explains, \
+including only under some conditions (input voltage, load, mode), and rank \
+it on that. A finding that explains the symptoms well belongs at #1."""
 
 DIAGNOSE = f"""\
 You are an expert hardware engineer debugging a PCB from its KiCad schematic \
@@ -144,8 +152,10 @@ def build_user_message(
     netlist: str,
     erc: str,
     pin_table: str,
+    findings: str,
 ) -> str:
-    """The user turn: symptoms, measurements, netlist, ERC, pin table."""
+    """The user turn: symptoms, measurements, netlist, ERC, pin table,
+    verified findings."""
     parts = ["## Symptoms\n" + "\n".join(f"{s.id}: {s.text}" for s in symptoms)]
     if measurements:
         lines = [
@@ -157,6 +167,7 @@ def build_user_message(
         "## Netlist\n" + netlist,
         "## ERC report\n" + erc,
         "## Pin table (from datasheets)\n" + pin_table,
+        "## Verified findings (netlist checked against the pin table)\n" + findings,
     ]
     return "\n\n".join(parts)
 

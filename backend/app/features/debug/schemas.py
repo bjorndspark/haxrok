@@ -205,6 +205,21 @@ class ErcEntry(BaseModel):
     items: list[str]
 
 
+class WiringFinding(BaseModel):
+    """A pin wired against its pin-table function, found by
+    ``pins.check_wiring`` before the model runs. Verified: it follows from the
+    netlist and the pin table alone. ``id`` (wf1, …) is how the model's input
+    names it."""
+
+    id: str
+    pin: str = Field(description="REF.PIN, e.g. U2.9.")
+    pin_name: str = Field(description="The datasheet's pin name, e.g. L2.")
+    net: str
+    conflicts: list[str] = Field(description="REF.PIN refs on the net that shouldn't be.")
+    inductors: list[str] = Field(description="Inductor pins on the net, which belong there.")
+    text: str
+
+
 class Symptom(BaseModel):
     id: str
     text: str
@@ -230,6 +245,7 @@ class DesignSummary(BaseModel):
     nets: int
     ics: list[IcSummary]
     erc: list[ErcEntry]
+    wiring: list[WiringFinding]
     symptoms: list[Symptom]
     measurements: list[Measurement]
 
