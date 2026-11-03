@@ -9,6 +9,9 @@ every such circuit needs:
   feedback divider, with the datasheet formula. Flagged when it is more
   than 8% from the voltage its output net is named for (+3V3 set to 0.73 V).
 - **charge_current**: a charger's current from its program resistor.
+- **dropout**: a fixed linear regulator's input minus its output, against
+  the datasheet dropout. Flagged when the input rail's named voltage leaves
+  less than the typical dropout (an AMS1117-3.3 on a 3.7 V rail).
 - **led_current**: rail → resistor → LED → ground, as a range over typical
   forward voltages. Flagged when an LED sits across a rail with no resistor.
 - **i2c_pullup**: the pull-up on each SDA/SCL net. Flagged when there is
@@ -194,6 +197,18 @@ class ProgramRule:
     source: str
 
 
+@dataclass(frozen=True)
+class DropoutRule:
+    """A fixed linear regulator: it needs VIN − VOUT ≥ its dropout."""
+
+    value_prefix: str
+    vin_pin: str
+    vout_pin: str
+    typical: float
+    maximum: float
+    source: str
+
+
 FEEDBACK_RULES: tuple[FeedbackRule, ...] = (
     FeedbackRule("SY8088", "5", 0.6, "Silergy AN_SY8088, FB pin: VOUT = 0.6 V × (1 + R1/R2)"),
 )
@@ -202,6 +217,18 @@ PROGRAM_RULES: tuple[ProgramRule, ...] = (
     # SOT-23-5 numbering (the package hobby boards use): PROG is pin 5.
     ProgramRule(
         "MCP7383", "5", 1000.0, "Microchip DS20001984H 5.0: IREG (mA) = 1000 V / RPROG (kΩ)"
+    ),
+)
+
+DROPOUT_RULES: tuple[DropoutRule, ...] = (
+    # SOT-223 numbering: 1 GND/ADJ, 2 VOUT, 3 VIN.
+    DropoutRule(
+        "AMS1117",
+        "3",
+        "2",
+        1.1,
+        1.3,
+        "AMS ds1117, Electrical Characteristics: dropout 1.1 V typical, 1.3 V max at 0.8 A",
     ),
 )
 
@@ -272,6 +299,67 @@ def _program(design: Design, ref: str, rule: ProgramRule) -> Calculation | None:
             f"{ref} charge current: {r.ref} ({format_ohms(r.value)}) from PROG to ground sets "
             f"{rule.k:g} V / {r.value / 1e3:g} kΩ = {current:.0f} mA ({rule.source})."
         ),
+    )
+
+
+def _fixed_output(value: str, prefix: str) -> float | None:
+    """The output voltage in a fixed regulator's value: "AMS1117-3.3" → 3.3,
+    "AMS1117-3V3" → 3.3; None for the adjustable part."""
+    suffix = value.upper().removeprefix(prefix).lstrip("-_ ").split()[0:1]
+    if not suffix:
+        return None
+    try:
+        return float(suffix[0])
+    except ValueError:
+        return named_voltage(suffix[0])
+
+
+_BATTERY = re.compile(r"BAT", re.IGNORECASE)
+_LIION_FULL = 4.2  # a single Li-ion/LiPo cell, fully charged
+
+
+def _dropout(design: Design, ref: str, rule: DropoutRule) -> Calculation | None:
+    vin_ref, vout_ref = f"{ref}.{rule.vin_pin}", f"{ref}.{rule.vout_pin}"
+    vin_net, vout_net = design.net_of(vin_ref), design.net_of(vout_ref)
+    if vin_net is None or vout_net is None:
+        return None
+    vout = _fixed_output(design.parts[ref].value, rule.value_prefix) or named_voltage(vout_net)
+    if vout is None:
+        return None
+    vin = named_voltage(vin_net)
+    battery = vin is None and _BATTERY.search(_short(vin_net)) is not None
+    if battery:
+        vin = _LIION_FULL
+    if vin is None:
+        return None
+    headroom = vin - vout
+    head = (
+        f"{ref} ({design.parts[ref].value}) headroom: VIN on {vin_net} "
+        f"({vin:g} V{' if it is one Li-ion cell, fully charged' if battery else ''}) − VOUT "
+        f"{vout:g} V = {headroom:.2f} V, against a dropout of {rule.typical:g} V typical, "
+        f"{rule.maximum:g} V maximum ({rule.source})."
+    )
+    if headroom < rule.typical:
+        tail = (
+            f" That is below the dropout, so the output sags below {vout:g} V and follows "
+            "the input"
+            + (" (and a cell spends most of its charge below 4.2 V)." if battery else ".")
+            + " A low-dropout regulator suits this rail better."
+        )
+    elif headroom < rule.maximum:
+        tail = " Within the maximum dropout: it may drop out near full load."
+    else:
+        tail = " Enough headroom."
+    return Calculation(
+        id="",
+        kind="dropout",
+        ic=ref,
+        pins=[vin_ref, vout_ref],
+        value=round(headroom, 2),
+        unit="V",
+        expected=rule.typical,
+        flagged=headroom < rule.typical and not battery,
+        text=head + tail,
     )
 
 
@@ -529,11 +617,11 @@ def _divider(design: Design, net: str) -> Calculation | None:
     )
 
 
-# Power-input pin names: VDD, VCC, AVDD, IOVDD, VDDIO, USB_VDD, VIN, VBAT, 3V3…
+# Power-input pin names: VDD, VCC, AVDD, IOVDD, VDDIO, USB_VDD, VIN, VI, VBAT, 3V3…
 # Not VBUS or VS, which are often sense inputs.
 # Not outputs (VOUT, VREG_VOUT) and not reserved or NC pins.
 _POWER_IN = re.compile(
-    r"^(?:\w+_)?(?:[ADP]|IO)?V(?:DD|CC)\w*$|^(?:VIN|VBAT|VREG_IN|3V3|V\+)$",
+    r"^(?:\w+_)?(?:[ADP]|IO)?V(?:DD|CC)\w*$|^(?:VIN?|VBAT|VREG_IN|3V3|V\+)$",
     re.IGNORECASE,
 )
 
@@ -721,6 +809,9 @@ def lookup(design: Design) -> list[Calculation]:
             if value.startswith(prog.value_prefix) and (c := _program(design, part.ref, prog)):
                 calcs.append(c)
                 fb_nets.add(design.net_of(f"{part.ref}.{prog.prog_pin}") or "")
+        for drop in DROPOUT_RULES:
+            if value.startswith(drop.value_prefix) and (c := _dropout(design, part.ref, drop)):
+                calcs.append(c)
         if _is_led(design, part.ref) and (c := _led(design, part.ref)):
             calcs.append(c)
         if _head(part.ref) in {"J", "P", "CN", "USB"} and (c := _usb_cc(design, part.ref)):
@@ -743,7 +834,7 @@ def format_calculations(calcs: list[Calculation]) -> str:
     """The calculations as the model reads them."""
     if not calcs:
         return (
-            "(none: no regulator divider, charger, LED, I²C, RC, divider, decoupling or "
-            "USB-C CC circuit recognised)\n"
+            "(none: no regulator divider or headroom, charger, LED, I²C, RC, divider, "
+            "decoupling or USB-C CC circuit recognised)\n"
         )
     return "\n".join(f"{c.id}{' FLAGGED' if c.flagged else ''}: {c.text}" for c in calcs) + "\n"

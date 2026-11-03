@@ -288,7 +288,7 @@ class ReferenceNote(BaseModel):
 
 class Calculation(BaseModel):
     """A value the backend computed from part values in the netlist
-    (``calc.py``): a regulator's output, a charge current, an LED current,
+    (``calc.py``): a regulator's output or headroom, a charge current, an LED current,
     an I²C pull-up, an RC delay, a divider, USB-C CC pull-downs, supply
     decoupling. Verified arithmetic, not the model's. ``flagged`` means the
     netlist as drawn contradicts itself or misses what every such circuit
@@ -305,6 +305,7 @@ class Calculation(BaseModel):
         "divider",
         "usb_cc",
         "decoupling",
+        "dropout",
     ]
     ic: str
     pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")

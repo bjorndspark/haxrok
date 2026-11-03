@@ -170,6 +170,15 @@ stays quiet on all of them; unit tests cover the flag.
 | `rp-micro-no-fault` | review | PASS (no issues) | 71 s | |
 | `rp-micro-cc-shared` | review | #1 (may fail) | 134 s | |
 
+After the AMS1117 and CH340 notes and the AMS1117 dropout calculation.
+No case has either part, so these runs only check nothing else moved;
+unit tests cover the notes and the flag.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `rp-micro-no-fault` | review | PASS (no issues) | 101 s | |
+| `rp-micro-cc-shared` | review | #1 (may fail) | 164 s | |
+
 ## Reading the result
 
 | Outcome | Meaning |

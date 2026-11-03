@@ -705,7 +705,7 @@ def test_a_supply_rail_with_no_capacitor_is_flagged():
         parts,
         {"+5V": ["U1.16(VCC)", "U2.3(VIN)"], "+3V3": ["U2.2(VOUT)", "C1.1"], "GND": ["C1.2"]},
     )
-    flagged = {c.ic: c for c in calc.lookup(bare)}
+    flagged = {c.ic: c for c in calc.lookup(bare) if c.kind == "decoupling"}
     assert set(flagged) == {"U1", "U2"} and all(c.flagged for c in flagged.values())
     assert "+5V" in flagged["U1"].text and "no capacitor" in flagged["U1"].text
 
@@ -713,7 +713,7 @@ def test_a_supply_rail_with_no_capacitor_is_flagged():
         parts,
         {"+5V": ["U1.16(VCC)", "U2.3(VIN)", "C1.1"], "+3V3": ["U2.2(VOUT)"], "GND": ["C1.2"]},
     )
-    assert calc.lookup(decoupled) == []
+    assert not [c for c in calc.lookup(decoupled) if c.kind == "decoupling"]
 
 
 def test_fewer_capacitors_than_power_pins_is_a_hint_not_a_flag():
@@ -725,3 +725,42 @@ def test_fewer_capacitors_than_power_pins_is_a_hint_not_a_flag():
     )
     (c,) = calc.lookup(design)
     assert c.kind == "decoupling" and not c.flagged and "3 power pins" in c.text
+
+
+def _ams1117(vin_net: str, value: str = "AMS1117-3.3") -> Design:
+    return _design(
+        {"U1": (value, "Regulator_Linear:AMS1117-3.3"), "C1": ("10u", "Device:C")},
+        {
+            vin_net: ["U1.3(VI)", "C1.1"],
+            "+3V3": ["U1.2(VO)", "C1.2"],  # C1 isn't to ground: keeps decoupling out of it
+            "GND": ["U1.1(GND)"],
+        },
+    )
+
+
+def test_ams1117_dropout_is_calculated_and_flagged_below_the_typical_dropout():
+    from app.features.debug import calc, reference
+
+    (ok,) = [c for c in calc.lookup(_ams1117("+5V")) if c.kind == "dropout"]
+    assert not ok.flagged and ok.value == pytest.approx(1.7)
+
+    (low,) = [c for c in calc.lookup(_ams1117("+3V7")) if c.kind == "dropout"]
+    assert low.flagged and low.value == pytest.approx(0.4) and "below the dropout" in low.text
+
+    (cell,) = [c for c in calc.lookup(_ams1117("+BATT")) if c.kind == "dropout"]
+    assert not cell.flagged and "Li-ion" in cell.text and cell.value == pytest.approx(0.9)
+
+    # The adjustable part has no voltage in its value; the output net's name gives it.
+    (adj,) = [c for c in calc.lookup(_ams1117("+5V", "AMS1117")) if c.kind == "dropout"]
+    assert adj.value == pytest.approx(1.7)
+    notes = reference.lookup(_ams1117("+5V"))
+    assert notes and all(n.part == "AMS1117-3.3" for n in notes)
+    assert any("1.1 V typical" in n.text for n in notes)
+
+
+def test_ch340_notes_are_found():
+    from app.features.debug import reference
+
+    design = _design({"U1": ("CH340C", "Interface_USB:CH340C")}, {"+5V": ["U1.16(VCC)"]})
+    notes = reference.lookup(design)
+    assert len(notes) >= 4 and any("no series" in n.text for n in notes)

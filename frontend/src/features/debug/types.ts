@@ -173,6 +173,7 @@ export interface Calculation {
     | "divider"
     | "usb_cc"
     | "decoupling"
+    | "dropout"
   ic: string
   pins: string[]
   /** Null when the thing to measure is missing (no pull-up, no resistor). */

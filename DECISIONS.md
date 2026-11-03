@@ -250,7 +250,7 @@ still suspected the correct resistor, though it held rework until a
 datasheet check. A pin table only
 fixes pin names, not specs or reference circuits, so retrieval replaces
 it as the next feature after the hackathon. Since 2026-11-04 a small
-hand-written reference table covers recommended circuits for four parts;
+hand-written reference table covers recommended circuits for six parts;
 see "Reference designs and calculations are verified evidence".
 
 ## Debug analysis is two model calls: diagnose, then structure
@@ -367,11 +367,12 @@ answer, so invented design faults are the main risk; reference notes
 **Decision:** `features/debug/reference.py` and `calc.py` add two kinds
 of verified input, both before the model runs. **Notes** (`rd1`, …) are short facts
 copied from the manufacturer's own datasheet, application note or
-hardware design guide, with the section, for RP2040, MCP73831, SY8088 and
-ESP32-C3-MINI-1. **Calculations** (`cf1`, …) apply a datasheet formula to
+hardware design guide, with the section, for RP2040, MCP73831, SY8088,
+ESP32-C3-MINI-1, AMS1117 and CH340. **Calculations** (`cf1`, …) apply a datasheet formula to
 resistor values in the netlist: a regulator's output from its feedback
 divider (SY8088: 0.6 V × (1 + R1/R2)), a charger's current from its
-program resistor (MCP73831: 1000 V / R), and generic circuits: LED
+program resistor (MCP73831: 1000 V / R), a fixed LDO's headroom against
+its dropout (AMS1117: 1.1 V typical), and generic circuits: LED
 current through its series resistor, the pull-up on each I²C line, RC
 delays on enable and reset pins, dividers into IC pins, the CC
 pull-downs on a USB-C receptacle, and the capacitors on each IC's supply
@@ -381,7 +382,10 @@ for (`+3V3`), an LED with no resistor, an I²C line with no pull-up on the
 board, or one pulled up above an IC's supply (VBUS counts as 5 V), and
 USB-C CC1/CC2 sharing one pull-down, a CC pin with none, or one outside
 5.1 kΩ ±10% (CC pins wired to an IC, a PD controller, are skipped), and
-an IC supply rail with no capacitor to ground at all. Fewer capacitors
+an IC supply rail with no capacitor to ground at all, and an AMS1117 whose
+input rail's named voltage leaves less than its 1.1 V typical dropout (on
+a rail named for a battery it assumes one Li-ion cell, 4.2 V, and reports
+without a flag). Fewer capacitors
 than power pins on a rail is reported but not flagged: the RP2040 minimal
 design shares one on purpose. Claims
 cite either with the evidence label `reference` ("Based on the
@@ -395,7 +399,7 @@ right, but a verified number is what lets the UI say "Verified". Copying
 values from third-party datasheet mirrors: the RT9013 has no notes
 because Richtek's own PDF couldn't be downloaded.
 
-**Consequence:** the table is as narrow as `pins.py`, four parts, and
+**Consequence:** the table is narrow, six parts (`pins.py` has four), and
 every entry has to be read in the source document, so it grows slowly
 until datasheet retrieval replaces both. Measured: review mode on
 `rp-micro-no-fault` went from one false alarm to "no issues", and the
