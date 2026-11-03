@@ -273,10 +273,8 @@ def check_wiring(design: Design, ref: str, entry: PartPins) -> list[WiringFindin
         if net is None:
             continue  # unconnected: KiCad's ERC reports that
         others = [n for n in design.nets[net] if n.pin_ref != pin_ref]
-        inductors = [n for n in others if _is_inductor(design, n.ref)]
-        foreign = [
-            n for n in others if not _is_inductor(design, n.ref) and _ref_head(n.ref) != "TP"
-        ]
+        inductors = [n for n in others if is_inductor(design, n.ref)]
+        foreign = [n for n in others if not is_inductor(design, n.ref) and _ref_head(n.ref) != "TP"]
         if not foreign and inductors:
             continue
         name = entry.pins[number][0]
@@ -314,7 +312,7 @@ def format_findings(findings: list[WiringFinding]) -> str:
     return "\n".join(f"{f.id}: {f.text}" for f in findings) + "\n"
 
 
-def _is_inductor(design: Design, ref: str) -> bool:
+def is_inductor(design: Design, ref: str) -> bool:
     """An inductor by designator (L3) or by symbol (Device:L_Small)."""
     part = design.parts.get(ref)
     lib_name = part.lib_part.rsplit(":", 1)[-1].upper() if part else ""

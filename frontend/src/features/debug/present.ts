@@ -3,6 +3,7 @@
 import type {
   CheckedAnalysis,
   DesignSummary,
+  Diagram,
   Evidence,
   GlossaryEntry,
   Hypothesis,
@@ -176,4 +177,74 @@ export function toMarkdown(run: Run, summary: DesignSummary, result: CheckedAnal
     lines.push("", "## Glossary", ...result.glossary.map((g) => `- **${g.term}**: ${g.definition}`))
   }
   return lines.join("\n") + "\n"
+}
+
+export interface DiagramLayout {
+  width: number
+  height: number
+  box: { x: number; y: number; width: number; height: number }
+  busX: number
+  pins: { pin: string; label: string; y: number; flagged: boolean }[]
+  nets: {
+    name: string
+    label: string
+    members: string
+    top: number
+    bottom: number
+    flagged: boolean
+  }[]
+}
+
+const ROW = 26
+const GROUP_GAP = 14
+const HEADER = 50
+// Characters of member text that fit right of the bus at 11px mono.
+const MEMBER_CHARS = 44
+
+/** Where everything in a wiring diagram goes: the IC's pins down the right
+ *  edge of its box, grouped by net, each group joined by a bus with the
+ *  net's name and its other notable parts beside it. */
+export function diagramLayout(d: Diagram): DiagramLayout {
+  const pins: DiagramLayout["pins"] = []
+  const nets: DiagramLayout["nets"] = []
+  let y = HEADER
+  for (const net of d.nets) {
+    const own = d.pins.filter((p) => p.net === net.name)
+    if (own.length === 0) continue
+    const top = y
+    for (const p of own) {
+      const number = p.pin.split(".")[1] ?? p.pin
+      pins.push({ pin: p.pin, label: `${number} ${p.name}`.trim(), y, flagged: p.flagged })
+      y += ROW
+    }
+    const labels = net.members.map((m) =>
+      m.inductor ? `${m.pin} (inductor)` : m.name ? `${m.pin}(${m.name})` : m.pin,
+    )
+    // Fit the line beside the bus; whatever doesn't fit joins "+N more".
+    const members: string[] = []
+    for (const label of labels) {
+      if ([...members, label].join(" · ").length > MEMBER_CHARS) break
+      members.push(label)
+    }
+    const more = net.more + labels.length - members.length
+    if (more > 0) members.push(`+${String(more)} more`)
+    nets.push({
+      name: net.name,
+      label: net.name.replace(/\/+$/, "").split("/").pop() ?? net.name,
+      members: members.join(" · "),
+      top,
+      bottom: y - ROW,
+      flagged: own.some((p) => p.flagged),
+    })
+    y = Math.max(y, top + 2 * ROW) + GROUP_GAP
+  }
+  const boxHeight = y - GROUP_GAP - ROW / 2
+  return {
+    width: 560,
+    height: boxHeight + 8,
+    box: { x: 4, y: 4, width: 150, height: boxHeight - 4 },
+    busX: 220,
+    pins,
+    nets,
+  }
 }

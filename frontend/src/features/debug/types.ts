@@ -78,11 +78,41 @@ export interface Problem {
   message: string
 }
 
+export interface DiagramPin {
+  pin: string
+  name: string
+  net: string
+  flagged: boolean
+}
+
+export interface DiagramMember {
+  pin: string
+  name: string
+  inductor: boolean
+}
+
+export interface DiagramNet {
+  name: string
+  members: DiagramMember[]
+  more: number
+}
+
+/** A hypothesis's IC, its cited pins and their nets, built from the
+ *  netlist by the backend (diagram.build). */
+export interface Diagram {
+  ic: string
+  value: string
+  pins: DiagramPin[]
+  nets: DiagramNet[]
+}
+
 export interface CheckedAnalysis {
   hypotheses: Hypothesis[]
   open_questions: OpenQuestion[]
   glossary: GlossaryEntry[]
   problems: Problem[]
+  /** Hypothesis id -> its diagram; missing when it cites no IC pin. */
+  diagrams: Partial<Record<string, Diagram>>
 }
 
 export interface IcSummary {

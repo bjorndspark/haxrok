@@ -93,6 +93,7 @@ function RunBody({
         <HypothesisCard
           key={h.id}
           hypothesis={h}
+          diagram={result.diagrams[h.id] ?? null}
           summary={run.summary}
           glossary={result.glossary}
           problems={result.problems}

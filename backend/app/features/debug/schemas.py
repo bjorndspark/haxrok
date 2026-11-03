@@ -180,8 +180,42 @@ class Problem(BaseModel):
     message: str
 
 
+class DiagramPin(BaseModel):
+    pin: str = Field(description="REF.PIN of the diagram's IC.")
+    name: str = Field(description="The pin's name in the netlist, e.g. L2.")
+    net: str
+    flagged: bool = Field(description="The wiring check flagged this pin.")
+
+
+class DiagramMember(BaseModel):
+    """Another part's pin on a net: an IC pin or an inductor."""
+
+    pin: str
+    name: str
+    inductor: bool
+
+
+class DiagramNet(BaseModel):
+    name: str
+    members: list[DiagramMember]
+    more: int = Field(description="Other pins on the net that aren't listed.")
+
+
+class Diagram(BaseModel):
+    """A hypothesis's IC, its cited pins and the nets they are on, from the
+    netlist (``diagram.build``). The UI draws it."""
+
+    ic: str
+    value: str
+    pins: list[DiagramPin]
+    nets: list[DiagramNet]
+
+
 class CheckedAnalysis(Analysis[CheckedClaim]):
     problems: list[Problem] = []
+    diagrams: dict[str, Diagram] = Field(
+        {}, description="Hypothesis id -> its wiring diagram, for those citing an IC pin."
+    )
 
 
 # --- design summary (first SSE event) ----------------------------------------------

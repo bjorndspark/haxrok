@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { isSchematicFile, projectName } from "./files"
-import { assess, splitGlossary } from "./present"
+import { assess, diagramLayout, splitGlossary } from "./present"
 import { fragmentLines, symptomHints, symptomLines } from "./symptoms"
 import type { CheckedClaim, DesignSummary, Hypothesis } from "./types"
 
@@ -115,5 +115,48 @@ describe("assess", () => {
     expect(assess(hypothesis([claim("none", null)], ["s1", "s2"]), summary).confidence).toBe(
       "speculative",
     )
+  })
+})
+
+describe("diagramLayout", () => {
+  it("groups pins by net, one bus per net, flagged net marked", () => {
+    const layout = diagramLayout({
+      ic: "U2",
+      value: "TPS63070",
+      pins: [
+        { pin: "U2.9", name: "L2", net: "+3V3", flagged: true },
+        { pin: "U2.7", name: "VOUT", net: "+3V3", flagged: false },
+        { pin: "U2.11", name: "L1", net: "/Power/SW1", flagged: false },
+      ],
+      nets: [
+        { name: "+3V3", members: [{ pin: "L1.2", name: "", inductor: true }], more: 30 },
+        { name: "/Power/SW1", members: [{ pin: "L1.1", name: "", inductor: true }], more: 1 },
+      ],
+    })
+    expect(layout.pins.map((p) => p.label)).toEqual(["9 L2", "7 VOUT", "11 L1"])
+    const [rail, node] = layout.nets
+    expect(rail.label).toBe("+3V3")
+    expect(rail.flagged).toBe(true)
+    expect(rail.members).toBe("L1.2 (inductor) · +30 more")
+    expect(node.label).toBe("SW1")
+    expect(node.flagged).toBe(false)
+    expect(node.top).toBeGreaterThan(rail.bottom)
+    expect(node.bottom).toBe(node.top)
+    expect(layout.box.y + layout.box.height).toBeLessThanOrEqual(layout.height)
+  })
+})
+
+describe("diagramLayout members", () => {
+  it("folds members that don't fit into +N more", () => {
+    const member = (n: number) => ({ pin: `U${String(n)}.1`, name: "VDD", inductor: false })
+    const layout = diagramLayout({
+      ic: "U2",
+      value: "",
+      pins: [{ pin: "U2.7", name: "VOUT", net: "+3V3", flagged: false }],
+      nets: [{ name: "+3V3", members: [1, 2, 3, 4, 5, 6].map(member), more: 30 }],
+    })
+    const text = layout.nets[0].members
+    expect(text.endsWith("+33 more")).toBe(true)
+    expect(text.length).toBeLessThanOrEqual(56)
   })
 })

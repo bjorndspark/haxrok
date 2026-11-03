@@ -27,12 +27,14 @@ import type {
   CheckedClaim,
   ConfirmStep,
   DesignSummary,
+  Diagram,
   Evidence,
   GlossaryEntry,
   Hypothesis,
   Problem,
 } from "../types"
 import { GlossaryText } from "./GlossaryText"
+import { WiringDiagram } from "./WiringDiagram"
 
 const EVIDENCE_TONE: Record<Evidence, BadgeProps["tone"]> = {
   schematic: "blue",
@@ -277,6 +279,7 @@ function StepView({
 
 interface HypothesisCardProps {
   hypothesis: Hypothesis
+  diagram: Diagram | null
   summary: DesignSummary | null
   glossary: GlossaryEntry[]
   problems: Problem[]
@@ -287,6 +290,7 @@ interface HypothesisCardProps {
 
 export function HypothesisCard({
   hypothesis: h,
+  diagram,
   summary,
   glossary,
   problems,
@@ -317,6 +321,11 @@ export function HypothesisCard({
           <GlossaryText text={h.summary} glossary={glossary} />
         </p>
         <ConfidenceLine assessment={assessment} />
+        {diagram && (
+          <div className="mt-4 rounded-lg border bg-background p-3">
+            <WiringDiagram diagram={diagram} />
+          </div>
+        )}
       </div>
 
       <div className="divide-y border-t">

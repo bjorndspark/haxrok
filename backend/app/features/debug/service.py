@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
-from app.features.debug import pins, prompt
+from app.features.debug import diagram, pins, prompt
 from app.features.debug.design import Design, compact, format_erc, parse_erc, parse_netlist
 from app.features.debug.evidence import EvidenceContext, check
 from app.features.debug.kicad import KicadRunner
@@ -160,7 +160,13 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         symptom_ids=frozenset(s.id for s in prepared.symptoms),
         measurement_ids=frozenset(m.id for m in prepared.measurements),
     )
-    yield _event("result", check(analysis, ctx).model_dump_json())
+    checked = check(analysis, ctx)
+    checked.diagrams = {
+        h.id: d
+        for h in checked.hypotheses
+        if (d := diagram.build(h, prepared.design, prepared.pin_lookup.findings))
+    }
+    yield _event("result", checked.model_dump_json())
 
 
 def _progress(stage: str, message: str) -> SseEvent:

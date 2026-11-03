@@ -12,13 +12,14 @@ from pathlib import Path
 import pytest
 
 from app.core.errors import BadRequestError, UpstreamError
-from app.features.debug import pins, router, service
+from app.features.debug import diagram, pins, router, service
 from app.features.debug.design import parse_netlist
 from app.features.debug.kicad import KicadCli, KicadOutput
 from app.features.debug.project import Project, load_project, missing_sheets, normalize_paths
 from app.features.debug.prompt import number_symptoms
 from app.features.debug.schemas import (
     Analysis,
+    CheckedClaim,
     Cite,
     Claim,
     Fix,
@@ -235,6 +236,45 @@ def test_inductor_pin_without_an_inductor_is_a_finding():
     assert "no inductor" in findings[1].text
 
 
+def test_diagram_shows_the_cited_ic_its_nets_and_the_flagged_pin():
+    design = parse_netlist(NETLIST)
+    findings = pins.lookup(design).findings
+    [h] = [
+        Hypothesis[CheckedClaim](
+            **h.model_dump(exclude={"claims"}),
+            claims=[CheckedClaim(**c.model_dump()) for c in h.claims],
+        )
+        for h in _analysis().hypotheses
+    ]
+    d = diagram.build(h, design, findings)
+    assert d is not None
+    assert (d.ic, d.value) == ("U2", "TPS63070RNMR")
+    # U2.7 isn't cited, but it is on the flagged pin's net, so it is shown.
+    assert [(p.pin, p.name, p.flagged) for p in d.pins] == [
+        ("U2.7", "VOUT", False),
+        ("U2.9", "L2", True),
+    ]
+    [net] = d.nets
+    assert net.name == "+3V3"
+    assert [(m.pin, m.inductor) for m in net.members] == [("L1.2", True)]
+    assert net.more == 0
+
+
+def test_no_diagram_without_an_ic_pin():
+    h = Hypothesis[CheckedClaim](
+        id="h2",
+        rank=2,
+        title="t",
+        summary="s",
+        claims=[CheckedClaim(text="The cable has no data wires.", evidence="none", cites=[])],
+        explains=[],
+        does_not_explain=[],
+        confirm=[],
+        fix=Fix(schematic=[], rework=[]),
+    )
+    assert diagram.build(h, parse_netlist(NETLIST), []) is None
+
+
 def test_pin_table_needs_the_right_package():
     entry = next(e for e in pins.PIN_TABLE if e.value_prefix == "TPS2121")
     assert entry.matches("TPS2121RUXR", "", "")
@@ -290,6 +330,7 @@ async def test_stream_sends_summary_progress_then_checked_result():
     assert structured[0].startswith("## Diagnosis\n1. L2 tied to VOUT.")
     assert seen[0] in structured[0]
 
+    assert events[-1][1]["diagrams"]["h1"]["ic"] == "U2"
     claims = events[-1][1]["hypotheses"][0]["claims"]
     assert [c["evidence"] for c in claims] == ["schematic", "datasheet", "none"]
     assert claims[2]["downgraded"] and "m2" in claims[2]["reason"]
