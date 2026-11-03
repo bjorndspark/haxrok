@@ -34,16 +34,16 @@ import type { DebugActions } from "../useDebug"
 
 const MODES: { mode: Mode; label: string; detail: string; icon: typeof Stethoscope }[] = [
   {
-    mode: "debug",
-    label: "Debug a board on the bench",
-    detail: "It's built and misbehaves. Find the cause.",
-    icon: Stethoscope,
-  },
-  {
     mode: "review",
     label: "Review before you order",
     detail: "Catch schematic mistakes before you pay for boards.",
     icon: ClipboardCheck,
+  },
+  {
+    mode: "debug",
+    label: "Debug a board on the bench",
+    detail: "It's built and misbehaves. Find the cause.",
+    icon: Stethoscope,
   },
 ]
 

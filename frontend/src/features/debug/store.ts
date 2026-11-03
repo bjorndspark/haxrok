@@ -34,7 +34,7 @@ interface DebugState {
 
 export const useDebugStore = create<DebugState>((set, get) => ({
   view: "input",
-  mode: "debug",
+  mode: "review",
   files: [],
   symptoms: "",
   measurements: [],
