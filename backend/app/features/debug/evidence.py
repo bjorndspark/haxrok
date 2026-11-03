@@ -196,7 +196,10 @@ def mentioned_pins(text: str) -> set[str]:
 
 def mentioned_nets(text: str, design: Design) -> dict[str, str]:
     """Nets named in ``text``, as short name -> full name. Only unambiguous
-    short names count, so a bare 'VCC' shared by two sheets isn't guessed."""
+    short names count, so a bare 'VCC' shared by two sheets isn't guessed.
+    Pin refs are blanked first: a net named like a pin number ('2', 'A1')
+    must not match inside 'R3.2' or 'J1.A1'."""
+    text = PIN_MENTION.sub(" ", text)
     return {short: full for short, full in design.short_net_names().items() if _names(short, text)}
 
 

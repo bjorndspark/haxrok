@@ -162,6 +162,37 @@ def test_overbar_markup_is_ignored_in_pin_names():
     assert not c.downgraded
 
 
+@pytest.mark.parametrize(
+    ("text", "part", "num"),
+    [
+        ("R3.2 is on net XOUT.", "R3", "2"),
+        ("J1.A1 is on net XOUT.", "J1", "A1"),
+        ("R3 pin 2 is on net XOUT.", "R3", "2"),
+    ],
+)
+def test_net_named_like_a_pin_number_is_not_found_inside_a_pin_ref(text, part, num):
+    # rp-micro has GPIO header nets literally named "2" and "A1".
+    design = Design(
+        {},
+        {
+            "XOUT": [Node(part, num, "")],
+            "2": [Node("J2", "5", "")],
+            "A1": [Node("J4", "7", "")],
+        },
+    )
+    ctx = EvidenceContext(design, {}, frozenset(), frozenset(), frozenset())
+    c = check_claim(claim(text, "schematic", pin(f"{part}.{num}", "XOUT")), ctx)
+    assert not c.downgraded, c.reason
+
+
+def test_net_named_like_a_number_still_counts_on_its_own():
+    design = Design({}, {"XOUT": [Node("R3", "2", "")], "2": [Node("J2", "5", "")]})
+    ctx = EvidenceContext(design, {}, frozenset(), frozenset(), frozenset())
+    c = check_claim(claim("R3.2 is on XOUT, next to net 2.", "schematic", pin("R3.2", "XOUT")), ctx)
+    assert c.downgraded
+    assert "net 2" in (c.reason or "")
+
+
 def test_label_needs_a_cite_of_its_kind(ctx):
     c = check_claim(claim("Two net names were merged.", "schematic", ref("erc", "erc-1")), ctx)
     assert c.downgraded
