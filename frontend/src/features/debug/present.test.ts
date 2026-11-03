@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest"
 
 import { isSchematicFile, projectName } from "./files"
-import { splitGlossary } from "./present"
+import { assess, splitGlossary } from "./present"
 import { fragmentLines, symptomHints, symptomLines } from "./symptoms"
+import type { CheckedClaim, DesignSummary, Hypothesis } from "./types"
 
 describe("symptoms", () => {
   it("numbers non-empty lines the way the backend does", () => {
@@ -57,5 +58,62 @@ describe("project files", () => {
         { path: "x/board.kicad_pro", file: blob },
       ]),
     ).toBe("board")
+  })
+})
+
+describe("assess", () => {
+  const claim = (evidence: CheckedClaim["evidence"], pin: string | null): CheckedClaim => ({
+    text: "t",
+    evidence,
+    cites: pin ? [{ kind: "pin_on_net", pin, net: "+3V3", id: null }] : [],
+    downgraded: false,
+    claimed_evidence: null,
+    reason: null,
+  })
+  const hypothesis = (claims: CheckedClaim[], explains: string[]): Hypothesis => ({
+    id: "h1",
+    rank: 1,
+    title: "t",
+    summary: "s",
+    claims,
+    explains,
+    does_not_explain: [],
+    confirm: [],
+    fix: { schematic: [], rework: [] },
+  })
+  const summary = {
+    symptoms: ["s1", "s2", "s3", "s4"].map((id) => ({ id, text: id })),
+    wiring: [
+      {
+        id: "wf1",
+        pin: "U2.9",
+        pin_name: "L2",
+        net: "+3V3",
+        conflicts: ["U2.7"],
+        inductors: ["L1.2"],
+        text: "",
+      },
+    ],
+  } as DesignSummary
+
+  it("calls a backed claim on a flagged pin a verified wiring fault", () => {
+    const a = assess(hypothesis([claim("schematic", "U2.9"), claim("none", null)], ["s1"]), summary)
+    expect(a.confidence).toBe("verified")
+    expect([a.explained, a.symptoms, a.backed, a.claims]).toEqual([1, 4, 1, 2])
+  })
+
+  it("ignores a flagged pin cited only by a downgraded claim", () => {
+    expect(assess(hypothesis([claim("none", "U2.9")], ["s1"]), summary).confidence).toBe(
+      "speculative",
+    )
+  })
+
+  it("needs half the symptoms and a backed claim to fit", () => {
+    const backed = [claim("schematic", "U1.2")]
+    expect(assess(hypothesis(backed, ["s1", "s2"]), summary).confidence).toBe("fits")
+    expect(assess(hypothesis(backed, ["s1"]), summary).confidence).toBe("speculative")
+    expect(assess(hypothesis([claim("none", null)], ["s1", "s2"]), summary).confidence).toBe(
+      "speculative",
+    )
   })
 })

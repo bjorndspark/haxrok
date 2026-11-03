@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Cpu, ShieldAlert } from "lucide-react"
+import { ChevronDown, ChevronUp, Cpu, ShieldAlert, Zap } from "lucide-react"
 import { useState } from "react"
 
 import { Badge } from "@/shared/ui/badge"
@@ -63,6 +63,23 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           </p>
         )}
       </div>
+
+      {summary.wiring.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50/60 p-3.5 text-xs dark:border-rose-900 dark:bg-rose-950/30">
+          <span className="flex items-center gap-2 font-semibold text-rose-900 dark:text-rose-200">
+            <Zap className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+            Wired against the datasheet ({summary.wiring.length})
+          </span>
+          {summary.wiring.map((f) => (
+            <p key={f.id} className="leading-relaxed">
+              {f.text}
+            </p>
+          ))}
+          <p className="text-[11px] text-muted-foreground">
+            Found by checking your netlist against the pin table, before the model runs.
+          </p>
+        </div>
+      )}
 
       <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 text-xs dark:border-amber-900 dark:bg-amber-950/30">
         <div className="flex items-center justify-between">

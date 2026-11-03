@@ -1,11 +1,28 @@
-import { CircleAlert, FileCode, Gauge, Hand, RotateCcw, Wrench } from "lucide-react"
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleHelp,
+  FileCode,
+  Gauge,
+  Hand,
+  RotateCcw,
+  ShieldCheck,
+  Wrench,
+} from "lucide-react"
 import { useState, type ReactNode } from "react"
 
 import { cn } from "@/shared/lib/utils"
 import { Badge, type BadgeProps } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 
-import { EVIDENCE_LABEL, symptomText } from "../present"
+import {
+  assess,
+  CONFIDENCE_LABEL,
+  EVIDENCE_LABEL,
+  symptomText,
+  type Assessment,
+  type Confidence,
+} from "../present"
 import type {
   CheckedClaim,
   ConfirmStep,
@@ -23,6 +40,62 @@ const EVIDENCE_TONE: Record<Evidence, BadgeProps["tone"]> = {
   datasheet: "green",
   measurement: "green",
   none: "neutral",
+}
+
+const CONFIDENCE_TONE: Record<Confidence, BadgeProps["tone"]> = {
+  verified: "green",
+  fits: "blue",
+  speculative: "neutral",
+}
+
+const CONFIDENCE_ICON: Record<Confidence, typeof ShieldCheck> = {
+  verified: ShieldCheck,
+  fits: CircleCheck,
+  speculative: CircleHelp,
+}
+
+/** "N of M" as text plus a thin bar. Counts, never a percentage. */
+function Meter({ label, value, of }: { label: string; value: number; of: number }) {
+  const share = of > 0 ? Math.min(value / of, 1) : 0
+  return (
+    <div className="min-w-0 flex-1 space-y-1">
+      <p className="text-[11px] text-muted-foreground">
+        {label}{" "}
+        <span className="font-semibold text-foreground tabular-nums">
+          {value} of {of}
+        </span>
+      </p>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+        role="meter"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={of}
+        aria-valuenow={value}
+      >
+        <div
+          className="h-full rounded-full bg-slate-600 dark:bg-slate-300"
+          style={{ width: `${String(share * 100)}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ConfidenceLine({ assessment: a }: { assessment: Assessment }) {
+  const Icon = CONFIDENCE_ICON[a.confidence]
+  return (
+    <div className="mt-3.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+      <Badge tone={CONFIDENCE_TONE[a.confidence]} className="self-start text-xs" title={a.reason}>
+        <Icon />
+        {CONFIDENCE_LABEL[a.confidence]}
+      </Badge>
+      <div className="flex flex-1 gap-5">
+        <Meter label="Explains" value={a.explained} of={a.symptoms} />
+        <Meter label="Claims backed" value={a.backed} of={a.claims} />
+      </div>
+    </div>
+  )
 }
 
 function Disclosure({
@@ -224,7 +297,7 @@ export function HypothesisCard({
   const primary = h.rank === 1
   const stepIds = new Set(h.confirm.map((s) => s.id))
   const ownProblems = problems.filter((p) => p.where === h.id || stepIds.has(p.where))
-  const kept = h.claims.filter((c) => c.evidence !== "none").length
+  const assessment = assess(h, summary)
   return (
     <div
       className={cn(
@@ -243,37 +316,50 @@ export function HypothesisCard({
         <p className="pt-2 text-sm leading-relaxed text-foreground/90">
           <GlossaryText text={h.summary} glossary={glossary} />
         </p>
-        {(h.explains.length > 0 || h.does_not_explain.length > 0) && (
-          <div className="mt-3.5 flex flex-wrap gap-1.5">
-            {h.explains.map((id) => (
-              <Badge
-                key={id}
-                tone="green"
-                className="max-w-full font-sans whitespace-normal"
-                title={id}
-              >
-                ✓ {symptomText(summary, id)}
-              </Badge>
-            ))}
-            {h.does_not_explain.map((id) => (
-              <Badge
-                key={id}
-                tone="red"
-                className="max-w-full font-sans whitespace-normal"
-                title={id}
-              >
-                ✗ Doesn&apos;t explain: {symptomText(summary, id)}
-              </Badge>
-            ))}
-          </div>
-        )}
+        <ConfidenceLine assessment={assessment} />
       </div>
 
       <div className="divide-y border-t">
+        {(h.explains.length > 0 || h.does_not_explain.length > 0) && (
+          <Disclosure
+            title="Symptoms"
+            aside={`${String(h.explains.length)} explained, ${String(h.does_not_explain.length)} not`}
+          >
+            <ul className="space-y-1.5 leading-relaxed">
+              {h.explains.map((id) => (
+                <li key={id} className="flex gap-2" title={id}>
+                  <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span>{symptomText(summary, id)}</span>
+                </li>
+              ))}
+              {h.does_not_explain.map((id) => (
+                <li key={id} className="flex gap-2" title={id}>
+                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                  <span>
+                    <span className="font-semibold">Doesn&apos;t explain:</span>{" "}
+                    {symptomText(summary, id)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Disclosure>
+        )}
+
         <Disclosure
           title="Evidence and claims"
-          aside={`${String(kept)} of ${String(h.claims.length)} backed by your input`}
+          aside={`${String(assessment.backed)} of ${String(assessment.claims)} backed by your input`}
         >
+          {assessment.findings.map((f) => (
+            <div
+              key={f.id}
+              className="flex gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 leading-relaxed dark:border-emerald-900 dark:bg-emerald-950/30"
+            >
+              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
+              <span>
+                <span className="font-semibold">Backend wiring check:</span> {f.text}
+              </span>
+            </div>
+          ))}
           {h.claims.map((c, i) => (
             <ClaimRow key={i} claim={c} />
           ))}

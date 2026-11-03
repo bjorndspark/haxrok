@@ -101,6 +101,18 @@ export interface ErcEntry {
   items: string[]
 }
 
+/** A pin wired against its pin-table function, found by the backend before
+ *  the model runs (pins.check_wiring). Verified, not the model's reasoning. */
+export interface WiringFinding {
+  id: string
+  pin: string
+  pin_name: string
+  net: string
+  conflicts: string[]
+  inductors: string[]
+  text: string
+}
+
 export interface Symptom {
   id: string
   text: string
@@ -126,6 +138,7 @@ export interface DesignSummary {
   nets: number
   ics: IcSummary[]
   erc: ErcEntry[]
+  wiring: WiringFinding[]
   symptoms: Symptom[]
   measurements: Measurement[]
 }

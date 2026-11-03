@@ -1,6 +1,14 @@
 /** Presentation logic for results: evidence wording, glossary matching and
  *  the downloadable Markdown report. Pure functions, no React. */
-import type { CheckedAnalysis, DesignSummary, Evidence, GlossaryEntry, Run } from "./types"
+import type {
+  CheckedAnalysis,
+  DesignSummary,
+  Evidence,
+  GlossaryEntry,
+  Hypothesis,
+  Run,
+  WiringFinding,
+} from "./types"
 
 /** Labels say what a claim rests on, never that it was verified. */
 export const EVIDENCE_LABEL: Record<Evidence, string> = {
@@ -9,6 +17,72 @@ export const EVIDENCE_LABEL: Record<Evidence, string> = {
   datasheet: "Based on the datasheet pin table",
   measurement: "Based on your measurement",
   none: "No direct evidence",
+}
+
+export type Confidence = "verified" | "fits" | "speculative"
+
+export const CONFIDENCE_LABEL: Record<Confidence, string> = {
+  verified: "Verified wiring fault",
+  fits: "Fits the symptoms",
+  speculative: "Speculative",
+}
+
+/** How much a hypothesis rests on, counted from the checked result. No
+ *  model-made percentages (plan 001, "Trust"): every number is a count. */
+export interface Assessment {
+  confidence: Confidence
+  /** Why the label was chosen, in one sentence. */
+  reason: string
+  explained: number
+  symptoms: number
+  backed: number
+  claims: number
+  /** Backend wiring findings this hypothesis cites with a backed claim. */
+  findings: WiringFinding[]
+}
+
+/** The label rule:
+ *  - verified: a claim that kept its evidence label cites a pin the
+ *    backend's wiring check flagged. The fault is verified; whether it is
+ *    the cause is what the confirm steps test.
+ *  - fits: explains at least half the symptoms and at least one claim is
+ *    backed by the input.
+ *  - speculative: anything else. */
+export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment {
+  const backedClaims = h.claims.filter((c) => c.evidence !== "none")
+  const citedPins = new Set(backedClaims.flatMap((c) => c.cites.map((x) => x.pin ?? "")))
+  const findings = (summary?.wiring ?? []).filter((f) => citedPins.has(f.pin))
+  const symptoms = summary?.symptoms.length ?? h.explains.length + h.does_not_explain.length
+  const base = {
+    explained: h.explains.length,
+    symptoms,
+    backed: backedClaims.length,
+    claims: h.claims.length,
+    findings,
+  }
+  if (findings.length > 0) {
+    const pins = findings.map((f) => `${f.pin} (${f.pin_name})`).join(", ")
+    return {
+      ...base,
+      confidence: "verified",
+      reason: `The backend's wiring check found ${pins} wired against the datasheet, and this hypothesis cites it.`,
+    }
+  }
+  if (backedClaims.length > 0 && symptoms > 0 && h.explains.length * 2 >= symptoms) {
+    return {
+      ...base,
+      confidence: "fits",
+      reason: "Explains at least half the symptoms, with claims backed by your input.",
+    }
+  }
+  return {
+    ...base,
+    confidence: "speculative",
+    reason:
+      backedClaims.length === 0
+        ? "None of its claims is backed by your input."
+        : "Explains fewer than half the symptoms.",
+  }
 }
 
 export interface TextPart {
@@ -63,7 +137,16 @@ export function toMarkdown(run: Run, summary: DesignSummary, result: CheckedAnal
     lines.push("", "## Measurements", ...summary.measurements.map((m) => `- ${m.id}: ${m.value}`))
   }
   for (const h of result.hypotheses) {
-    lines.push("", `## #${String(h.rank)} ${h.title}`, "", h.summary, "")
+    const a = assess(h, summary)
+    lines.push(
+      "",
+      `## #${String(h.rank)} ${h.title}`,
+      "",
+      `**${CONFIDENCE_LABEL[a.confidence]}** · explains ${String(a.explained)} of ${String(a.symptoms)} symptoms · ${String(a.backed)} of ${String(a.claims)} claims backed`,
+      "",
+      h.summary,
+      "",
+    )
     if (h.explains.length > 0)
       lines.push(`Explains: ${h.explains.map((id) => symptomText(summary, id)).join("; ")}`)
     if (h.does_not_explain.length > 0)
