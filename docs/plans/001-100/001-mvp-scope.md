@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-01 | 2026-11-02 | In progress | — | `evals/README.md`, `README.md` |
+| 2026-11-01 | 2026-11-03 | MVP implemented; stretch open | — | `evals/README.md`, `README.md` |
 
 What Häxrök builds for the Meta Global AI Developer Hackathon (2026), what
 it leaves out, and the other ideas that were weighed against it. The
@@ -105,8 +105,10 @@ One feature, `debug`, named the same on both sides
      recommends (no libraries). Its `kicad-cli` must be at least as new
      as the user's KiCad, because older versions can't open newer
      files.
-2. **One model call.** It starts from the `gonogo.py` prompt, reworded
-   for hobbyists (see "Who it's for"), through `app/core/ai/` with
+2. **One model call** (built as two: diagnose in free text, then
+   structure it; see `DECISIONS.md`, "Debug analysis is two model
+   calls"). It starts from the `gonogo.py` prompt, reworded for
+   hobbyists (see "Who it's for"), through `app/core/ai/` with
    `AI_CHAT_MODEL`. It returns structured JSON, not markdown, so the UI
    can render it and the backend can check it. It carries the
    `gonogo.py` rule on recalled part facts: they are unverified, and an
@@ -131,13 +133,13 @@ One feature, `debug`, named the same on both sides
      board matches the schematic. A step that changes the board lists the
      full intended rewiring (`setup`) and what each reading establishes.
    - Rework stays at pin and part level, since there's no PCB data.
-   - The run takes about two minutes, and the model streams nothing for
-     the first ~90 s (no reasoning text comes through the gateway). So
-     the SSE stream sends the design summary at once, then our own stage
-     updates, then the result. The UI shows elapsed time. Cards don't
-     arrive one by one. The debug call needs its own timeout, longer
-     than `AI_TIMEOUT_S` (120 s per read), because a go/no-go run took
-     130 s.
+   - A run takes 4–6 minutes (two calls of ~90–150 s), and the model
+     streams nothing for the first ~90 s of each call (no reasoning text
+     comes through the gateway). So the SSE stream sends the design
+     summary at once, then our own stage updates, then the result. The
+     UI shows elapsed time. Cards don't arrive one by one. The debug call
+     needs its own timeout, longer than `AI_TIMEOUT_S` (120 s per read),
+     because a go/no-go run took 130 s.
    - Symptoms are numbered by line, so each line has to stand on its own
      ("Fails on battery", not "battery"). A test run whose lines lacked
      that context couldn't tell which supplies passed. The UI nudges for
@@ -149,7 +151,8 @@ One feature, `debug`, named the same on both sides
    agent loop.
 
 Done means: a real bug's KiCad project runs from the UI and ranks the
-fault #1.
+fault #1. Met on 2026-11-03 on a private board, so no demo board ships
+with the app.
 
 ## Stretch (only after the MVP works)
 
@@ -233,8 +236,8 @@ apart from linters that run before fab.
 2. Add a second real-bug case. Public KiCad repos with fix commits are a
    source of labelled cases. (The fault-free board is done:
    `rp-micro-no-fault`.)
-3. Build the MVP, then replace the template's seed chat, voice and image
-   features.
+3. ~~Build the MVP, then replace the template's seed chat, voice and image
+   features.~~ Done 2026-11-03.
 
 ## After the hackathon
 

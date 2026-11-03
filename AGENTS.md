@@ -10,7 +10,7 @@ the whole contract. `DECISIONS.md` holds the few trade-offs worth recording.
 - **The tree is the architecture.** Placement and naming carry the design;
   keep the layout below exact.
 - **Self-similar naming.** The same word names the same concern at every
-  layer — `backend/app/features/chat/` and `frontend/src/features/chat/` are
+  layer — `backend/app/features/debug/` and `frontend/src/features/debug/` are
   the same feature. Never name two different things alike.
 - **I/O at the edges.** Routers/components do I/O; services hold logic and
   take dependencies. A hard-to-test unit is a structural smell — fix the
@@ -26,7 +26,7 @@ the whole contract. `DECISIONS.md` holds the few trade-offs worth recording.
 backend/app/
   main.py                # composition root — routers, middleware, mounts
   core/                  # platform plumbing: config, db, clock, logging,
-                         # errors, responses, middleware, storage, ai/
+                         # errors, responses, middleware, redis, ai/
   features/<name>/       # models.py, schemas.py, repository.py, service.py, router.py
 backend/tests/           # mirrors features; fake the gateway, never mock the DB schema away
 frontend/src/
@@ -135,7 +135,7 @@ frontend/src/
 
 Solo dev: commit directly to `main` and push — CI runs the same gates on
 every push, so a red main is visible immediately. Small commits named for
-intent (`feat(chat): …`, `fix(backend): …`). Revert with `git revert`, never
+intent (`feat(debug): …`, `fix(backend): …`). Revert with `git revert`, never
 rewrite pushed history. Revisit PRs if a second maintainer joins.
 
 No AI attribution in commits or PRs — no `Co-Authored-By` trailers,
