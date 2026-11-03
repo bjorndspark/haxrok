@@ -168,3 +168,31 @@ input. The printed line now names the findings (`findings <pins>`).
 | Case | Run | Rank of real cause | Total time | Notes |
 |---|---|---|---|---|
 | `rp-micro-no-fault` | 1 | PASS | 221 s | No finding; cable #1, #3 is assembly "despite correct schematic" |
+
+### Through the backend from KiCad files, 2026-11-03
+
+The first time the six planted / no-fault cases went through the real
+upload path: `POST /api/v1/debug/analyze` with each board's `.kicad_pro`
+and `.kicad_sch` files, so the backend parsed the schematic itself instead
+of reading `netlist.txt`. The KiCad files aren't committed. They were
+rebuilt from the source commit and edit in each `expected.md`, and each
+rebuild exports exactly that case's `netlist.txt`. The symptoms were
+rewritten one observation per line, as the app expects: the hard-wrapped
+`symptom.md` splits into fragments ("Works:", half sentences) that count
+as symptoms. One run each, three at once.
+
+| Case | Rank of real cause | Label on it | Total time | Notes |
+|---|---|---|---|---|
+| `orbit-boot0-high` | #1 | Fits the symptoms | 254 s | #2 proposes an NRST pull-up (the STM32 has one inside), gated on a datasheet check, while saying it "does not fit" |
+| `orbit-uart-swapped` | #1 | Speculative | 279 s | Labelled Speculative because it explains 4 of 12 lines, and the other 8 are setup and "Works:" lines |
+| `rp-micro-ldo-en` | #1 | Fits the symptoms | 215 s | |
+| `rust-board-fb-swapped` | #1 | Fits the symptoms | 207 s | |
+| `rust-board-i2c-vbus` | #1 | Fits the symptoms | 247 s | Titles came back as "#1 #1 - …" |
+| `rp-micro-no-fault` | MISS (cable #1) | | 225 s | #2 suspects the correct 1k R3 on XOUT, rework gated on the design-guide check; all three hypotheses are labelled "Fits the symptoms" |
+
+All five planted faults ranked #1 from KiCad files. The no-fault case
+fell back to the R3 suspicion it passed on before, so its pass is not
+stable. The run also showed the evidence check stripping labels from
+correct claims on boards with nets named like pin numbers (rp-micro's
+`2`, `3`, `A1` matched inside `R3.2`, `J1.A1`); fixed in `24220f7`, after
+these runs.
