@@ -4,24 +4,4 @@
 
 ```sql
 
-CREATE TABLE conversations (
-	id SERIAL NOT NULL, 
-	title VARCHAR(200) NOT NULL, 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	PRIMARY KEY (id)
-);
-
-
-CREATE TABLE messages (
-	id SERIAL NOT NULL, 
-	conversation_id INTEGER NOT NULL, 
-	role VARCHAR(20) NOT NULL, 
-	content TEXT NOT NULL, 
-	media_url VARCHAR(500), 
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
-);
-
-CREATE INDEX ix_messages_conversation_id ON messages (conversation_id);
 ```
