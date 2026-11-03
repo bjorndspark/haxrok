@@ -57,6 +57,15 @@ class Settings(BaseSettings):
     AI_TTS_FALLBACKS: str = ""
     AI_STT_FALLBACKS: str = ""
 
+    # Debug feature. The analysis call streams nothing for ~90 s and a run
+    # has taken 130 s, so it gets its own per-read timeout above AI_TIMEOUT_S.
+    DEBUG_AI_TIMEOUT_S: float = 300.0
+    # kicad-cli must be at least as new as the KiCad that saved the upload.
+    KICAD_CLI: str = "kicad-cli"
+    KICAD_TIMEOUT_S: float = 60.0
+    DEBUG_MAX_FILES: int = 200
+    DEBUG_MAX_UPLOAD_BYTES: int = 20 * 1024 * 1024
+
     # Generated media, bind-mounted to ./data on the host and served at
     # /media/files/<name>.
     MEDIA_DIR: str = "data/media"

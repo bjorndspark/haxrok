@@ -15,6 +15,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libspeexdsp1 \
     && rm -rf /var/lib/apt/lists/*
 
+# kicad-cli for the debug feature (netlist export + ERC). Debian's kicad
+# package without recommends: no symbol/footprint libraries, which the
+# schematics don't need since they embed their symbols. It adds ~800 MB.
+# It must be at least as new as the KiCad that saved the user's files.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends kicad \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install deps from the committed lockfile only — never re-resolve at build

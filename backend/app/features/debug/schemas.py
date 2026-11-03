@@ -211,8 +211,12 @@ class Symptom(BaseModel):
 
 
 class Measurement(BaseModel):
+    """A bench value the user entered. ``context`` is the confirm step it
+    answers, as text, since the model doesn't see earlier runs."""
+
     id: str
     step_id: str | None
+    context: str | None
     value: str
 
 
@@ -220,7 +224,10 @@ class DesignSummary(BaseModel):
     """Parsed input, shown before the model call: lets the user check the
     parse, and shows which ICs have pin data."""
 
+    project: str
+    sheets: int
     parts: int
+    nets: int
     ics: list[IcSummary]
     erc: list[ErcEntry]
     symptoms: list[Symptom]
@@ -242,15 +249,17 @@ class MeasurementInput(BaseModel):
     """A value the user entered under a confirm step, sent on re-runs."""
 
     step_id: str | None = Field(None, max_length=50)
+    context: str | None = Field(None, max_length=1000, description="The step's instruction.")
     value: str = Field(..., min_length=1, max_length=500)
 
 
 # --- SSE events -------------------------------------------------------------------
 #
 # Order: design_summary, then any number of progress, then exactly one terminal
-# event, result or error.
+# event, result or error. Parsing and ERC run before the stream opens, so their
+# failures come back as an ordinary error response instead.
 
-ProgressStage = Literal["parsing", "erc", "pin_lookup", "reasoning", "checking"]
+ProgressStage = Literal["pin_lookup", "reasoning", "checking"]
 
 
 class ProgressEvent(BaseModel):

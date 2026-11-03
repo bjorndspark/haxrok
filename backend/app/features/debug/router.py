@@ -1,0 +1,66 @@
+"""Debug routes. Thin: read the multipart upload, hand it to the service,
+stream the result as SSE (exempt from the envelope, see app.core.responses)."""
+
+import json
+from typing import Annotated
+
+from fastapi import APIRouter, File, Form, UploadFile
+from pydantic import TypeAdapter, ValidationError
+from sse_starlette.sse import EventSourceResponse
+
+from app.core.ai.structured import complete_structured
+from app.core.config import settings
+from app.core.errors import BadRequestError
+from app.features.debug import service
+from app.features.debug.kicad import KicadCli
+from app.features.debug.schemas import Analysis, Claim, MeasurementInput
+
+router = APIRouter(prefix="/debug", tags=["debug"])
+
+_measurements = TypeAdapter(list[MeasurementInput])
+
+
+async def _reason(system: str, user: str) -> Analysis[Claim]:
+    return await complete_structured(
+        Analysis[Claim],
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        name="debug_analysis",
+        timeout_s=settings.DEBUG_AI_TIMEOUT_S,
+    )
+
+
+@router.post("/analyze")
+async def analyze(
+    files: Annotated[
+        list[UploadFile], File(description="The project's .kicad_pro and .kicad_sch files")
+    ],
+    symptoms: Annotated[str, Form(min_length=1, max_length=8000)],
+    measurements: Annotated[str, Form(description="JSON list of MeasurementInput")] = "[]",
+) -> EventSourceResponse:
+    """Analyze a KiCad project against bench symptoms.
+
+    Upload errors, missing sub-sheets and kicad-cli failures return the
+    error envelope. Otherwise the response is an SSE stream:
+    ``design_summary``, ``progress``…, then ``result`` (CheckedAnalysis) or
+    ``error``. File names carry the path inside the dropped folder.
+    """
+    try:
+        parsed = _measurements.validate_python(json.loads(measurements))
+    except (json.JSONDecodeError, ValidationError) as e:
+        raise BadRequestError("measurements must be a JSON list.", field="measurements") from e
+    if len(files) > settings.DEBUG_MAX_FILES:
+        raise BadRequestError(f"Too many files; at most {settings.DEBUG_MAX_FILES}.")
+
+    raw: list[tuple[str, bytes]] = []
+    total = 0
+    for f in files:
+        data = await f.read()
+        total += len(data)
+        if total > settings.DEBUG_MAX_UPLOAD_BYTES:
+            raise BadRequestError(
+                f"The schematics add up to more than {settings.DEBUG_MAX_UPLOAD_BYTES // 2**20} MB."
+            )
+        raw.append((f.filename or "", data))
+
+    prepared = await service.prepare(raw, symptoms, parsed, KicadCli())
+    return EventSourceResponse(service.stream(prepared, _reason))
