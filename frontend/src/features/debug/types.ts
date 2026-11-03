@@ -6,8 +6,9 @@ export type Mode = "debug" | "review"
 /** Review mode only: how badly an issue hurts the board. */
 export type Severity = "will_fail" | "may_fail" | "improve"
 
-export type Evidence = "schematic" | "erc" | "datasheet" | "measurement" | "none"
-export type CiteKind = "pin_on_net" | "pin_name" | "erc" | "pin_function" | "measurement"
+export type Evidence = "schematic" | "erc" | "datasheet" | "reference" | "measurement" | "none"
+export type CiteKind =
+  "pin_on_net" | "pin_name" | "erc" | "pin_function" | "reference" | "measurement"
 
 export interface Cite {
   kind: CiteKind
@@ -151,6 +152,28 @@ export interface WiringFinding {
   text: string
 }
 
+/** A fact from a manufacturer's reference design or datasheet (rd1, …). */
+export interface ReferenceNote {
+  id: string
+  part: string
+  source: string
+  text: string
+}
+
+/** A value the backend computed from the netlist with a datasheet formula
+ *  (cf1, …). `flagged`: it contradicts the design's intent. */
+export interface Calculation {
+  id: string
+  kind: "regulator_output" | "charge_current"
+  ic: string
+  pins: string[]
+  value: number
+  unit: string
+  expected: number | null
+  flagged: boolean
+  text: string
+}
+
 export interface Symptom {
   id: string
   text: string
@@ -178,6 +201,8 @@ export interface DesignSummary {
   ics: IcSummary[]
   erc: ErcEntry[]
   wiring: WiringFinding[]
+  references: ReferenceNote[]
+  calculations: Calculation[]
   /** Bench symptoms; in review mode, the designer's notes on the board. */
   symptoms: Symptom[]
   measurements: Measurement[]

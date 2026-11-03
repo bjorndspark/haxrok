@@ -18,8 +18,11 @@ _INPUT = """\
 Input: numbered symptoms (s1, s2, ...), the compact netlist (one line per \
 part, then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
 (erc-1, ...), a pin table copied from datasheets for some ICs, verified \
-findings (wf1, ...) the backend computed from the netlist and pin table, and \
-sometimes bench measurements the user entered (m1, ...)."""
+findings (wf1, ...) the backend computed from the netlist and pin table, \
+reference notes (rd1, ...) copied from manufacturers' reference designs and \
+datasheets, values the backend calculated from the netlist with datasheet \
+formulas (cf1, ...), and sometimes bench measurements the user entered \
+(m1, ...)."""
 
 # The unverified-facts rule: the model recalls part specs from memory, and in
 # the no-fault eval it called a correct part an error and told the user to
@@ -48,7 +51,16 @@ netlist against the pin table (e.g. an inductor pin that shares a net with \
 anything but its inductor). They are design errors, not hypotheses: never \
 call one unverified or recalled. Work out which symptoms each explains, \
 including only under some conditions (input voltage, load, mode), and rank \
-it on that. A finding that explains the symptoms well belongs at #1."""
+it on that. A finding that explains the symptoms well belongs at #1.
+
+Reference notes are also verified: they are copied from the manufacturer's \
+own documents. A circuit that matches a reference note is correct as \
+designed: never call it an error or suggest changing it, and use the note \
+instead of what you recall. A deviation from a note is worth reporting, with \
+its consequence. Calculated values (cf...) are exact arithmetic on the \
+netlist's resistor values; trust them over your own arithmetic. One marked \
+FLAGGED contradicts the design's own intent (an output named +3V3 set to \
+0.73 V): it is a verified design error."""
 
 DIAGNOSE = f"""\
 You are an expert hardware engineer debugging a PCB from its KiCad schematic \
@@ -80,6 +92,9 @@ gives it, and use that same name in the text).
 - datasheet: a pin function from the pin table. Cite pin_function with the \
 pin. Only pins listed in the pin table can be cited. State only what the pin \
 does; put which net it is on in a separate schematic claim.
+- reference: a fact from a reference note (rd...) or a calculated value \
+(cf...). Cite kind reference with its id. Use it for "this matches the \
+manufacturer's design" and for calculated voltages and currents.
 - measurement: a value the user entered. Cite its id. Symptom text is not a \
 measurement id; a claim about what the user reported in the symptoms uses \
 evidence none.
@@ -155,8 +170,11 @@ _REVIEW_INPUT = """\
 Input: optional notes from the designer on what the board is for (s1, s2, \
 ...; supplies, loads, environment), the compact netlist (one line per part, \
 then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
-(erc-1, ...), a pin table copied from datasheets for some ICs, and verified \
-findings (wf1, ...) the backend computed from the netlist and pin table."""
+(erc-1, ...), a pin table copied from datasheets for some ICs, verified \
+findings (wf1, ...) the backend computed from the netlist and pin table, \
+reference notes (rd1, ...) copied from manufacturers' reference designs and \
+datasheets, and values the backend calculated from the netlist with \
+datasheet formulas (cf1, ...)."""
 
 REVIEW_DIAGNOSE = f"""\
 You are an expert hardware engineer reviewing a hobbyist's KiCad schematic \
@@ -248,6 +266,7 @@ def build_user_message(
     erc: str,
     pin_table: str,
     findings: str,
+    references: str = "",
 ) -> str:
     """The user turn: symptoms (review: the designer's notes), measurements,
     netlist, ERC, pin table, verified findings."""
@@ -269,6 +288,8 @@ def build_user_message(
         "## Pin table (from datasheets)\n" + pin_table,
         "## Verified findings (netlist checked against the pin table)\n" + findings,
     ]
+    if references:
+        parts.append("## Reference designs and calculated values\n" + references)
     return "\n\n".join(parts)
 
 

@@ -43,6 +43,7 @@ const EVIDENCE_TONE: Record<Evidence, BadgeProps["tone"]> = {
   schematic: "blue",
   erc: "amber",
   datasheet: "green",
+  reference: "green",
   measurement: "green",
   none: "neutral",
 }
@@ -386,6 +387,17 @@ export function HypothesisCard({
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
               <span>
                 <span className="font-semibold">Backend wiring check:</span> {f.text}
+              </span>
+            </div>
+          ))}
+          {assessment.calculations.map((c) => (
+            <div
+              key={c.id}
+              className="flex gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 leading-relaxed dark:border-emerald-900 dark:bg-emerald-950/30"
+            >
+              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
+              <span>
+                <span className="font-semibold">Backend calculation:</span> {c.text}
               </span>
             </div>
           ))}

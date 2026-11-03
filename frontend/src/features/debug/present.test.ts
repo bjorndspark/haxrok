@@ -110,6 +110,32 @@ describe("assess", () => {
     )
   })
 
+  it("verifies an issue that cites a flagged calculation", () => {
+    const calc = {
+      id: "cf1",
+      kind: "regulator_output" as const,
+      ic: "U5",
+      pins: ["U5.5", "R2.1", "R2.2", "R3.1", "R3.2"],
+      value: 0.73,
+      unit: "V",
+      expected: 3.3,
+      flagged: true,
+      text: "",
+    }
+    const review = {
+      ...summary,
+      mode: "review",
+      symptoms: [],
+      calculations: [calc],
+    } as DesignSummary
+    const byId: CheckedClaim = {
+      ...claim("reference", null),
+      cites: [{ kind: "reference", pin: null, net: null, id: "cf1" }],
+    }
+    expect(assess(hypothesis([byId], []), review).confidence).toBe("verified")
+    expect(assess(hypothesis([claim("schematic", "R3.1")], []), review).confidence).toBe("verified")
+  })
+
   it("verifies a review issue only through the wiring check", () => {
     const review = { ...summary, mode: "review", symptoms: [] } as DesignSummary
     expect(assess(hypothesis([claim("schematic", "U2.9")], []), review).confidence).toBe("verified")

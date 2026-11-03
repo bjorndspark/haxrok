@@ -22,9 +22,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # --- shared vocabulary ---------------------------------------------------------
 
-Evidence = Literal["schematic", "erc", "datasheet", "measurement", "none"]
+Evidence = Literal["schematic", "erc", "datasheet", "reference", "measurement", "none"]
 """schematic: the netlist. erc: a KiCad ERC entry. datasheet: the hand-written
-pin table. measurement: a value the user entered. none: no direct evidence."""
+pin table. reference: a manufacturer reference note or a value the backend
+calculated with a datasheet formula (``reference.py``). measurement: a value
+the user entered. none: no direct evidence."""
 
 Mode = Literal["debug", "review"]
 """debug: find the schematic cause of bench symptoms. review: look for design
@@ -36,7 +38,7 @@ Severity = Literal["will_fail", "may_fail", "improve"]
 fails under some conditions (a supply, a load, a tolerance). improve: works,
 but a cheap change makes it more robust."""
 
-CiteKind = Literal["pin_on_net", "pin_name", "erc", "pin_function", "measurement"]
+CiteKind = Literal["pin_on_net", "pin_name", "erc", "pin_function", "reference", "measurement"]
 
 # Which citation kinds back which evidence label. pin_name is the pin's name
 # as the netlist gives it (U2.9 is "L2"); pin_function is what the pin does,
@@ -45,6 +47,7 @@ EVIDENCE_CITE_KINDS: dict[Evidence, frozenset[CiteKind]] = {
     "schematic": frozenset({"pin_on_net", "pin_name"}),
     "erc": frozenset({"erc"}),
     "datasheet": frozenset({"pin_function"}),
+    "reference": frozenset({"reference"}),
     "measurement": frozenset({"measurement"}),
     "none": frozenset(),
 }
@@ -67,14 +70,17 @@ class Cite(_Strict):
     kind: CiteKind = Field(
         description="pin_on_net: the pin is on that net in the netlist. pin_name: the pin's "
         "name as the netlist gives it, e.g. U2.9(L2). erc: an ERC entry. pin_function: what "
-        "the pin does, from the pin table. measurement: a value the user entered."
+        "the pin does, from the pin table. reference: a reference note (rd1) or calculated value "
+        "(cf1). measurement: a value the user entered."
     )
     pin: str | None = Field(
         description='Pin as REF.PIN, e.g. "U2.9". Required for pin_on_net, pin_name and '
         "pin_function."
     )
     net: str | None = Field(description="Net name exactly as in the netlist. For pin_on_net.")
-    id: str | None = Field(description='ERC entry id ("erc-3") or measurement id ("m1").')
+    id: str | None = Field(
+        description='ERC entry id ("erc-3"), reference id ("rd2", "cf1") or measurement id ("m1").'
+    )
 
 
 class Claim(_Strict):
@@ -267,6 +273,34 @@ class WiringFinding(BaseModel):
     text: str
 
 
+class ReferenceNote(BaseModel):
+    """A fact from a manufacturer's reference design, datasheet or app note
+    (``reference.REFERENCES``). ``id`` (rd1, …) is what claims cite."""
+
+    id: str
+    part: str
+    source: str
+    text: str
+
+
+class Calculation(BaseModel):
+    """A value the backend computed from netlist resistor values with a
+    datasheet formula: a regulator's output from its feedback divider, a
+    charger's current from its program resistor. Verified arithmetic, not
+    the model's. ``flagged`` means it contradicts the design's own intent
+    (an output net named +3V3 that the divider sets to 0.73 V)."""
+
+    id: str
+    kind: Literal["regulator_output", "charge_current"]
+    ic: str
+    pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")
+    value: float
+    unit: str
+    expected: float | None = Field(description="The value the net name promises, if any.")
+    flagged: bool
+    text: str
+
+
 class Symptom(BaseModel):
     id: str
     text: str
@@ -294,6 +328,8 @@ class DesignSummary(BaseModel):
     ics: list[IcSummary]
     erc: list[ErcEntry]
     wiring: list[WiringFinding]
+    references: list[ReferenceNote]
+    calculations: list[Calculation]
     symptoms: list[Symptom] = Field(
         description="Bench symptoms; in review mode, the user's notes on what the board is for."
     )

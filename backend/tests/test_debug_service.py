@@ -10,7 +10,8 @@ import pytest
 
 from app.core.errors import BadRequestError, UpstreamError
 from app.features.debug import diagram, pins, prompt, router, service
-from app.features.debug.design import parse_netlist
+from app.features.debug.design import Design, Node, Part, parse_netlist
+from app.features.debug.evidence import EvidenceContext
 from app.features.debug.kicad import KicadOutput
 from app.features.debug.project import Project, load_project, missing_sheets, normalize_paths
 from app.features.debug.prompt import number_symptoms
@@ -416,3 +417,67 @@ async def test_analyze_rejects_malformed_measurements(client, fake_backends):
     )
     assert res.status_code == 400
     assert res.json()["error"]["field"] == "measurements"
+
+
+# --- reference designs ------------------------------------------------------------------------
+
+
+def test_resistor_values_parse_in_kicad_styles():
+    from app.features.debug.reference import named_voltage, parse_ohms
+
+    assert parse_ohms("22k1R 1%") == 22100
+    assert parse_ohms("4k7") == 4700
+    assert parse_ohms("470R") == 470
+    assert parse_ohms("1M") == 1e6
+    assert parse_ohms("DNP") is None
+    assert named_voltage("+3V3") == 3.3
+    assert named_voltage("/5V") == 5
+    assert named_voltage("VBUS") is None
+
+
+def _buck(top: str, bottom: str) -> Design:
+    parts = {
+        "U5": Part("U5", "SY8088", "Rust_Board:SY8088", ""),
+        "R2": Part("R2", top, "Device:R", ""),
+        "R3": Part("R3", bottom, "Device:R", ""),
+    }
+    nets = {
+        "+3V3": [Node("R2", "1", "")],
+        "Net-(U5-FB)": [Node("R2", "2", ""), Node("R3", "1", ""), Node("U5", "5", "FB")],
+        "GND": [Node("R3", "2", "")],
+    }
+    return Design(parts, nets)
+
+
+def test_a_swapped_feedback_divider_is_flagged():
+    from app.features.debug import reference
+
+    swapped = reference.lookup(_buck("22k1", "100k")).calculations
+    assert len(swapped) == 1 and swapped[0].flagged
+    assert swapped[0].value == pytest.approx(0.733, abs=0.01)
+    assert "rd" in reference.lookup(_buck("22k1", "100k")).text  # SY8088 notes included
+
+    right = reference.lookup(_buck("100k", "22k1")).calculations
+    assert not right[0].flagged
+    assert right[0].value == pytest.approx(3.31, abs=0.01)
+
+
+def test_a_reference_cite_must_name_a_known_id():
+    from app.features.debug.evidence import check_claim
+
+    ctx = EvidenceContext(
+        design=_buck("100k", "22k1"),
+        erc={},
+        pin_data=frozenset(),
+        symptom_ids=frozenset(),
+        measurement_ids=frozenset(),
+        reference_ids=frozenset({"rd1", "cf1"}),
+    )
+    good = Claim(
+        text="The divider sets 3.31 V.",
+        evidence="reference",
+        cites=[Cite(kind="reference", pin=None, net=None, id="cf1")],
+    )
+    bad = good.model_copy(update={"cites": [Cite(kind="reference", pin=None, net=None, id="rd9")]})
+    assert not check_claim(good, ctx).downgraded
+    assert check_claim(bad, ctx).downgraded

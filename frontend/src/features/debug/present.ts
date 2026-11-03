@@ -1,6 +1,7 @@
 /** Presentation logic for results: evidence wording, glossary matching and
  *  the downloadable Markdown report. Pure functions, no React. */
 import type {
+  Calculation,
   CheckedAnalysis,
   DesignSummary,
   Diagram,
@@ -17,6 +18,7 @@ export const EVIDENCE_LABEL: Record<Evidence, string> = {
   schematic: "Based on your schematic",
   erc: "Based on KiCad's checker",
   datasheet: "Based on the datasheet pin table",
+  reference: "Based on the manufacturer's design",
   measurement: "Based on your measurement",
   none: "No direct evidence",
 }
@@ -24,7 +26,7 @@ export const EVIDENCE_LABEL: Record<Evidence, string> = {
 export type Confidence = "verified" | "fits" | "speculative"
 
 export const CONFIDENCE_LABEL: Record<Confidence, string> = {
-  verified: "Verified wiring fault",
+  verified: "Verified design fault",
   fits: "Fits the symptoms",
   speculative: "Speculative",
 }
@@ -59,6 +61,8 @@ export interface Assessment {
   claims: number
   /** Backend wiring findings this hypothesis cites with a backed claim. */
   findings: WiringFinding[]
+  /** Flagged backend calculations it cites, by id or by one of their pins. */
+  calculations: Calculation[]
 }
 
 /** The label rule:
@@ -72,6 +76,10 @@ export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment
   const backedClaims = h.claims.filter((c) => c.evidence !== "none")
   const citedPins = new Set(backedClaims.flatMap((c) => c.cites.map((x) => x.pin ?? "")))
   const findings = (summary?.wiring ?? []).filter((f) => citedPins.has(f.pin))
+  const citedIds = new Set(backedClaims.flatMap((c) => c.cites.map((x) => x.id ?? "")))
+  const calculations = (summary?.calculations ?? []).filter(
+    (c) => c.flagged && (citedIds.has(c.id) || c.pins.some((p) => citedPins.has(p))),
+  )
   const symptoms = summary?.symptoms.length ?? h.explains.length + h.does_not_explain.length
   const base = {
     explained: h.explains.length,
@@ -79,6 +87,7 @@ export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment
     backed: backedClaims.length,
     claims: h.claims.length,
     findings,
+    calculations,
   }
   if (findings.length > 0) {
     const pins = findings.map((f) => `${f.pin} (${f.pin_name})`).join(", ")
@@ -86,6 +95,13 @@ export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment
       ...base,
       confidence: "verified",
       reason: `The backend's wiring check found ${pins} wired against the datasheet, and this hypothesis cites it.`,
+    }
+  }
+  if (calculations.length > 0) {
+    return {
+      ...base,
+      confidence: "verified",
+      reason: `The backend calculated ${calculations.map((c) => `${c.ic} at ${String(c.value)} ${c.unit}`).join(", ")} from your netlist with the datasheet formula, which contradicts the design, and this hypothesis cites it.`,
     }
   }
   if (isReview(summary)) {

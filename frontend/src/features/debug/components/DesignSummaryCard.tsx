@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Cpu, ShieldAlert, Zap } from "lucide-react"
+import { BookCheck, Calculator, ChevronDown, ChevronUp, Cpu, ShieldAlert, Zap } from "lucide-react"
 import { useState } from "react"
 
 import { Badge } from "@/shared/ui/badge"
@@ -11,6 +11,8 @@ import type { DesignSummary } from "../types"
 export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
   const [showErc, setShowErc] = useState(false)
   const [showSymptoms, setShowSymptoms] = useState(true)
+  const [showRefs, setShowRefs] = useState(false)
+  const refParts = new Set(summary.references.map((n) => n.part))
   return (
     <Card className="space-y-6 p-6 sm:p-7">
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
@@ -46,9 +48,12 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
                     {ic.ref} · {ic.value}
                   </span>
                 </span>
-                <Badge tone={ic.pin_data ? "green" : "neutral"}>
-                  {ic.pin_data ? "Pin table" : "No pin data"}
-                </Badge>
+                <span className="flex shrink-0 gap-1">
+                  {refParts.has(ic.value) && <Badge tone="green">Reference</Badge>}
+                  <Badge tone={ic.pin_data ? "green" : "neutral"}>
+                    {ic.pin_data ? "Pin table" : "No pin data"}
+                  </Badge>
+                </span>
               </div>
               <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
                 {ic.footprint || "no footprint"}
@@ -78,6 +83,72 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           <p className="text-[11px] text-muted-foreground">
             Found by checking your netlist against the pin table, before the model runs.
           </p>
+        </div>
+      )}
+
+      {summary.calculations.length > 0 && (
+        <div className="space-y-2 rounded-lg border bg-background p-3.5 text-xs">
+          <span className="flex items-center gap-2 font-semibold">
+            <Calculator className="h-4 w-4 text-blue-600 dark:text-sky-400" />
+            Calculated from your netlist ({summary.calculations.length})
+          </span>
+          {summary.calculations.map((c) => (
+            <div
+              key={c.id}
+              className={
+                c.flagged
+                  ? "flex flex-col gap-1.5 rounded-md border border-rose-200 bg-rose-50/60 p-2.5 sm:flex-row sm:items-start dark:border-rose-900 dark:bg-rose-950/30"
+                  : "flex flex-col gap-1.5 rounded-md border p-2.5 sm:flex-row sm:items-start"
+              }
+            >
+              <Badge tone={c.flagged ? "red" : "green"} className="shrink-0 self-start font-mono">
+                {c.value} {c.unit}
+                {c.expected !== null && (c.flagged ? ` ≠ ${String(c.expected)} V` : " ✓")}
+              </Badge>
+              <span className="leading-relaxed">{c.text}</span>
+            </div>
+          ))}
+          <p className="text-[11px] text-muted-foreground">
+            Exact arithmetic on your resistor values with the datasheet formula, before the model
+            runs.
+          </p>
+        </div>
+      )}
+
+      {summary.references.length > 0 && (
+        <div className="overflow-hidden rounded-lg border">
+          <button
+            type="button"
+            onClick={() => setShowRefs(!showRefs)}
+            className="flex w-full items-center justify-between bg-background p-3.5 text-left hover:bg-accent"
+          >
+            <span className="flex items-center gap-2 text-xs font-semibold">
+              <BookCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              Reference designs ({summary.references.length} notes for {[...refParts].join(", ")})
+            </span>
+            {showRefs ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+          </button>
+          {showRefs && (
+            <ul className="space-y-2 border-t p-4 text-xs">
+              {summary.references.map((n) => (
+                <li key={n.id} className="space-y-0.5">
+                  <p className="leading-relaxed">
+                    <span className="mr-1.5 font-mono font-semibold text-muted-foreground">
+                      {n.id}
+                    </span>
+                    {n.text}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {n.part} · {n.source}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
