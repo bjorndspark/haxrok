@@ -107,6 +107,12 @@ evidence none.
 is honest.
 - Every pin (REF.PIN) and every net named in a claim's text must be cited \
 in that claim. Keep claims short so this is easy.
+- When a verified finding names a label as its likely cause, add an erc \
+claim that copies the label's name, position and sheet file from the \
+finding (e.g. "ERC erc-4 reports the SW2 label at (116.84, 48.26) mm on \
+power.kicad_sch joined to another net"), citing that ERC id. Give the same \
+name and position in the confirm step that inspects it and in the fix, so \
+the user knows which of the same-named labels to change.
 
 Keep every caveat the diagnosis gives: a part fact it marks UNVERIFIED stays \
 unverified (evidence none, with the datasheet section to check), and a fix \
