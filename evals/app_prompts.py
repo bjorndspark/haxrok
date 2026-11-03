@@ -12,6 +12,8 @@ Runs inside the backend container, which mounts evals/ at /evals:
   make eval-app case=rust-board-fb-swapped
 
 Writes evals/results/<case>/<model>/app-diagnosis.md and app-analysis.json.
+``--mode review`` sends the case with no symptoms through the review prompts
+(pre-fab review) and writes app-review-diagnosis.md / app-review-analysis.json.
 Prints where the Auto-check keywords (gonogo.py's rule) first match in the
 structured hypotheses; read the answer to judge it. The gateway can't take
 much concurrency, so run at most ~3 at once.
@@ -66,14 +68,22 @@ def parse_compact(text: str) -> Design:
     return Design(parts, nets)
 
 
-def build_input(case_dir: pathlib.Path) -> tuple[str, pins.PinLookup]:
+def build_input(
+    case_dir: pathlib.Path, mode: str = "debug"
+) -> tuple[str, pins.PinLookup]:
     """The first call's user message, built as the app builds it, and the
-    pin lookup it includes."""
+    pin lookup it includes. Review mode drops the symptoms."""
     erc = case_dir / "erc.txt"
     netlist = (case_dir / "netlist.txt").read_text()
     lookup = pins.lookup(parse_compact(netlist))
+    symptoms = (
+        []
+        if mode == "review"
+        else prompt.number_symptoms((case_dir / "symptom.md").read_text())
+    )
     user = prompt.build_user_message(
-        symptoms=prompt.number_symptoms((case_dir / "symptom.md").read_text()),
+        mode="review" if mode == "review" else "debug",
+        symptoms=symptoms,
         measurements=[],
         netlist=netlist,
         erc=erc.read_text() if erc.exists() else "(none)",
@@ -95,36 +105,51 @@ def keyword_rank(analysis: Analysis[Claim], groups: list[list[str]] | None) -> s
     return "MISS?"
 
 
-async def run(case: str, timeout_s: float) -> None:
+async def run(case: str, timeout_s: float, mode: str = "debug") -> None:
     case_dir = ROOT / "cases" / case
     out_dir = ROOT / "results" / case / settings.AI_CHAT_MODEL.replace("/", "_")
     out_dir.mkdir(parents=True, exist_ok=True)
-    user, lookup = build_input(case_dir)
+    user, lookup = build_input(case_dir, mode)
+    review = mode == "review"
+    diagnose_prompt = prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE
+    structure_prompt = prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE
+    stem = "app-review" if review else "app"
 
     start = time.monotonic()
     diagnosis = await complete_text(
-        [{"role": "system", "content": prompt.DIAGNOSE}, {"role": "user", "content": user}],
+        [
+            {"role": "system", "content": diagnose_prompt},
+            {"role": "user", "content": user},
+        ],
         name="eval_diagnosis",
         timeout_s=timeout_s,
     )
     diagnosed = time.monotonic() - start
-    (out_dir / "app-diagnosis.md").write_text(diagnosis)
+    (out_dir / f"{stem}-diagnosis.md").write_text(diagnosis)
     analysis = await complete_structured(
         Analysis[Claim],
         [
-            {"role": "system", "content": prompt.STRUCTURE},
+            {"role": "system", "content": structure_prompt},
             {
                 "role": "user",
-                "content": prompt.build_structure_message(diagnosis=diagnosis, user=user),
+                "content": prompt.build_structure_message(
+                    diagnosis=diagnosis, user=user
+                ),
             },
         ],
         name="eval_analysis",
         timeout_s=timeout_s,
     )
-    (out_dir / "app-analysis.json").write_text(analysis.model_dump_json(indent=1))
+    (out_dir / f"{stem}-analysis.json").write_text(analysis.model_dump_json(indent=1))
 
     mark = keyword_rank(analysis, auto_check(case_dir))
-    titles = " | ".join(f"#{h.rank} {h.title}" for h in analysis.hypotheses)
+    titles = (
+        " | ".join(
+            f"#{h.rank}{f' [{h.severity}]' if h.severity else ''} {h.title}"
+            for h in analysis.hypotheses
+        )
+        or "(no issues)"
+    )
     findings = ",".join(f.pin for f in lookup.findings) or "-"
     print(
         f"{case:22} {mark}  findings {findings}  diagnose {diagnosed:4.0f}s  "
@@ -136,8 +161,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--case", default="rust-board-fb-swapped")
     ap.add_argument("--timeout", type=float, default=settings.DEBUG_AI_TIMEOUT_S)
+    ap.add_argument("--mode", choices=["debug", "review"], default="debug")
     args = ap.parse_args()
-    asyncio.run(run(args.case, args.timeout))
+    asyncio.run(run(args.case, args.timeout, args.mode))
 
 
 if __name__ == "__main__":
