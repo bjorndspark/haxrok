@@ -18,8 +18,8 @@ Built for the Meta Global AI Developer Hackathon (2026).
 ## Status
 
 The MVP is built: a KiCad project folder runs end to end from the UI,
-and it ranked a real board's fault #1. Pre-fab review mode and reference
-designs are built too.
+and it ranked a real board's fault #1. Pre-fab review mode, reference
+designs, wiring checks and ngspice simulations are built too.
 
 Scope, the go/no-go result and the ideas weighed against this one are in
 [`docs/plans/001-100/001-mvp-scope.md`](docs/plans/001-100/001-mvp-scope.md).
@@ -39,7 +39,15 @@ Scope, the go/no-go result and the ideas weighed against this one are in
       few ICs, and values calculated from the netlist with datasheet
       formulas (regulator output from its feedback divider, charger
       current), flagged when they contradict the design
-- [ ] Stretch: ngspice check with waveforms, agent loop
+- [x] Wiring checks in code: USB-C CC pull-downs, missing decoupling,
+      SOT-23 transistor pinouts, and from
+      `docs/plans/001-100/002-verified-wiring-checks.md` UART wired TX to
+      TX, a regulator enabled from its own output, and pull-ups above an
+      IC's supply. The STM32 BOOT0 check waits for ST's reference manual
+- [x] ngspice simulations of I²C lines and enable/reset RC delays, run in
+      parallel with the review and drawn as waveforms. You can ask the model
+      about each one (`docs/plans/001-100/003-simulate-and-ask.md`)
+- [ ] Stretch: agent loop, what-if re-runs ("try C5 = 1 µF")
 
 The app started from a FastAPI, React and Postgres template. Its
 seed chat, voice and image features have been removed; `debug` is the only

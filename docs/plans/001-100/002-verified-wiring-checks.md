@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-04 | 2026-11-04 | In progress | — | `001-mvp-scope.md`, `evals/README.md` |
+| 2026-11-04 | 2026-11-04 | Done, except BOOT0 (blocked on RM0360) | — | `001-mvp-scope.md`, `evals/README.md` |
 
 The model already ranks three planted faults #1 (`orbit-uart-swapped`,
 `orbit-boot0-high`, `rp-micro-ldo-en`), but only as "Reasoned: check it".
