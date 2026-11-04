@@ -336,6 +336,29 @@ a private board (not in the repo): where the finding alone got "remove
 L1.2 from +3V3", the review now ranks the short #1 and its fix is "move
 or remove the misplaced label … do not rewire pins".
 
+**Transistor pinouts (added later):** a three-pin part's symbol names its
+pins after the datasheet (G, S, D), so `pins.check_pinout` compares those
+names with the datasheet numbering in `pins.PINOUTS`. A mismatch is a
+verified finding, one per part. It exists because a private board (not in
+the repo) drew its AO3400s with `Simulation_SPICE:NMOS` (1=D, 2=G, 3=S) on
+a SOT-23 footprint (1=G, 2=S, 3=D): every pad was wrong, the schematic
+read correctly, and neither ERC nor the model caught it. `PINOUTS` holds
+only parts whose pinout was copied from their datasheet (AO3400, AO3401,
+2N7002, BSS138). Any other SOT-23 transistor with G/S/D pins in another
+order gets an unverified pin warning (`pw1`, …) from
+`pins.check_convention` instead: 1=G, 2=S, 3=D is right for most SOT-23
+MOSFETs but not all, and a verified finding tells the user to rework the
+board, so a wrong one costs more trust than a missed one. The warning is
+shown on the summary card and given to the model in its own section, with
+reading the part's pin diagram as the first confirm step; claims can't
+cite it. Rejected: applying the convention as a verified finding (wrong
+for the exceptions), and fetching the datasheet per part now (see "Datasheet
+facts come from memory until retrieval"). The cost: the datasheets draw
+SOT-23 leads with letters, not numbers, so each entry reads its numbering
+off the standard SOT-23 lead positions, not a numbered table. On that
+board all three transistors are flagged; how the model ranks the finding
+hasn't been measured yet.
+
 ## Review mode reuses the debug pipeline
 
 **Decision:** pre-fab review (`mode=review` on `POST /debug/analyze`) is
