@@ -76,6 +76,80 @@ Provider keys and routing are configured in Bifrost, not here. To switch
 models or providers, change the gateway config or these variables. No code
 changes are needed.
 
+### How the app uses the model
+
+Every model call is a chat completion with `AI_CHAT_MODEL` (Meta's
+`muse-spark-1.3-contributor`, set in `.env`), made through
+`backend/app/core/ai/chat.py`. The app asks for no other model: the image,
+TTS and STT variables aren't read by any feature, and `AI_CHAT_FALLBACKS` is
+empty by default. When it's empty, the gateway's own routing decides any
+fallback, so keep the Bifrost virtual key on Meta models only.
+
+- **Analyze** (`POST /api/v1/debug/analyze`, debug or review mode): two calls
+  in a row.
+  1. `debug_diagnosis`: free text. The model traces the circuit (or reviews
+     it, in review mode) and writes its reasoning in English.
+  2. `debug_analysis`: structured output. It turns that diagnosis into
+     `Analysis[Claim]` JSON, written in the user's language (en or ja). The
+     gateway enforces a strict `json_schema` and Pydantic validates the
+     answer again. `DECISIONS.md` explains why there are two calls.
+- **Ask** (`POST /api/v1/debug/ask`): one free-text call (`debug_ask`) per
+  question about a simulation.
+- **Repeats:** an identical request (same model, fallbacks, messages and
+  format) is served from Redis for `AI_CACHE_TTL_S` (7 days) without calling
+  the model.
+
+Everything else is our own code, not the model: kicad-cli, netlist and ERC
+parsing, the pin-table wiring check, the calculations, ngspice simulations
+and the evidence check.
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant S as debug service
+    participant AI as core/ai
+    participant R as Redis
+    participant G as Gateway (Meta model)
+
+    B->>S: POST /debug/analyze
+    S->>S: kicad-cli, netlist, ERC, pins, calcs
+    S-->>B: SSE design_summary
+    par ngspice runs alongside the model
+        S-->>B: SSE simulation (each)
+    and
+        S-->>B: SSE progress "reasoning"
+        S->>AI: debug_diagnosis (free text)
+        AI->>R: cache lookup
+        AI->>G: chat completion
+        G-->>AI: diagnosis
+        S-->>B: SSE progress "structuring"
+        S->>AI: debug_analysis (json_schema)
+        AI->>R: cache lookup
+        AI->>G: chat completion
+        G-->>AI: Analysis JSON
+        S->>S: evidence check, wiring diagrams
+    end
+    S-->>B: SSE result
+
+    B->>S: POST /debug/ask
+    S->>AI: debug_ask (free text)
+    AI->>G: chat completion
+    G-->>B: answer (envelope)
+```
+
+The gateway streams nothing while the model reasons, so the backend sends
+its own `progress` events and these calls use `DEBUG_AI_TIMEOUT_S` (300 s)
+instead of `AI_TIMEOUT_S`. Measured on 2026-11-03, one analyze run takes
+about 4.5–5 minutes of model time and 55–65k tokens:
+
+- `debug_diagnosis`: ~2 min, ~12k prompt tokens, ~11–12k completion tokens
+  (~7–8k of them reasoning).
+- `debug_analysis`: 2.5–3.5 min, ~18k prompt tokens, ~18–25k completion
+  tokens (~11–17k of them reasoning).
+
+`completion … took …` lines in `logs/backend/app.log` show each call's time
+and token usage.
+
 ## Evals
 
 ```sh
