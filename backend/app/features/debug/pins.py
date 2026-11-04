@@ -365,6 +365,7 @@ def check_pinout(design: Design, ref: str, pinout: Pinout) -> list[WiringFinding
             net=wrong[0][3],
             conflicts=[w[0] for w in wrong[1:]],
             inductors=[],
+            nets=list(dict.fromkeys(w[3] for w in wrong)),
             text=(
                 f"{ref} ({part.value}) is drawn with {symbol}, numbered "
                 f"{', '.join(drawn_order)}, but the {part.value} is {order} "
@@ -391,17 +392,17 @@ def check_convention(design: Design, ref: str) -> PinWarning | None:
     order = ", ".join(f"{n}={t}" for n, t in drawn.items())
     usual = ", ".join(f"{n}={t}" for n, t in _CONVENTION.items())
     wrong = [n for n in _CONVENTION if drawn[n] != _CONVENTION[n]]
+    nets = {n: net for n in wrong if (net := design.net_of(f"{ref}.{n}"))}
     pads = "; ".join(
-        f"net {design.net_of(f'{ref}.{n}')} (drawn on {drawn[n]}) would land on the "
-        f"{_CONVENTION[n]} pad ({ref}.{n})"
-        for n in wrong
-        if design.net_of(f"{ref}.{n}")
+        f"net {net} (drawn on {drawn[n]}) would land on the {_CONVENTION[n]} pad ({ref}.{n})"
+        for n, net in nets.items()
     )
     symbol = part.lib_part or "its symbol"
     return PinWarning(
         id="",
         ref=ref,
         pins=[f"{ref}.{n}" for n in wrong],
+        nets=list(dict.fromkeys(nets.values())),
         text=(
             f"{ref} ({part.value}) is drawn with {symbol}, numbered {order}, on SOT-23 "
             f"footprint {part.footprint}. Most SOT-23 MOSFETs are {usual}; if this one is, "
@@ -469,6 +470,7 @@ def check_wiring(
                 net=net,
                 conflicts=[n.pin_ref for n in foreign],
                 inductors=[n.pin_ref for n in inductors],
+                nets=[net],
                 text=(
                     f"{pin_ref} ({name}) is an inductor connection ({entry.source}), "
                     f"{problem}. It should connect only to its inductor."

@@ -10,6 +10,7 @@ import type {
   GlossaryEntry,
   Hypothesis,
   Run,
+  PinWarning,
   Severity,
   WiringFinding,
 } from "./types"
@@ -391,4 +392,58 @@ function niceStep(raw: number): number {
   const mag = 10 ** Math.floor(Math.log10(raw))
   const n = raw / mag
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag
+}
+
+export type MarkKind = "ref" | "net"
+
+/** ``text`` split so each listed ref (U5, U5.9) and net can be coloured. A
+ *  token counts only as a whole word: U1.2 doesn't mark inside U1.23 or
+ *  /A/U1.2X. Longer tokens win where two start at the same place. */
+export function markTokens(
+  text: string,
+  tokens: { ref: string[]; net: string[] },
+): { text: string; kind?: MarkKind }[] {
+  const all = [
+    ...tokens.ref.map((t) => ({ t, kind: "ref" as const })),
+    ...tokens.net.map((t) => ({ t, kind: "net" as const })),
+  ]
+    .filter(({ t }) => t !== "")
+    .sort((a, b) => b.t.length - a.t.length)
+  const word = /[A-Za-z0-9_]/
+  const parts: { text: string; kind?: MarkKind }[] = []
+  let plain = ""
+  let i = 0
+  while (i < text.length) {
+    const before = text[i - 1] ?? ""
+    const hit = all.find(({ t }) => {
+      if (!text.startsWith(t, i)) return false
+      const after = text[i + t.length] ?? ""
+      const next = text[i + t.length + 1] ?? ""
+      // Not glued to a word on either side, and not REF in front of .PIN.
+      return (
+        !word.test(before) &&
+        before !== "/" &&
+        !word.test(after) &&
+        !(after === "." && word.test(next))
+      )
+    })
+    if (hit) {
+      if (plain) parts.push({ text: plain })
+      parts.push({ text: hit.t, kind: hit.kind })
+      plain = ""
+      i += hit.t.length
+    } else {
+      plain += text[i]
+      i += 1
+    }
+  }
+  if (plain) parts.push({ text: plain })
+  return parts
+}
+
+/** The refs and nets a wiring finding or pin warning names, to mark. */
+export function findingTokens(f: WiringFinding | PinWarning): { ref: string[]; net: string[] } {
+  const pins = "ref" in f ? f.pins : [f.pin, ...f.conflicts, ...f.inductors]
+  const parts = pins.map((p) => p.split(".")[0] ?? p)
+  return { ref: [...new Set([...pins, ...parts])], net: f.nets ?? [] }
 }

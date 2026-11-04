@@ -9,6 +9,7 @@ import {
   assess,
   confidenceLabel,
   EVIDENCE_LABEL,
+  findingTokens,
   isReview,
   SEVERITY_LABEL,
   symptomText,
@@ -28,6 +29,7 @@ import type {
   Simulation,
 } from "../types"
 import { GlossaryText } from "./GlossaryText"
+import { MarkedText } from "./MarkedText"
 import { SimulationPlot } from "./SimulationPlot"
 import { WiringDiagram } from "./WiringDiagram"
 
@@ -359,7 +361,8 @@ export function HypothesisCard({
             >
               <span className="shrink-0 text-ok">✓</span>
               <span>
-                <span className="font-bold text-ok">Backend wiring check:</span> {f.text}
+                <span className="font-bold text-ok">Backend wiring check:</span>{" "}
+                <MarkedText text={f.text} tokens={findingTokens(f)} />
               </span>
             </div>
           ))}

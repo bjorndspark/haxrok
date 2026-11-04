@@ -219,6 +219,7 @@ def test_inductor_pin_on_the_output_rail_is_a_finding():
     assert finding.net == "+3V3"
     assert finding.conflicts == ["U2.7"]
     assert finding.inductors == ["L1.2"]
+    assert finding.nets == ["+3V3"]
     assert "U2.7(VOUT)" in finding.text
     assert "wf1: U2.9 (L2) is an inductor connection" in pins.format_findings(lookup.findings)
 
@@ -376,6 +377,7 @@ def test_mosfet_symbol_numbered_against_the_part_is_one_finding():
     [finding] = lookup.findings
     assert (finding.pin, finding.pin_name, finding.net) == ("Q1.1", "G", "/LOAD")
     assert finding.conflicts == ["Q1.2", "Q1.3"]
+    assert finding.nets == ["/LOAD", "/GATE", "GND"]
     assert "numbered 1=D, 2=G, 3=S, but the AO3400A is 1=G, 2=S, 3=D" in finding.text
     assert "net /GATE (drawn on G) lands on the S pad (Q1.2)" in finding.text
     assert {"Q1.1", "Q1.2", "Q1.3"} <= lookup.pin_refs
@@ -404,6 +406,7 @@ def test_unknown_sot23_mosfet_in_another_order_is_an_unverified_warning():
     assert lookup.findings == []
     [warning] = lookup.warnings
     assert (warning.id, warning.ref, warning.pins) == ("pw1", "Q1", ["Q1.1", "Q1.2", "Q1.3"])
+    assert warning.nets == ["/LOAD", "/GATE", "GND"]
     assert "net /LOAD (drawn on D) would land on the G pad (Q1.1)" in warning.text
     assert "UNVERIFIED" in warning.text
     assert pins.format_warnings(lookup.warnings).startswith("pw1: Q1 (SI2302)")

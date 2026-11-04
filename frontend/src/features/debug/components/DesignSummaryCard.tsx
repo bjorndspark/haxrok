@@ -4,8 +4,9 @@ import { Badge } from "@/shared/ui/badge"
 import { Card } from "@/shared/ui/card"
 import { Title } from "@/shared/ui/title"
 
-import { calculationBadge } from "../present"
+import { calculationBadge, findingTokens } from "../present"
 import type { DesignSummary } from "../types"
+import { MarkedText } from "./MarkedText"
 
 /** A sub-heading as a named rule: `LABEL ─────`, like aitop's machine rows. */
 function Rule({ children }: { children: ReactNode }) {
@@ -75,7 +76,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           </span>
           {summary.wiring.map((f) => (
             <p key={f.id} className="leading-relaxed">
-              {f.text}
+              <MarkedText text={f.text} tokens={findingTokens(f)} />
             </p>
           ))}
         </div>
@@ -89,7 +90,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           </span>
           {summary.pin_warnings.map((w) => (
             <p key={w.id} className="leading-relaxed">
-              {w.text}
+              <MarkedText text={w.text} tokens={findingTokens(w)} />
             </p>
           ))}
         </div>

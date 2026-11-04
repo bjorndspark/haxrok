@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import { isSchematicFile, projectName } from "./files"
 import {
+  findingTokens,
+  markTokens,
   assess,
   calculationBadge,
   diagramLayout,
@@ -349,5 +351,42 @@ describe("toMarkdown", () => {
     expect(md).toContain("## Simulations\n\n### EN rising through its RC delay")
     expect(md).toContain("```spice\nRC on EN\nRpull rail pin 10000\n```")
     expect(md).toContain("**Q:** When does it pass 63%?\n\nAt 10 ms.")
+  })
+})
+
+describe("markTokens", () => {
+  const marked = (text: string, ref: string[], net: string[]) =>
+    markTokens(text, { ref, net })
+      .filter((p) => p.kind)
+      .map((p) => `${p.kind ?? ""}:${p.text}`)
+
+  it("marks whole refs and nets, including nets with spaces", () => {
+    expect(
+      marked(
+        "Q1 (AO3400): net /Power Control/Q_GATE (drawn on G) lands on the S pad (Q1.2); net GND",
+        ["Q1", "Q1.2"],
+        ["/Power Control/Q_GATE", "GND"],
+      ),
+    ).toEqual(["ref:Q1", "net:/Power Control/Q_GATE", "ref:Q1.2", "net:GND"])
+  })
+
+  it("doesn't mark inside a longer word, ref or path", () => {
+    expect(marked("U1.23 U1.2X /A/GND GNDA U1.2", ["U1.2", "U1"], ["GND"])).toEqual(["ref:U1.2"])
+  })
+
+  it("keeps the text intact", () => {
+    const text = "U5.9 (L2) on +3V3 also connects U5.7(VOUT)."
+    const parts = markTokens(text, { ref: ["U5.9", "U5.7"], net: ["+3V3"] })
+    expect(parts.map((p) => p.text).join("")).toBe(text)
+    expect(parts.filter((p) => p.kind).map((p) => p.text)).toEqual(["U5.9", "+3V3", "U5.7"])
+  })
+})
+
+describe("findingTokens", () => {
+  it("takes pins, their parts and nets, and tolerates runs without nets", () => {
+    expect(findingTokens({ id: "pw1", ref: "Q1", pins: ["Q1.1"], text: "" })).toEqual({
+      ref: ["Q1.1", "Q1"],
+      net: [],
+    })
   })
 })

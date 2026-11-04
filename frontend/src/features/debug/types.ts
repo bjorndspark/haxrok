@@ -149,6 +149,8 @@ export interface WiringFinding {
   net: string
   conflicts: string[]
   inductors: string[]
+  /** Every net the text names. Absent in runs recorded before it existed. */
+  nets?: string[]
   text: string
 }
 
@@ -158,6 +160,8 @@ export interface PinWarning {
   id: string
   ref: string
   pins: string[]
+  /** Every net the text names. Absent in runs recorded before it existed. */
+  nets?: string[]
   text: string
 }
 

@@ -275,6 +275,7 @@ class WiringFinding(BaseModel):
     net: str
     conflicts: list[str] = Field(description="REF.PIN refs on the net that shouldn't be.")
     inductors: list[str] = Field(description="Inductor pins on the net, which belong there.")
+    nets: list[str] = Field(description="Every net the text names, for the browser to mark.")
     text: str
 
 
@@ -286,6 +287,7 @@ class PinWarning(BaseModel):
     id: str
     ref: str
     pins: list[str] = Field(description="REF.PIN refs whose net would land on another pad.")
+    nets: list[str] = Field(description="Every net the text names, for the browser to mark.")
     text: str
 
 
