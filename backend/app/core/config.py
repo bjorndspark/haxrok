@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # Setting it overrides the gateway's own VK/routing-rule fallbacks;
     # empty = gateway decides.
     AI_CHAT_FALLBACKS: str = ""
+    # Seconds a gateway answer stays cached in Redis, keyed by the whole
+    # request (model, fallbacks, messages, schema); 0 = always call the model.
+    AI_CACHE_TTL_S: int = 7 * 24 * 3600
 
     # Debug feature. The analysis call streams nothing for ~90 s and a run
     # has taken 130 s, so it gets its own per-read timeout above AI_TIMEOUT_S.
