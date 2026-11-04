@@ -111,8 +111,8 @@ frontend/src/
 - `make eval-app case=<name> [mode=review]` — run an `evals/cases/` case
   through the app's debug (or pre-fab review) prompts
   (`evals/app_prompts.py`); `evals/README.md` has the rest
-- `make docs` — regenerate `docs/architecture/` (`db/schema.md`, `db/er-diagram.md`,
-  `api/routes.md`) from the models and route table; run after changing either
+- `make docs` — regenerate `docs/architecture/api/routes.md` from the route
+  table; run after changing routes
 - CI runs the same checks on GitHub Actions (`.github/workflows/`) on pushes
   to `main` and PRs; Dependabot updates uv/pnpm/action pins weekly and its
   minor/patch PRs auto-merge once checks pass (`dependabot-automerge.yml`) —

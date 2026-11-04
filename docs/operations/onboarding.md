@@ -43,7 +43,6 @@ console/errors. Check both when debugging.
 # 1. edit backend/app/features/<name>/models.py
 make revision m='add widgets table'   # autogenerate migration
 make migrate                          # apply it
-make docs                             # refresh db/schema.md + db/er-diagram.md
 ```
 
 Never edit an applied migration — always a new revision. Column defaults use
@@ -110,13 +109,12 @@ the agent CLI on PATH.
 ## Docs
 
 ```sh
-make docs          # regenerate docs/architecture/{db,api}/*.md
+make docs          # regenerate docs/architecture/api/routes.md
 make docs-serve    # browse all of docs/ with mkdocs (live reload)
 ```
 
-Generated from the SQLAlchemy models and FastAPI route table — no DB needed.
-Rerun after changing models or routes. `db/er-diagram.md` renders as a diagram on
-GitHub. Other docs: trade-offs go in `DECISIONS.md`, runbooks here in
+Generated from the FastAPI route table — no DB needed. Rerun after changing
+routes. Other docs: trade-offs go in `DECISIONS.md`, runbooks here in
 `docs/operations/`, plans in `docs/plans/`.
 
 ## When something's broken

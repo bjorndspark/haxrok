@@ -24,7 +24,7 @@ help:
 	@echo "  format     rewrite files in place (ruff format + prettier)"
 	@echo "  down       stop app containers"
 	@echo "  logs       tail app logs"
-	@echo "  docs       regenerate docs/architecture/ (db/schema.md, db/er-diagram.md, api/routes.md)"
+	@echo "  docs       regenerate docs/architecture/api/routes.md"
 	@echo "  docs-serve browse docs/ with mkdocs at http://localhost:\$$DOCS_HOST_PORT"
 	@echo "  eval-app   run an eval case through the app's debug prompts: make eval-app case=rust-board-fb-swapped [mode=review]"
 	@echo "  issues     list open GitHub issues"

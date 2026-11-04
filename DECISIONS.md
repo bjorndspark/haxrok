@@ -133,19 +133,18 @@ PR diff. Revisit if a second maintainer joins.
 
 ## Architecture docs are generated, not written
 
-**Decision:** `docs/architecture/db/schema.md`, `db/er-diagram.md`, and
-`api/routes.md` are emitted by `make docs`
-(`backend/scripts/docs/generate.py`) from SQLAlchemy metadata and the
-FastAPI route table, then committed. Hand-written design notes may still
-live alongside them.
+**Decision:** `docs/architecture/api/routes.md` is emitted by `make docs`
+(`backend/scripts/docs/generate.py`) from the FastAPI route table, then
+committed. Hand-written design notes may still live alongside it.
 
 **Alternatives rejected:** hand-maintained docs — they drift and become the
-broken windows AGENTS.md bans. eralchemy2/graphviz — a system dependency to
-draw what Mermaid renders natively on GitHub.
+broken windows AGENTS.md bans. Generated DB schema and ER pages — dropped
+while the app has no tables; they rendered empty. Bring them back with the
+first model.
 
-**Consequence:** `make docs` is part of the schema/route change loop
-(same step as `make migrate`). No DB connection is needed — generation
-reads metadata, not a live database.
+**Consequence:** `make docs` is part of the route change loop. No DB
+connection is needed — generation reads the route table, not a live
+database.
 
 
 ## Frontend style: Prettier + typescript-eslint strict, not a style guide

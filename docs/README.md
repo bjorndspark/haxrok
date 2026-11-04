@@ -5,7 +5,7 @@ belong in `DECISIONS.md`, and code changes still don't get doc files — see
 AGENTS.md. What lives here:
 
 - `architecture/` — design notes on the system as built (or as intended).
-  `db/` and `api/` hold generated references (`make docs`) — regenerate,
+  `api/` holds the generated route table (`make docs`) — regenerate,
   don't hand-edit.
 - `operations/` — runbooks: how to operate, debug, and recover the app.
   Start at `operations/onboarding.md`.
