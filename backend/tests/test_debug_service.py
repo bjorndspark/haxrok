@@ -436,7 +436,7 @@ def test_pin_warnings_reach_the_model_as_unverified():
 
 
 def _rc_wrdata(netlist: str) -> str:
-    """What ngspice's wrdata writes for the deck: v(sda) of an ideal RC."""
+    """What ngspice's wrdata writes for the deck: the node of an ideal RC."""
     import math
 
     values = {}
@@ -495,13 +495,34 @@ async def test_a_flagged_i2c_line_gets_a_simulated_rise():
     assert "tran " in deck and " uic" in deck and "wrdata out.txt v(sda)" in deck
 
     sim = sda.simulation
-    assert sim is not None and (sim.v_pull, sim.v_supply) == (5.0, 3.3)
-    assert len(sim.t_ns) == len(sim.v) <= 202 and sim.v[0] == 0
+    assert sim is not None and sim.t_unit == "ns"
+    assert [(lv.v, lv.danger) for lv in sim.levels] == [(5.0, False), (3.6, True)]
+    assert len(sim.t) == len(sim.v) <= 202 and sim.v[0] == 0
     # 30→70 % of an RC is ln(7/3)·RC = 0.847 × 141 ns.
-    assert sim.rise_ns == pytest.approx(119.5, abs=2)
-    assert "3.6" not in sim.text and "3.3 V supply + 0.3 V" in sim.text
+    assert "Rise time 30→70% is 119 ns" in sim.text
+    assert "3.3 V supply + 0.3 V" in sim.text
     # The model's text is unchanged: the simulation is for the UI only.
     assert calc.format_calculations(calcs) == calc.format_calculations(calc.lookup(design))
+
+
+async def test_an_rc_delay_gets_a_simulated_rise_in_milliseconds():
+    from app.features.debug import calc, spice
+
+    design = _design(
+        {"U1": ("ESP32-C3-MINI-1", "x:y"), "R1": ("10k", "Device:R"), "C1": ("1u", "Device:C")},
+        {"+3V3": ["R1.1", "U1.1(VDD)"], "EN": ["R1.2", "C1.1", "U1.8(EN)"], "GND": ["C1.2"]},
+    )
+    fake = FakeSpice()
+    calcs = await spice.attach(calc.lookup(design), design, fake)
+    rc = next(c for c in calcs if c.kind == "rc_delay")
+    (deck,) = fake.decks
+    assert "Rpull rail pin 10000" in deck and "Cbus pin 0 1e-06 IC=0" in deck
+
+    sim = rc.simulation
+    assert sim is not None and sim.t_unit == "ms" and sim.t[-1] == pytest.approx(50)
+    assert [lv.label for lv in sim.levels] == ["rail 3.3 V", "63% 2.09 V"]
+    assert not any(lv.danger for lv in sim.levels)
+    assert "after 10 ms" in sim.text and "R×C = 10 ms" in sim.text
 
 
 async def test_no_simulation_when_ngspice_fails_or_answers_garbage():

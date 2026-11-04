@@ -297,16 +297,27 @@ class ReferenceNote(BaseModel):
     text: str
 
 
-class Simulation(BaseModel):
-    """An ngspice transient of a flagged I²C line released from low
-    (``spice.py``): pull-up, estimated bus capacitance, ideal rail. For the
-    UI to draw; the model never sees it."""
+TimeUnit = Literal["ns", "µs", "ms"]
 
-    t_ns: list[float]
+
+class SimLevel(BaseModel):
+    """A horizontal reference line on a simulation plot."""
+
+    v: float
+    label: str
+    danger: bool = Field(description="A limit the waveform shouldn't cross.")
+
+
+class Simulation(BaseModel):
+    """An ngspice transient of an RC node rising from 0 V (``spice.py``): a
+    flagged I²C line through its pull-up and estimated bus capacitance, or
+    an enable/reset pin through its RC delay. For the UI to draw; the model
+    never sees it."""
+
+    t: list[float] = Field(description="Sample times, in t_unit.")
+    t_unit: TimeUnit
     v: list[float]
-    v_pull: float = Field(description="The pull-up rail's named voltage.")
-    v_supply: float = Field(description="The lowest supply of an IC on the line.")
-    rise_ns: float | None = Field(description="30% to 70% of v_pull, as the I²C spec times it.")
+    levels: list[SimLevel]
     text: str
 
 

@@ -3,8 +3,9 @@ import { useState } from "react"
 import { nearestPoint, simulationLayout } from "../present"
 import type { Simulation } from "../types"
 
-/** ngspice's waveform for a flagged I²C line: the line rising through its
- *  pull-up past the IC's supply + 0.3 V. Hover reads off a sample. */
+/** ngspice's waveform for an RC node: a flagged I²C line rising past the
+ *  IC's supply + 0.3 V, or an enable pin rising through its RC delay.
+ *  Hover reads off a sample. */
 export function SimulationPlot({ sim }: { sim: Simulation }) {
   const layout = simulationLayout(sim)
   const [hover, setHover] = useState<ReturnType<typeof nearestPoint>>(null)
@@ -51,7 +52,7 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
           </text>
         ))}
         <text x={plot.x1} y={plot.y0 + 25} textAnchor="end" className="fill-muted-foreground">
-          ns
+          {sim.t_unit}
         </text>
         <text x={plot.x0 - 6} y={plot.y1 - 12} textAnchor="end" className="fill-muted-foreground">
           V
@@ -104,7 +105,7 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
               textAnchor={hover.x > (plot.x0 + plot.x1) / 2 ? "end" : "start"}
               className="fill-foreground font-semibold"
             >
-              {`${hover.v.toFixed(2)} V @ ${hover.t.toFixed(0)} ns`}
+              {`${hover.v.toFixed(2)} V @ ${String(Number(hover.t.toPrecision(3)))} ${sim.t_unit}`}
             </text>
           </g>
         )}

@@ -93,7 +93,8 @@ async def prepare(
     """Validate the upload, run kicad-cli and parse its output. Raises
     ``AppError`` subclasses with messages the user can act on. In review
     mode the symptoms are optional notes on what the board is for. With
-    ``ngspice``, flagged I²C lines get a simulated waveform for the UI."""
+    ``ngspice``, flagged I²C lines and RC delays get a simulated waveform for
+    the UI."""
     symptoms = prompt.number_symptoms(symptoms_text)
     if mode == "debug" and not symptoms:
         raise BadRequestError("Describe what you see on the bench first.", field="symptoms")

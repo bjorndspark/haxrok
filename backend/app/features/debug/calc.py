@@ -693,6 +693,31 @@ def _overvoltage(design: Design, net: str) -> Calculation | None:
     )
 
 
+@dataclass(frozen=True)
+class RcLine:
+    """The RC an enable or reset pin rises through, for ``spice.py``."""
+
+    net: str
+    r_ohm: float
+    v_rail: float
+    c_farad: float
+
+
+def rc_line(design: Design, calc: Calculation) -> RcLine | None:
+    """The circuit behind an ``rc_delay``, or None (another kind, or a
+    pull-up rail without a named voltage)."""
+    if calc.kind != "rc_delay" or not calc.pins:
+        return None
+    net = design.net_of(calc.pins[0])
+    if net is None:
+        return None
+    ups = [r for r in _resistors(design, net) if not is_ground(r.other) and r.value > 0]
+    caps = [c for c in _capacitors(design, net) if is_ground(c.other)]
+    if len(ups) != 1 or len(caps) != 1 or (v := named_voltage(ups[0].other)) is None:
+        return None
+    return RcLine(net, ups[0].value, v, caps[0].value)
+
+
 def _divider(design: Design, net: str) -> Calculation | None:
     ics = _ic_nodes(design, net)
     if not ics:

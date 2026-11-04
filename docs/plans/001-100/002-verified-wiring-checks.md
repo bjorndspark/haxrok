@@ -89,15 +89,15 @@ than 0.3 V above the IC's lowest named supply (`_supply()`).
 - No planted case yet. Only a hand-built unit test, plus the offline sweep
   showing no false alarms on any eval board.
 
-## 4. Simulate the EN/RESET RC delay (`spice.py`)
+## 4. Simulate the EN/RESET RC delay (`spice.py`): done
 
 Draw each `rc_delay` the way the flagged I²C line is drawn: the pin
 voltage rising through R×C from 0 V, with the 63% point marked. This finds
 nothing new. It's demo polish.
 
-- Make `Simulation` general: time in seconds with a display unit, a
-  reference line instead of `v_supply`, and `rise` optional. The I²C plot
-  keeps its current look.
+- `Simulation` is general: times in their own unit (`t`, `t_unit`: ns up
+  to 10,000, then µs, then ms) and a list of reference lines (`levels`).
+  The I²C plot keeps its look: rail, and the red VDD+0.3 line.
 - Only for `rc_delay`s whose pull-up rail has a named voltage. Any ngspice
   failure leaves the card without a plot, as now.
 

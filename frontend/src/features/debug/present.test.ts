@@ -225,11 +225,13 @@ describe("diagramLayout box", () => {
 
 describe("simulationLayout", () => {
   const sim: Simulation = {
-    t_ns: [0, 100, 200, 400, 700],
+    t: [0, 100, 200, 400, 700],
+    t_unit: "ns",
     v: [0, 2.5, 3.8, 4.7, 4.97],
-    v_pull: 5,
-    v_supply: 3.3,
-    rise_ns: 120,
+    levels: [
+      { v: 5, label: "rail 5 V", danger: false },
+      { v: 3.6, label: "VDD+0.3 3.6 V", danger: true },
+    ],
     text: "",
   }
 
@@ -243,6 +245,17 @@ describe("simulationLayout", () => {
     const [rail, limit] = layout.levels.map((l) => l.y)
     expect(rail).toBeLessThan(limit) // 5 V sits above 3.6 V
     expect(layout.xTicks.map((t) => t.label)).toEqual(["0", "200", "400", "600"])
+  })
+
+  it("labels short spans with fractions, not rounded integers", () => {
+    const short = { ...sim, t: [0, 0.5, 1, 2], t_unit: "µs" as const, v: [0, 2, 3, 3.3] }
+    expect(simulationLayout(short).xTicks.map((t) => t.label)).toEqual([
+      "0",
+      "0.5",
+      "1",
+      "1.5",
+      "2",
+    ])
   })
 
   it("finds the sample under the cursor", () => {

@@ -339,32 +339,28 @@ export interface SimulationLayout {
   yTicks: { y: number; label: string }[]
 }
 
-/** Where the waveform of a simulated I²C line goes: volts up, nanoseconds
- *  across, with the pull-up rail and the IC's supply + 0.3 V (its usual
- *  absolute maximum) as reference lines. */
+/** Where a simulated waveform goes: volts up, time across in the
+ *  simulation's own unit, with its reference lines (a flagged I²C line's
+ *  rail and the IC's supply + 0.3 V; an RC delay's rail and 63% point). */
 export function simulationLayout(sim: Simulation): SimulationLayout {
   const { width, height, left, right, top, bottom } = PLOT
   const plot = { x0: left, x1: width - right, y0: height - bottom, y1: top }
-  const tMax = Math.max(...sim.t_ns, 1)
-  const vMax = Math.ceil(Math.max(sim.v_pull, sim.v_supply + 0.3, ...sim.v))
+  const tMax = Math.max(...sim.t, 1e-9)
+  const vMax = Math.ceil(Math.max(...sim.levels.map((l) => l.v), ...sim.v))
   const x = (t: number) => plot.x0 + (t / tMax) * (plot.x1 - plot.x0)
   const y = (v: number) => plot.y0 - (v / vMax) * (plot.y0 - plot.y1)
-  const points = sim.t_ns.map((t, i) => {
+  const points = sim.t.map((t, i) => {
     const v = sim.v[i] ?? 0
     return { x: x(t), y: y(v), t, v }
   })
   const path = points
     .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
     .join(" ")
-  const abs = Math.round((sim.v_supply + 0.3) * 10) / 10
-  const levels = [
-    { y: y(sim.v_pull), label: `rail ${String(sim.v_pull)} V`, danger: false },
-    { y: y(abs), label: `VDD+0.3 ${String(abs)} V`, danger: true },
-  ]
+  const levels = sim.levels.map((l) => ({ y: y(l.v), label: l.label, danger: l.danger }))
   const step = niceStep(tMax / 4)
   const xTicks = []
   for (let t = 0; t <= tMax + 1e-9; t += step) {
-    xTicks.push({ x: x(t), label: String(Math.round(t)) })
+    xTicks.push({ x: x(t), label: String(Number(t.toPrecision(3))) })
   }
   const yTicks = []
   for (let v = 0; v <= vMax; v += 1) yTicks.push({ y: y(v), label: String(v) })

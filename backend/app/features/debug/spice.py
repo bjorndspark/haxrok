@@ -1,8 +1,10 @@
-"""Simulates a flagged I²C line with ``ngspice -b``, for the UI to draw.
+"""Simulates RC nodes with ``ngspice -b``, for the UI to draw: a flagged I²C
+line, and the RC delay on an enable or reset pin.
 
 Demo polish, not detection: it only re-draws what ``calc.py`` already
-flagged (a pull-up rail above an IC's supply). The circuit is the pull-up,
-the estimated bus capacitance and an ideal rail, released from 0 V at t=0.
+found. Each circuit is a resistor from an ideal rail and a capacitor to
+ground, rising from 0 V at t=0: for I²C the pull-up and the estimated bus
+capacitance, for an RC delay the pull-up and the pin's capacitor.
 Any failure (ngspice missing, a non-zero exit, a timeout, unreadable output)
 leaves the Calculation without a simulation; it never fails the request.
 
@@ -17,9 +19,16 @@ from typing import Protocol
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.features.debug.calc import I2cLine, format_farads, format_ohms, i2c_line
+from app.features.debug.calc import (
+    I2cLine,
+    RcLine,
+    format_farads,
+    format_ohms,
+    i2c_line,
+    rc_line,
+)
 from app.features.debug.design import Design
-from app.features.debug.schemas import Calculation, Simulation
+from app.features.debug.schemas import Calculation, SimLevel, Simulation, TimeUnit
 
 logger = get_logger(__name__)
 
@@ -56,7 +65,7 @@ class Ngspice:
                     stderr=asyncio.subprocess.STDOUT,
                 )
             except FileNotFoundError:
-                logger.info("ngspice isn't installed; skipping the I²C simulation")
+                logger.info("ngspice isn't installed; skipping the simulation")
                 return None
             try:
                 out, _ = await asyncio.wait_for(proc.communicate(), self.timeout_s)
@@ -73,26 +82,35 @@ class Ngspice:
             return data.read_text("utf-8")
 
 
-def netlist(line: I2cLine) -> str:
-    """The transient deck: rail → pull-up → line, bus capacitance to ground,
-    starting at 0 V (the moment the driver lets go)."""
-    tau = line.r_ohm * line.c_farad
-    stop = _TAUS * tau
+def _deck(title: str, v: float, r: float, c: float, node: str) -> str:
+    """The transient deck: rail → resistor → node, capacitor to ground,
+    starting at 0 V and run to 5 RC."""
+    stop = _TAUS * r * c
     return "\n".join(
         [
-            f"I2C {line.net} released from low",
-            f"Vpull rail 0 DC {line.v_pull:g}",
-            f"Rpull rail sda {line.r_ohm:g}",
-            f"Cbus sda 0 {line.c_farad:g} IC=0",
+            title,
+            f"Vpull rail 0 DC {v:g}",
+            f"Rpull rail {node} {r:g}",
+            f"Cbus {node} 0 {c:g} IC=0",
             ".control",
             f"tran {stop / _STEPS:g} {stop:g} uic",
-            "wrdata out.txt v(sda)",
+            f"wrdata out.txt v({node})",
             "quit",
             ".endc",
             ".end",
             "",
         ]
     )
+
+
+def netlist(line: I2cLine) -> str:
+    """An I²C line released from low (the moment the driver lets go)."""
+    return _deck(f"I2C {line.net} released from low", line.v_pull, line.r_ohm, line.c_farad, "sda")
+
+
+def rc_netlist(line: RcLine) -> str:
+    """An enable or reset pin rising from 0 V as its rail comes up."""
+    return _deck(f"RC on {line.net}", line.v_rail, line.r_ohm, line.c_farad, "pin")
 
 
 def parse(text: str) -> list[tuple[float, float]]:
@@ -120,46 +138,103 @@ def _thin(rows: list[tuple[float, float]]) -> list[tuple[float, float]]:
     return rows[::step] if rows[-1] in rows[::step] else [*rows[::step], rows[-1]]
 
 
+_UNITS: tuple[tuple[TimeUnit, float], ...] = (("ns", 1e9), ("µs", 1e6), ("ms", 1e3))
+
+
+def _unit(stop: float) -> tuple[TimeUnit, float]:
+    """The smallest time unit that keeps the axis under 10,000 of it: an
+    I²C rise stays in ns, an RC delay of tens of ms goes to ms."""
+    for name, scale in _UNITS:
+        if stop * scale <= 10_000:
+            return name, scale
+    return _UNITS[-1]
+
+
+def _times(rows: list[tuple[float, float]], scale: float) -> list[float]:
+    return [round(t * scale, 3) for t, _ in rows]
+
+
 def simulation(line: I2cLine, rows: list[tuple[float, float]]) -> Simulation:
-    """The waveform and the caption the UI shows under it."""
+    """The I²C waveform and the caption the UI shows under it."""
     rows = _thin(rows)
+    unit, scale = _unit(rows[-1][0])
     lo, hi = _crossing(rows, 0.3 * line.v_pull), _crossing(rows, 0.7 * line.v_pull)
-    rise = (hi - lo) * 1e9 if lo is not None and hi is not None else None
     over = _crossing(rows, line.v_supply + 0.3)
     text = (
         f"ngspice: {format_ohms(line.r_ohm)} to {line.v_pull:g} V into "
         f"~{format_farads(line.c_farad)} of bus (estimated: 10 pF per device pin + 10 pF trace)."
     )
-    if rise is not None:
-        text += f" Rise time 30→70% is {rise:.0f} ns."
+    if lo is not None and hi is not None:
+        text += f" Rise time 30→70% is {(hi - lo) * scale:.3g} {unit}."
     if over is not None:
         text += (
             f" The line passes the IC's {line.v_supply:g} V supply + 0.3 V after "
-            f"{over * 1e9:.0f} ns and settles at {line.v_pull:g} V."
+            f"{over * scale:.3g} {unit} and settles at {line.v_pull:g} V."
         )
+    limit = round(line.v_supply + 0.3, 1)
     return Simulation(
-        t_ns=[round(t * 1e9, 3) for t, _ in rows],
+        t=_times(rows, scale),
+        t_unit=unit,
         v=[round(v, 4) for _, v in rows],
-        v_pull=line.v_pull,
-        v_supply=line.v_supply,
-        rise_ns=round(rise, 1) if rise is not None else None,
+        levels=[
+            SimLevel(v=line.v_pull, label=f"rail {line.v_pull:g} V", danger=False),
+            SimLevel(v=limit, label=f"VDD+0.3 {limit:g} V", danger=True),
+        ],
         text=text,
     )
+
+
+def rc_simulation(line: RcLine, rows: list[tuple[float, float]]) -> Simulation:
+    """The enable/reset pin's rise, with the 63% point at one time constant."""
+    rows = _thin(rows)
+    unit, scale = _unit(rows[-1][0])
+    tau = line.r_ohm * line.c_farad
+    at_63 = round(0.632 * line.v_rail, 2)
+    reached = _crossing(rows, at_63)
+    text = (
+        f"ngspice: {format_ohms(line.r_ohm)} from {line.v_rail:g} V into "
+        f"{format_farads(line.c_farad)}, the rail switched on at t = 0."
+    )
+    if reached is not None:
+        text += (
+            f" The pin reaches 63% ({at_63:g} V) after {reached * scale:.3g} {unit} "
+            f"(R×C = {tau * scale:.3g} {unit}). The IC's enable threshold is in its datasheet."
+        )
+    return Simulation(
+        t=_times(rows, scale),
+        t_unit=unit,
+        v=[round(v, 4) for _, v in rows],
+        levels=[
+            SimLevel(v=line.v_rail, label=f"rail {line.v_rail:g} V", danger=False),
+            SimLevel(v=at_63, label=f"63% {at_63:g} V", danger=False),
+        ],
+        text=text,
+    )
+
+
+async def _run(runner: SpiceRunner, deck: str, net: str) -> list[tuple[float, float]] | None:
+    if (text := await runner.run(deck)) is None:
+        return None
+    try:
+        return parse(text)
+    except ValueError as e:
+        logger.warning("ngspice output for %s unreadable: %s", net, e)
+        return None
 
 
 async def attach(
     calcs: list[Calculation], design: Design, runner: SpiceRunner
 ) -> list[Calculation]:
     """``calcs`` with a simulation on each flagged I²C line that has a
-    pull-up; the others unchanged."""
+    pull-up and each RC delay on a named rail; the others unchanged."""
     out = []
     for c in calcs:
-        line = i2c_line(design, c)
         sim = None
-        if line is not None and (text := await runner.run(netlist(line))) is not None:
-            try:
-                sim = simulation(line, parse(text))
-            except ValueError as e:
-                logger.warning("ngspice output for %s unreadable: %s", line.net, e)
+        if (i2c := i2c_line(design, c)) is not None:
+            rows = await _run(runner, netlist(i2c), i2c.net)
+            sim = simulation(i2c, rows) if rows else None
+        elif (rc := rc_line(design, c)) is not None:
+            rows = await _run(runner, rc_netlist(rc), rc.net)
+            sim = rc_simulation(rc, rows) if rows else None
         out.append(c.model_copy(update={"simulation": sim}) if sim else c)
     return out
