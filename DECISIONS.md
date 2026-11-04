@@ -430,3 +430,37 @@ swapped divider is ranked #1 in both modes as verified, citing the
 calculated 0.73 V. The SY8088 source is an application note (Rev. 0.1),
 not a full datasheet. The named-voltage parse covers names like `+3V3`,
 `5V` and `1.8V`; a rail named `VCC` gets the calculation but no check.
+
+## Wiring checks trust pin names and vendor pin data, never net names
+
+**Decision:** the `uart` check (`calc.py`) reads a pin's direction only
+from its own name (`TXD`, `U0RXD`, `USART1_TX`) or, for MCU pins named
+by port (`PA9`, `GPIO0`), from `UART_PINS`: ST's STM32_open_pin_data XML
+for STM32F030/G030/F103 and Table 279 of the RP2040 datasheet. Net names
+are never used. It flags only nets between ICs: connector pins, CAN and
+LIN transceivers (whose input is named `TXD`), and pin pairs that share
+a non-direction token (`RXD/GPIO20` on `GPIO20/U0RXD`, a board-outline
+symbol carrying the chip's own signal) are skipped. The
+`overvoltage_pullup` check flags a pull-up above an IC's I/O supply,
+except on STM32 parts, where it's an unflagged hint.
+
+**Why:** a net is named from one end's point of view. `USART1_TX` is TX
+for the MCU and RX for the bridge, so reading direction from the name
+would raise a false alarm on half of all correct boards. On STM32 parts,
+many pins are 5 V tolerant ("FT" in the datasheet pin table), and the
+netlist can't say which pins those are. A flag there would be a verified
+false alarm on correct boards.
+
+**Alternatives rejected:** direction from the net name (false alarms, as
+above). Flagging STM32 over-voltage pull-ups anyway (wrong on every FT
+pin). Copying STM32 alternate functions from third-party datasheet
+mirrors: ST's own XML on GitHub has the same table, and st.com doesn't
+serve its PDFs to this machine.
+
+**Consequence:** an MCU outside `UART_PINS` whose UART pins are named
+only by port gets no UART check. Each new family is a table entry read
+from the vendor's data. An I/O supply skips core-only rails (`DVDD`,
+`VDD_CORE`): the RP2040's 1.1 V DVDD once made every 3.3 V I²C pull-up on
+an RP2040 look like over-voltage. Measured offline on all seven eval
+cases: `uart` flags only `orbit-uart-swapped`, and `overvoltage_pullup`
+flags nothing.
