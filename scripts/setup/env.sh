@@ -54,10 +54,16 @@ PY
   fi
 }
 
+# Ports already handed out in this run. Nothing listens on them yet, so
+# port_is_free alone would give two services the same port (e.g. backend
+# bumped 8000 -> 8001 colliding with the docs default 8001).
+TAKEN_PORTS=" "
+
 next_free_port() {
   local port="$1"
   while [ "$port" -lt 65535 ]; do
-    if [ "$(port_is_free "$port")" = "free" ]; then
+    if [ "${TAKEN_PORTS#* $port }" = "$TAKEN_PORTS" ] &&
+       [ "$(port_is_free "$port")" = "free" ]; then
       echo "$port"
       return
     fi
@@ -135,8 +141,12 @@ fi
 [ -z "$POSTGRES_PORT" ] && POSTGRES_PORT="$DEFAULT_POSTGRES"
 
 if [ "$NO_AUTO" = "no" ]; then
+  # Explicit ports are reserved first so auto-picks steer around them.
+  TAKEN_PORTS=" $BACKEND_PORT $FRONTEND_PORT $DOCS_PORT "
   [ -z "$BACKEND_PORT" ]  && BACKEND_PORT="$(next_free_port "$DEFAULT_BACKEND")"
+  TAKEN_PORTS="$TAKEN_PORTS$BACKEND_PORT "
   [ -z "$FRONTEND_PORT" ] && FRONTEND_PORT="$(next_free_port "$DEFAULT_FRONTEND")"
+  TAKEN_PORTS="$TAKEN_PORTS$FRONTEND_PORT "
   [ -z "$DOCS_PORT" ]     && DOCS_PORT="$(next_free_port "$DEFAULT_DOCS")"
 else
   [ -z "$BACKEND_PORT" ]  && BACKEND_PORT="$DEFAULT_BACKEND"
