@@ -21,4 +21,4 @@ at a33a81c, `Hardware/ORBIT.kicad_sch`. License: MIT.
 Scoring: PASS if the TX/RX swap between the STM32 and the CP2102 is in the
 top 3 hypotheses.
 
-Auto-check: txd|tx; rxd|rx; swap|crossed|tx-to-tx|tx to tx|reversed
+Auto-check: txd|tx; rxd|rx; swap|crossed|tx-to-tx|tx to tx|tied to tx|reversed

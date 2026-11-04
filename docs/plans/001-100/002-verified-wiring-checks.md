@@ -29,7 +29,7 @@ any commit can be the submission.
 - Update the `calc.py` module docstring, the `Calculation.kind` literal and
   docstring, and the "(none: …)" line in `format_calculations`.
 
-## 1. UART lines wired TX-to-TX (`uart`)
+## 1. UART lines wired TX-to-TX (`uart`): done
 
 A net that joins two transmit outputs, or two receive inputs and no
 transmit output.
@@ -51,7 +51,7 @@ transmit output.
 - Planted: `orbit-uart-swapped` flagged. Must stay quiet: `orbit-boot0-high`
   (the same board wired correctly), `rust-board-*`, `rp-micro-*`.
 
-## 2. Enable and boot pins that can't reach their working level (`enable_pin`)
+## 2. Enable and boot pins that can't reach their working level (`enable_pin`): EN done, BOOT0 blocked
 
 Two cases. Both are wiring facts, so no thresholds are needed:
 
@@ -66,19 +66,26 @@ Two cases. Both are wiring facts, so no thresholds are needed:
   STM32F030 reference manual) gives the boot mode table. Planted:
   `orbit-boot0-high`. Must stay quiet: `orbit-uart-swapped`, whose BOOT0
   switch selects +3.3V or R2 to GND.
+- BOOT0 is blocked: st.com doesn't serve RM0360 or the datasheet to this
+  machine, and the boot mode table isn't in ST's GitHub data. It waits for
+  a copy of the document.
 - A floating EN (nothing on the net but the IC pin) is left out: whether
   that's a fault depends on each part's internal pull-up.
 
-## 3. Pull-up to a rail above the IC's supply (`overvoltage_pullup`)
+## 3. Pull-up to a rail above the IC's supply (`overvoltage_pullup`): done
 
 The I²C check already flags pull-ups to VBUS. This applies the same rule
 to any IC signal pin: a resistor from the pin's net to a named rail more
 than 0.3 V above the IC's lowest named supply (`_supply()`).
 
-- Skip the IC's own power and enable pins (an LDO's EN pulled to VIN is
-  normal), I²C nets (already covered), and ICs with no named supply.
-- The text says it may be fine if the pin is 5 V tolerant, and names the
-  datasheet column to check (STM32 "FT" pins).
+- An IC's supply is its I/O supply: a core-only rail (the RP2040's 1.1 V
+  DVDD) is skipped. That also fixed the I²C check, which flagged ordinary
+  3.3 V pull-ups on any RP2040.
+- Skip ground and named rails, the IC's own power, enable and sense
+  pins (an LDO's EN pulled to VIN is normal), I²C nets (already covered),
+  nets with a resistor to ground (a divider), and ICs with no named supply.
+- On STM32 parts it's an unflagged hint: many of their pins are 5 V
+  tolerant ("FT" in the pin table), and the netlist can't say which.
 - No planted case yet. Only a hand-built unit test, plus the offline sweep
   showing no false alarms on any eval board.
 

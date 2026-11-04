@@ -179,6 +179,21 @@ unit tests cover the notes and the flag.
 | `rp-micro-no-fault` | review | PASS (no issues) | 101 s | |
 | `rp-micro-cc-shared` | review | #1 (may fail) | 164 s | |
 
+After plan 002's checks: `uart` (TX wired to TX), `enable_pin` (a
+regulator's EN on its own output) and `overvoltage_pullup` (a non-I²C
+pull-up above an IC's I/O supply). Run offline on every case, `uart` flags
+only `orbit-uart-swapped` and `enable_pin` only `rp-micro-ldo-en`;
+`overvoltage_pullup` flags nothing (no case has the fault; unit tests
+cover it). `orbit-boot0-high`, the same board with the UART wired right,
+stays quiet. Both planted faults were already #1, but only reasoned; now
+they cite the flagged calculation.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `orbit-uart-swapped` | review | #1 (won't work) | 161 s | "UART TX tied to TX and RX tied to RX"; cites `cf1` and the USART_CR2 SWAP bit. The keyword check missed "tied to TX", now added |
+| `rp-micro-ldo-en` | review | #1 (won't work) | 181 s | "U3 EN tied to its own output - regulator never starts" |
+| `rp-micro-no-fault` | review | PASS (no issues) | 94 s | |
+
 ## Reading the result
 
 | Outcome | Meaning |

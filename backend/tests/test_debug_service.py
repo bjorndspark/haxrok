@@ -17,6 +17,7 @@ from app.features.debug.project import Project, load_project, missing_sheets, no
 from app.features.debug.prompt import number_symptoms
 from app.features.debug.schemas import (
     Analysis,
+    Calculation,
     CheckedClaim,
     Cite,
     Claim,
@@ -848,6 +849,105 @@ def test_an_i2c_pullup_is_compared_with_the_io_supply_not_the_core():
     )
     (c,) = [c for c in calc.lookup(design) if c.kind == "i2c_pullup"]
     assert not c.flagged
+
+
+def _pulled(rail: str, pin: str, mcu: str = "ESP32-C3-MINI-1", extra: list[str] = ()) -> Design:
+    """U1 on +3V3 with ``pin`` pulled up to ``rail`` through R1."""
+    return _design(
+        {"U1": (mcu, "x:y"), "R1": ("10k", "Device:R"), "R2": ("10k", "Device:R")},
+        {
+            "+3V3": ["U1.1(VDD)"],
+            rail: ["R1.1"],
+            "SIG": ["R1.2", f"U1.5({pin})", *extra],
+            "GND": ["R2.2"],
+        },
+    )
+
+
+def test_a_pullup_above_the_ic_supply_is_flagged_off_i2c_too():
+    from app.features.debug import calc
+
+    def over(d: Design) -> list[Calculation]:
+        return [c for c in calc.lookup(d) if c.kind == "overvoltage_pullup"]
+
+    (c,) = over(_pulled("+5V", "GPIO3"))
+    assert c.flagged and c.value == 5 and c.expected == 3.3 and "protection diode" in c.text
+
+    (c,) = over(_pulled("+5V", "PA8", mcu="STM32F030C8Tx"))
+    assert not c.flagged and "FT" in c.text  # maybe 5 V tolerant: a hint
+
+    assert over(_pulled("+3V3", "GPIO3")) == []  # its own supply
+    assert over(_pulled("VBUS", "VBUS_DET")) == []  # a sense pin, by design
+    assert over(_pulled("+5V", "EN")) == []  # an enable
+    assert over(_pulled("+5V", "GPIO3", extra=["R2.1"])) == []  # a divider, not a pull-up
+
+
+def _uart(tx_net: list[str], rx_net: list[str], mcu: str = "STM32F030C8Tx") -> Design:
+    """An MCU U1 and a CP2102 U2; each net holds the given nodes."""
+    parts = {"U1": (mcu, "x:y"), "U2": ("CP2102-GMR", "x:y"), "J1": ("Conn", "x:y")}
+    return _design(parts, {"USART1_TX": tx_net, "USART1_RX": rx_net})
+
+
+def test_uart_swapped_between_an_stm32_and_a_bridge_is_one_flag():
+    from app.features.debug import calc
+
+    (c,) = calc.lookup(_uart(["U1.30(PA9)", "U2.26(TXD)"], ["U1.31(PA10)", "U2.25(RXD)"]))
+    assert c.kind == "uart" and c.flagged and "swapped" in c.text
+    assert set(c.pins) == {"U1.30", "U2.26", "U1.31", "U2.25"}
+    assert "PA9 = USART1_TX" in c.text and "STM32F030C8Tx" in c.text and "SWAP" in c.text
+
+    # Correctly crossed: nothing to say.
+    assert calc.lookup(_uart(["U1.30(PA9)", "U2.25(RXD)"], ["U1.31(PA10)", "U2.26(TXD)"])) == []
+
+
+def test_uart_direction_comes_from_pin_names_or_the_rp2040_table():
+    from app.features.debug import calc
+
+    (c,) = calc.lookup(_uart(["U1.2(GPIO0)", "U2.26(TXD)"], [], mcu="RP2040"))
+    assert c.flagged and "two transmit outputs" in c.text and "Table 279" in c.text
+    assert "SWAP" not in c.text  # RP2040 has no such bit
+
+    # An MCU not in the table, with a port-named pin, has no known direction.
+    assert calc.lookup(_uart(["U1.2(PA9)", "U2.26(TXD)"], [], mcu="ATSAMD21")) == []
+    # Named on both sides: TXD0 to TXD.
+    (c,) = calc.lookup(_uart(["U1.2(TXD0)", "U2.26(TXD)"], [], mcu="ESP32"))
+    assert c.flagged
+
+
+def test_uart_check_stays_quiet_on_look_alikes():
+    from app.features.debug import calc
+
+    # A board-outline symbol naming its pin after the chip's own signal.
+    passthrough = _uart(["U1.30(GPIO20/U0RXD)", "U2.15(RXD/GPIO20)"], [], mcu="ESP32-C3")
+    assert calc.lookup(passthrough) == []
+    # Two receivers listening to a header that brings the transmitter in.
+    assert calc.lookup(_uart(["U1.31(PA10)", "U2.25(RXD)", "J1.1(Pin_1)"], [])) == []
+    # A status pin, not the data line.
+    assert calc.lookup(_uart(["U1.30(PA9)", "U2.12(TX_LED)"], [])) == []
+    # A CAN transceiver's TXD is its input: MCU TX to it is correct.
+    can = _uart(["U1.30(PA9)", "U2.1(TXD)"], ["U2.7(CANH)"])
+    assert calc.lookup(can) == []
+
+
+def _ldo(en_net: str, en_pin: str = "EN") -> Design:
+    """An RT9013-style LDO U3: VIN on RAW, VOUT on +3V3, EN on ``en_net``."""
+    nets = {"RAW": ["U3.1(VIN)"], "+3V3": ["U3.5(VOUT)"], "GND": ["U3.2(GND)"]}
+    nets[en_net] = [*nets.get(en_net, []), f"U3.3({en_pin})"]
+    return _design({"U3": ("RT9013-33GB", "x:y")}, nets)
+
+
+def test_a_regulator_enabled_from_its_own_output_is_flagged():
+    from app.features.debug import calc
+
+    (c,) = calc.lookup(_ldo("+3V3"))
+    assert c.kind == "enable_pin" and c.flagged and set(c.pins) == {"U3.3", "U3.5"}
+    assert "never starts" in c.text and "tie U3.3 to RAW" in c.text
+
+    def kinds(d: Design) -> set[str]:
+        return {c.kind for c in calc.lookup(d)}
+
+    assert "enable_pin" not in kinds(_ldo("RAW"))  # EN on the input: normal
+    assert "enable_pin" not in kinds(_ldo("+3V3", en_pin="~{EN}"))  # active-low
 
 
 def _usb_c(cc1: list[str], cc2: list[str], resistors: dict[str, str]) -> Design:

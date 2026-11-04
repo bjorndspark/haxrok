@@ -27,6 +27,16 @@ every such circuit needs:
 - **usb_cc**: the Rd pull-downs on a USB-C receptacle's CC1 and CC2. Flagged
   when the two pins share one resistor, a pin has none, or one isn't
   5.1 kΩ ±10% (USB Type-C Specification, Rd for a sink).
+- **overvoltage_pullup**: a pull-up from an IC signal pin (not I²C, which
+  has its own check) to a named rail more than 0.3 V above the IC's I/O
+  supply. Flagged, except on STM32 parts, whose 5 V tolerant (FT) pins the
+  netlist can't tell apart: there it's a hint.
+- **enable_pin**: always flagged. A regulator whose active-high enable is
+  on its own output net, so it can never start.
+- **uart**: always flagged. A net joining two IC transmit outputs, or IC
+  receive inputs and nothing that transmits; both lines of one link wrong
+  is reported once, as swapped. Direction comes from the pin's name or,
+  for MCU pins named by port (PA9, GPIO0), from ``UART_PINS``.
 
 The formulas for specific parts (feedback, program resistor) were read in
 the named document; see ``reference.py`` for the notes from the same
@@ -486,8 +496,8 @@ def _supply(design: Design, ref: str) -> tuple[str, float] | None:
         for n in nodes
         if n.ref == ref and _SUPPLY_PIN.match(n.function) and (v := named_voltage(net))
     ]
-    io = [(net, v) for net, v, core in rails if not core]
-    rails = io or [(net, v) for net, v, _ in rails]
+    io = [(net, v) for net, v, core in found if not core]
+    rails = io or [(net, v) for net, v, _ in found]
     return min(rails, key=lambda r: r[1]) if rails else None
 
 
@@ -615,6 +625,71 @@ def _rc(design: Design, net: str) -> Calculation | None:
             f"and {c.ref} ({format_farads(c.value)}) to ground: an RC delay of "
             f"R×C = {format_seconds(tau)} before it rises to about 63% of {r.other}."
         ),
+    )
+
+
+# Pins that sense or take a higher rail by design: VBUS detect, battery
+# sense, a regulator's input. Not signal pins.
+_SENSE_PIN = re.compile(r"VBUS|VBAT|VIN|SENSE|VSYS|^IN$|^VI$", re.IGNORECASE)
+# Families with many 5 V tolerant pins ("FT" in the datasheet pin table)
+# that the netlist can't tell apart: hinted, not flagged.
+_FIVE_V_TOLERANT = ("STM32",)
+
+
+def _overvoltage(design: Design, net: str) -> Calculation | None:
+    """A pull-up from an IC signal pin to a named rail more than 0.3 V above
+    the IC's I/O supply. I²C nets have their own check; a resistor to ground
+    on the net makes it a divider, which ``_divider`` reports."""
+    if is_ground(net) or named_voltage(net) is not None:
+        return None  # a rail, not a signal
+    resistors = [r for r in _resistors(design, net) if r.value > 0]
+    if any(is_ground(r.other) for r in resistors):
+        return None
+    ups = [(r, v) for r in resistors if (v := named_voltage(r.other)) is not None]
+    if not ups:
+        return None
+    pull, pull_v = max(ups, key=lambda u: u[1])
+    over = []
+    for n in _ic_nodes(design, net):
+        if (
+            _POWER_IN.match(n.function)
+            or _SUPPLY_PIN.match(n.function)
+            or _ENABLE.match(n.function)
+            or _DELAY_PIN.match(n.function)
+            or _SENSE_PIN.search(n.function)
+        ):
+            continue
+        supply = _supply(design, n.ref)
+        if supply and pull_v > supply[1] + 0.3:
+            over.append((n, supply))
+    if not over:
+        return None
+    hinted = all(design.parts[n.ref].value.upper().startswith(_FIVE_V_TOLERANT) for n, _ in over)
+    listed = ", ".join(
+        f"{n.pin_ref} ({n.function}, I/O supply {s[0]} = {s[1]:g} V)" for n, s in over
+    )
+    text = (
+        f"{net} is pulled up to {pull.other} ({pull_v:g} V) by {pull.ref} "
+        f"({format_ohms(pull.value)}), above the supply of {listed}. A pin driven above its "
+        "supply conducts through its protection diode into that rail, back-powering it."
+    )
+    text += (
+        " Not flagged: STM32 pins marked FT in the datasheet's pin table tolerate 5 V; "
+        "check this pin's column."
+        if hinted
+        else " Unless the datasheet says the pin is 5 V tolerant, pull it up to its own "
+        "supply instead."
+    )
+    return Calculation(
+        id="",
+        kind="overvoltage_pullup",
+        ic=over[0][0].ref,
+        pins=[*(n.pin_ref for n, _ in over), *_pins_of(pull)],
+        value=pull_v,
+        unit="V",
+        expected=max(s[1] for _, s in over),
+        flagged=not hinted,
+        text=text,
     )
 
 
@@ -836,6 +911,250 @@ def _usb_cc(design: Design, ref: str) -> Calculation | None:
     )
 
 
+# An active-high enable. Not ~{EN}, EN#, nSHDN: those are active-low.
+_ENABLE = re.compile(r"^(EN|CE|ENABLE|CHIP_EN)$", re.IGNORECASE)
+_OUTPUT = re.compile(r"^(VOUT|OUT|VO)$", re.IGNORECASE)
+
+
+def _enable_loop(design: Design, ref: str) -> Calculation | None:
+    """A regulator whose enable pin sits on its own output net: the output
+    is 0 V until EN goes high, and EN only goes high from the output, so it
+    never starts. Logic, not a threshold: no datasheet value is needed."""
+    pins = [n for nodes in design.nets.values() for n in nodes if n.ref == ref]
+    for en in (n for n in pins if _ENABLE.match(n.function)):
+        net = design.net_of(en.pin_ref)
+        if net is None or is_ground(net):
+            continue
+        out = next(
+            (n for n in pins if _OUTPUT.match(n.function) and design.net_of(n.pin_ref) == net), None
+        )
+        if out is None:
+            continue
+        vin = next(
+            (
+                design.net_of(n.pin_ref)
+                for n in pins
+                if re.match(r"^(VIN|IN|VI)$", n.function, re.IGNORECASE)
+            ),
+            None,
+        )
+        fix = (
+            f" Fix: tie {en.pin_ref} to {vin} (the input), or to a pin that sets it high."
+            if vin
+            else ""
+        )
+        return Calculation(
+            id="",
+            kind="enable_pin",
+            ic=ref,
+            pins=[en.pin_ref, out.pin_ref],
+            value=None,
+            unit="",
+            expected=None,
+            flagged=True,
+            text=(
+                f"{ref} ({design.parts[ref].value}): its enable {en.pin_ref} ({en.function}) is on "
+                f"{net}, the same net as its own output {out.pin_ref} ({out.function}). The output "
+                "is 0 V until EN is high, and EN only rises from the output, so the regulator "
+                "never starts. A bench supply on the output rail can latch it on, which hides "
+                f"the fault.{fix}"
+            ),
+        )
+    return None
+
+
+@dataclass(frozen=True)
+class UartPins:
+    """The UART direction of MCU pins named only by port (PA9, GPIO0), for
+    a part family. ``pins`` maps the symbol's pin name to its UART signal."""
+
+    value_prefix: str
+    pins: dict[str, str]
+    source: str
+
+
+_STM32_F0_G0 = {
+    "PA2": "USART2_TX",
+    "PA3": "USART2_RX",
+    "PA9": "USART1_TX",
+    "PA10": "USART1_RX",
+    "PA14": "USART2_TX",
+    "PA15": "USART2_RX",
+    "PB6": "USART1_TX",
+    "PB7": "USART1_RX",
+}
+# The small F030s have one USART: USART1 on all of these pins.
+_STM32_F030_SMALL = {pin: "USART1_" + sig.rsplit("_", 1)[1] for pin, sig in _STM32_F0_G0.items()}
+_ST_PIN_DATA = "ST STM32_open_pin_data (github.com/STMicroelectronics), mcu/"
+
+UART_PINS: tuple[UartPins, ...] = (
+    # Most specific prefix first: the first match wins.
+    UartPins("STM32F030F4", _STM32_F030_SMALL, _ST_PIN_DATA + "STM32F030F4Px"),
+    UartPins("STM32F030K6", _STM32_F030_SMALL, _ST_PIN_DATA + "STM32F030K6Tx"),
+    UartPins("STM32F030", _STM32_F0_G0, _ST_PIN_DATA + "STM32F030C8Tx"),
+    UartPins("STM32G030", _STM32_F0_G0, _ST_PIN_DATA + "STM32G030F6Px, G030K(6-8)Tx"),
+    UartPins(
+        "STM32F103",
+        {
+            "PA2": "USART2_TX",
+            "PA3": "USART2_RX",
+            "PA9": "USART1_TX",
+            "PA10": "USART1_RX",
+            "PB6": "USART1_TX",
+            "PB7": "USART1_RX",
+            "PB10": "USART3_TX",
+            "PB11": "USART3_RX",
+        },
+        _ST_PIN_DATA + "STM32F103C(8-B)Tx",
+    ),
+    # Table 279: UART TX on GPIO 0, 4, 8, … and RX on GPIO 1, 5, 9, … (function F2).
+    UartPins(
+        "RP2040",
+        {
+            f"GPIO{n + k}": f"UART{0 if n in (0, 12, 16, 28) else 1}_{'TX' if k == 0 else 'RX'}"
+            for n in range(0, 29, 4)
+            for k in (0, 1)
+        },
+        "RP2040 Datasheet (build 2025-02-20), 2.19.2 Function Select, Table 279",
+    ),
+)
+
+# Families whose USART has a TX/RX swap bit (ST's CMSIS device headers).
+_SWAP_BIT = ("STM32F030", "STM32G030")
+
+# A whole token of a pin name: TX, TXD, TXD0, U0TXD, U1RXD, … USART1_TX is
+# split into USART1 and TX before matching.
+_UART_TOKEN = re.compile(r"^(?:U\d)?(TX|RX)D?\d?$", re.IGNORECASE)
+# Pins whose TX/RX names a status, not the data line (TX_LED, RXEN).
+_NOT_DATA = {"LED", "EN", "ACT", "IND"}
+# CAN and LIN transceivers name their input TXD (it takes the controller's
+# TX), so an MCU TX on a transceiver's TXD is correct.
+_TRANSCEIVER = re.compile(r"^(CAN[HL]?|LIN)$", re.IGNORECASE)
+
+
+def _tokens(name: str) -> list[str]:
+    return [t for t in re.split(r"[_/\-. ]", name.upper()) if t]
+
+
+def _uart_dir(design: Design, node: Node) -> tuple[str, str, str] | None:
+    """("TX" | "RX", why, source) for an IC pin, or None; source is "" when
+    the pin's name says it. From the
+    pin's own name, else from a ``UART_PINS`` table; never from the net's
+    name, which is written from one end's point of view."""
+    tokens = _tokens(node.function)
+    if _NOT_DATA & set(tokens):
+        return None
+    found = {m.group(1).upper() for t in tokens if (m := _UART_TOKEN.match(t))}
+    if len(found) == 1:
+        return found.pop(), node.function, ""
+    if found:
+        return None  # both TX and RX in one name
+    value = design.parts[node.ref].value.upper() if node.ref in design.parts else ""
+    for table in UART_PINS:
+        if value.startswith(table.value_prefix) and (sig := table.pins.get(node.function)):
+            return sig.rsplit("_", 1)[1], f"{node.function} = {sig}", table.source
+    return None
+
+
+def _is_transceiver(design: Design, ref: str) -> bool:
+    return any(
+        n.ref == ref and _TRANSCEIVER.match(n.function)
+        for nodes in design.nets.values()
+        for n in nodes
+    )
+
+
+@dataclass(frozen=True)
+class _UartEnd:
+    node: Node
+    direction: str
+    why: str
+    source: str
+
+
+def _uart_net(design: Design, net: str) -> list[_UartEnd] | None:
+    """The UART ends on a net when they can't work: two transmit outputs,
+    or receive inputs with nothing transmitting. None when the net is fine
+    or isn't a UART line between ICs."""
+    ends = [
+        _UartEnd(n, *d)
+        for n in _ic_nodes(design, net)
+        if not _is_transceiver(design, n.ref) and (d := _uart_dir(design, n))
+    ]
+    if len({e.node.ref for e in ends}) < 2:
+        return None
+    # A pass-through symbol (a board outline, a module footprint) names its
+    # pin after the chip's own signal: RXD/GPIO20 on GPIO20/U0RXD. A shared
+    # non-direction token means the same signal, not two ends of a link.
+    for a in ends:
+        for b in ends:
+            if a.node.ref != b.node.ref:
+                shared = set(_tokens(a.node.function)) & set(_tokens(b.node.function))
+                if any(not _UART_TOKEN.match(t) for t in shared):
+                    return None
+    tx = [e for e in ends if e.direction == "TX"]
+    if len(tx) >= 2:
+        return ends
+    # Receivers only: a header on the net may bring the transmitter in.
+    if not tx and not any(_head(n.ref) in {"J", "P", "CN"} for n in design.nets[net]):
+        return ends
+    return None
+
+
+def _uart(design: Design) -> list[Calculation]:
+    """Flagged UART links: TX wired to TX, RX to RX. When both lines of one
+    link are wrong between the same ICs, that's one swap, reported once."""
+    bad = [(net, ends) for net in sorted(design.nets) if (ends := _uart_net(design, net))]
+    by_pair: dict[frozenset[str], list[tuple[str, list[_UartEnd]]]] = {}
+    for net, ends in bad:
+        by_pair.setdefault(frozenset(e.node.ref for e in ends), []).append((net, ends))
+    calcs = []
+    for group in by_pair.values():
+        lines = []
+        for net, ends in group:
+            kind = "two transmit outputs" if ends[0].direction == "TX" else "only receive inputs"
+            listed = ", ".join(f"{e.node.pin_ref} ({e.why})" for e in ends)
+            lines.append(f"{net} joins {kind}: {listed}")
+        both = {ends[0].direction for _, ends in group} == {"TX", "RX"}
+        text = f"UART: {'; '.join(lines)}. " + (
+            "TX and RX are swapped: each TX must go to the other side's RX. Both outputs "
+            "idle high, so the fight is silent until one transmits, and nothing gets through "
+            "in either direction."
+            if both
+            else "Each TX must go to the other side's RX; as drawn nothing drives the "
+            "receive side of this line."
+        )
+        text += " Fix: cross the lines (bodge wires on the bench)."
+        sources = sorted({e.source for _, ends in group for e in ends if e.source})
+        if sources:
+            text += f" Pin functions: {'; '.join(sources)}."
+        if any(
+            design.parts[e.node.ref].value.upper().startswith(_SWAP_BIT)
+            for _, ends in group
+            for e in ends
+            if e.node.ref in design.parts
+        ):
+            text += (
+                " In firmware, the STM32's USART_CR2 SWAP bit (bit 15) swaps TX and RX "
+                "(ST CMSIS headers stm32f030x8.h, stm32g030xx.h)."
+            )
+        nodes = [e.node for _, ends in group for e in ends]
+        calcs.append(
+            Calculation(
+                id="",
+                kind="uart",
+                ic=nodes[0].ref,
+                pins=[n.pin_ref for n in nodes],
+                value=None,
+                unit="",
+                expected=None,
+                flagged=True,
+                text=text,
+            )
+        )
+    return calcs
+
+
 # Enough to cover a board's regulators, chargers and buses without drowning
 # the model's input in LED arithmetic.
 _MAX = 16
@@ -864,14 +1183,20 @@ def lookup(design: Design) -> list[Calculation]:
             calcs.append(c)
         if _head(part.ref) in {"U", "IC"} and (c := _decoupling(design, part.ref)):
             calcs.append(c)
+        if _head(part.ref) in {"U", "IC"} and (c := _enable_loop(design, part.ref)):
+            calcs.append(c)
     for net in sorted(design.nets):
         if net in fb_nets:
             continue
         if line := _i2c_line(design, net):
             if c := _i2c(design, net, line):
                 calcs.append(c)
-        elif c := _rc(design, net) or _divider(design, net):
-            calcs.append(c)
+        else:
+            if c := _rc(design, net) or _divider(design, net):
+                calcs.append(c)
+            if c := _overvoltage(design, net):
+                calcs.append(c)
+    calcs += _uart(design)
     calcs.sort(key=lambda c: not c.flagged)
     return [c.model_copy(update={"id": f"cf{i}"}) for i, c in enumerate(calcs[:_MAX], start=1)]
 
@@ -881,6 +1206,7 @@ def format_calculations(calcs: list[Calculation]) -> str:
     if not calcs:
         return (
             "(none: no regulator divider or headroom, charger, LED, I²C, RC, divider, "
-            "decoupling or USB-C CC circuit recognised)\n"
+            "decoupling, USB-C CC, over-voltage pull-up, enable loop or miswired UART "
+            "circuit recognised)\n"
         )
     return "\n".join(f"{c.id}{' FLAGGED' if c.flagged else ''}: {c.text}" for c in calcs) + "\n"

@@ -13,6 +13,7 @@ import { useState } from "react"
 import { Badge } from "@/shared/ui/badge"
 import { Card } from "@/shared/ui/card"
 
+import { calculationBadge } from "../present"
 import type { DesignSummary } from "../types"
 import { SimulationPlot } from "./SimulationPlot"
 
@@ -130,8 +131,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
               }
             >
               <Badge tone={c.flagged ? "red" : "green"} className="shrink-0 self-start font-mono">
-                {c.value === null ? "missing" : `${String(c.value)} ${c.unit}`}
-                {c.expected !== null && (c.flagged ? ` ≠ ${String(c.expected)} V` : " ✓")}
+                {calculationBadge(c)}
               </Badge>
               <div className="min-w-0 flex-1 space-y-2">
                 <p className="leading-relaxed">{c.text}</p>
@@ -141,7 +141,8 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           ))}
           <p className="text-[11px] text-muted-foreground">
             Exact arithmetic on your part values (regulator outputs, charge and LED currents, I²C
-            pull-ups, RC delays, dividers), before the model runs.
+            pull-ups, RC delays, dividers) and wiring checks (USB-C CC, decoupling, UART TX/RX),
+            before the model runs.
           </p>
         </div>
       )}

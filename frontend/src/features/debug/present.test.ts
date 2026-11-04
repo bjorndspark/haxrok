@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest"
 
 import { isSchematicFile, projectName } from "./files"
-import { assess, diagramLayout, nearestPoint, simulationLayout, splitGlossary } from "./present"
+import {
+  assess,
+  calculationBadge,
+  diagramLayout,
+  nearestPoint,
+  simulationLayout,
+  splitGlossary,
+} from "./present"
 import { fragmentLines, symptomHints, symptomLines } from "./symptoms"
-import type { CheckedClaim, DesignSummary, Hypothesis, Simulation } from "./types"
+import type { Calculation, CheckedClaim, DesignSummary, Hypothesis, Simulation } from "./types"
 
 describe("symptoms", () => {
   it("numbers non-empty lines the way the backend does", () => {
@@ -242,5 +249,35 @@ describe("simulationLayout", () => {
     const layout = simulationLayout(sim)
     const third = layout.points[2].x
     expect(nearestPoint(layout, third + 1)?.v).toBe(3.8)
+  })
+})
+
+describe("calculationBadge", () => {
+  const calc = (over: Partial<Calculation>): Calculation => ({
+    id: "cf1",
+    kind: "usb_cc",
+    ic: "J1",
+    pins: [],
+    value: 56000,
+    unit: "Ω",
+    expected: 5100,
+    flagged: true,
+    text: "",
+    simulation: null,
+    ...over,
+  })
+
+  it("compares against the expected value in the calculation's own unit", () => {
+    expect(calculationBadge(calc({}))).toBe("56000 Ω ≠ 5100 Ω")
+    expect(calculationBadge(calc({ value: 5100, flagged: false }))).toBe("5100 Ω ✓")
+  })
+
+  it("says miswired for a UART flag and missing for a value that isn't there", () => {
+    expect(calculationBadge(calc({ kind: "uart", value: null, unit: "", expected: null }))).toBe(
+      "miswired",
+    )
+    expect(calculationBadge(calc({ kind: "i2c_pullup", value: null, expected: null }))).toBe(
+      "missing",
+    )
   })
 })

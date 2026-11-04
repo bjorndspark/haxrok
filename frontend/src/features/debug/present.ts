@@ -40,6 +40,20 @@ export function confidenceLabel(c: Confidence, review: boolean): string {
   return review && c === "speculative" ? "Reasoned: check it" : CONFIDENCE_LABEL[c]
 }
 
+/** The badge on a calculation: its value and unit, or what's wrong when
+ *  there is no value (a UART check has nothing to measure; a missing
+ *  pull-up has nothing to compute), plus the expected value when given. */
+export function calculationBadge(c: Calculation): string {
+  const value =
+    c.value !== null
+      ? `${String(c.value)} ${c.unit}`
+      : c.kind === "uart" || c.kind === "enable_pin"
+        ? "miswired"
+        : "missing"
+  if (c.expected === null) return value
+  return value + (c.flagged ? ` ≠ ${String(c.expected)} ${c.unit}` : " ✓")
+}
+
 export const SEVERITY_LABEL: Record<Severity, string> = {
   will_fail: "Won't work as drawn",
   may_fail: "May fail",

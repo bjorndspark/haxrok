@@ -311,13 +311,15 @@ class Simulation(BaseModel):
 
 
 class Calculation(BaseModel):
-    """A value the backend computed from part values in the netlist
-    (``calc.py``): a regulator's output or headroom, a charge current, an LED current,
-    an I²C pull-up, an RC delay, a divider, USB-C CC pull-downs, supply
-    decoupling. Verified arithmetic, not the model's. ``flagged`` means the
-    netlist as drawn contradicts itself or misses what every such circuit
-    needs (+3V3 set to 0.73 V, an I²C line with no pull-up, CC1 and CC2
-    sharing one resistor, a supply rail with no capacitor)."""
+    """A value or wiring check the backend computed from the netlist
+    (``calc.py``): a regulator's output or headroom, a charge current, an LED
+    current, an I²C pull-up, an RC delay, a divider, USB-C CC pull-downs,
+    supply decoupling, a UART's TX/RX wiring, a regulator's enable, a pull-up
+    above an IC's supply. Verified,
+    not the model's. ``flagged`` means the netlist as drawn contradicts
+    itself or misses what every such circuit needs (+3V3 set to 0.73 V, an
+    I²C line with no pull-up, CC1 and CC2 sharing one resistor, a supply rail
+    with no capacitor, TX wired to TX, an enable pin on its own output)."""
 
     id: str
     kind: Literal[
@@ -330,6 +332,9 @@ class Calculation(BaseModel):
         "usb_cc",
         "decoupling",
         "dropout",
+        "uart",
+        "enable_pin",
+        "overvoltage_pullup",
     ]
     ic: str
     pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")
