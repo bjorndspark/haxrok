@@ -835,6 +835,21 @@ def test_an_i2c_pullup_above_the_ic_supply_is_flagged():
     assert c.flagged and "5 V" in c.text and "+3V3" in c.text
 
 
+def test_an_i2c_pullup_is_compared_with_the_io_supply_not_the_core():
+    from app.features.debug import calc
+
+    design = _design(
+        {"U1": ("RP2040", "x:y"), "R1": ("4k7", "Device:R")},
+        {
+            "+3V3": ["U1.1(IOVDD)", "R1.1"],
+            "+1V1": ["U1.23(DVDD)", "U1.45(VREG_VOUT)"],
+            "SDA": ["U1.6(GPIO4)", "R1.2"],
+        },
+    )
+    (c,) = [c for c in calc.lookup(design) if c.kind == "i2c_pullup"]
+    assert not c.flagged
+
+
 def _usb_c(cc1: list[str], cc2: list[str], resistors: dict[str, str]) -> Design:
     """A USB-C receptacle J1 whose CC1/CC2 nets hold the given extra nodes."""
     parts = {"J1": ("USB_C_Receptacle_USB2.0", "Connector:USB_C_Receptacle_USB2.0")}

@@ -471,16 +471,23 @@ def _i2c_line(design: Design, net: str) -> str | None:
 
 
 _SUPPLY_PIN = re.compile(r"^(VDD\w*|VCC\w*|IOVDD|VDDIO|DVDD|3V3|VIN)$", re.IGNORECASE)
+# Core supplies power the logic inside, not the pins: the RP2040's DVDD is
+# "Digital core power supply, nominal voltage 1.1V" (RP2040 Datasheet, pin
+# descriptions), while its GPIOs run from IOVDD.
+_CORE_PIN = re.compile(r"^(DVDD|VDD_?CORE|VCORE)$", re.IGNORECASE)
 
 
 def _supply(design: Design, ref: str) -> tuple[str, float] | None:
-    """The lowest named supply rail on an IC's power pins, e.g. ("+3V3", 3.3)."""
+    """The lowest named supply rail on an IC's I/O power pins, e.g.
+    ("+3V3", 3.3). A core-only rail is skipped, unless it's all there is."""
     rails = [
-        (net, v)
+        (net, v, bool(_CORE_PIN.match(n.function)))
         for net, nodes in design.nets.items()
         for n in nodes
         if n.ref == ref and _SUPPLY_PIN.match(n.function) and (v := named_voltage(net))
     ]
+    io = [(net, v) for net, v, core in rails if not core]
+    rails = io or [(net, v) for net, v, _ in rails]
     return min(rails, key=lambda r: r[1]) if rails else None
 
 
