@@ -43,6 +43,7 @@ from app.features.debug.schemas import (
     DesignSummary,
     ErcEntry,
     ErrorEvent,
+    Language,
     Measurement,
     MeasurementInput,
     Mode,
@@ -87,6 +88,7 @@ class Prepared:
     calculations: list[Calculation]
     symptoms: list[Symptom]
     measurements: list[Measurement]
+    language: Language = "en"
 
 
 async def prepare(
@@ -95,10 +97,12 @@ async def prepare(
     measurements: list[MeasurementInput],
     kicad: KicadRunner,
     mode: Mode = "debug",
+    language: Language = "en",
 ) -> Prepared:
     """Validate the upload, run kicad-cli and parse its output. Raises
     ``AppError`` subclasses with messages the user can act on. In review
-    mode the symptoms are optional notes on what the board is for."""
+    mode the symptoms are optional notes on what the board is for.
+    ``language`` is the one the structured answer is written in."""
     symptoms = prompt.number_symptoms(symptoms_text)
     if mode == "debug" and not symptoms:
         raise BadRequestError("Describe what you see on the bench first.", field="symptoms")
@@ -131,7 +135,7 @@ async def prepare(
         symptoms=symptoms,
         measurements=numbered,
     )
-    return Prepared(mode, summary, design, erc, lookup, notes, calcs, symptoms, numbered)
+    return Prepared(mode, summary, design, erc, lookup, notes, calcs, symptoms, numbered, language)
 
 
 async def stream(
@@ -259,8 +263,12 @@ async def _review(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
             if review
             else "Writing the diagnosis up as claims and bench steps.",
         )
+        # Only the write-up switches language: the diagnosis is reasoning the
+        # user never sees, and the prompts that find bugs were tuned in English.
         analysis = await model.structure(
-            prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE,
+            prompt.in_language(
+                prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE, prepared.language
+            ),
             prompt.build_structure_message(diagnosis=diagnosis, user=user),
         )
     except AppError as e:
@@ -296,7 +304,8 @@ async def ask(req: AskRequest, answer: Answerer) -> str:
     deck, the caption and the samples the browser sent back."""
     start = time.monotonic()
     text = await answer(
-        prompt.ASK_SIMULATION, prompt.build_ask_message(req.simulation, req.history, req.question)
+        prompt.in_language(prompt.ASK_SIMULATION, req.language),
+        prompt.build_ask_message(req.simulation, req.history, req.question),
     )
     logger.info(
         "ask about %s (%s) in %.1fs: %r",

@@ -11,9 +11,18 @@ Both are worded for hobbyists with a multimeter (plan 001, "Who it's for").
 Review mode (``REVIEW_DIAGNOSE``, ``REVIEW_STRUCTURE``) is the same pair
 before the board is built: no symptoms, look for design mistakes.
 ``ASK_SIMULATION`` answers a question about one ngspice simulation.
+``in_language`` makes the user-facing calls (structure, ask) write in the
+user's language; the diagnosis stays English, since it is internal reasoning.
 """
 
-from app.features.debug.schemas import AskTurn, Measurement, Mode, Simulation, Symptom
+from app.features.debug.schemas import (
+    AskTurn,
+    Language,
+    Measurement,
+    Mode,
+    Simulation,
+    Symptom,
+)
 
 _INPUT = """\
 Input: numbered symptoms (s1, s2, ...), the compact netlist (one line per \
@@ -266,6 +275,26 @@ Fix
 
 Ids: hypotheses h1, h2, ...; confirm steps h1-c1, h1-c2, ...
 """
+
+
+_LANGUAGE_RULES: dict[Language, str] = {
+    "en": "",
+    "ja": """
+
+Language: write every sentence the user reads in natural Japanese: titles, \
+summaries, claims, instructions, readings, fixes, open questions, glossary \
+definitions and answers. Keep these exactly as the input writes them, in \
+ASCII: refs and pins (U2, U2.9; write a pin as REF.PIN, never "U2のピン9"), pin \
+names, net names, part values, ids (s1, m1, erc-1, rd1, cf1, h1-c1), numbers \
+and units (3.3 V, 10 kΩ). A glossary term is the word exactly as it appears \
+in your Japanese text (e.g. ERC, バックフィード).""",
+}
+
+
+def in_language(system: str, language: Language) -> str:
+    """``system`` with the rule to answer in ``language`` appended
+    (nothing for English, the language the prompts are written in)."""
+    return system + _LANGUAGE_RULES[language]
 
 
 def number_symptoms(text: str) -> list[Symptom]:

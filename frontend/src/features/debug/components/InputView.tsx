@@ -8,43 +8,32 @@ import { Textarea } from "@/shared/ui/textarea"
 import { Title } from "@/shared/ui/title"
 
 import { projectName } from "../files"
+import { useMessages } from "../messages"
 import { useDebugStore } from "../store"
-import {
-  REVIEW_PLACEHOLDER,
-  SYMPTOM_PLACEHOLDER,
-  SYMPTOM_PROMPTS,
-  fragmentLines,
-  symptomHints,
-  symptomLines,
-} from "../symptoms"
+import { fragmentLines, symptomHints, symptomLines } from "../symptoms"
 import type { Mode } from "../types"
 import type { DebugActions } from "../useDebug"
 
-const MODES: { mode: Mode; label: string; detail: string }[] = [
-  {
-    mode: "review",
-    label: "Review before you order",
-    detail: "Catch schematic mistakes before you pay for boards.",
-  },
-  {
-    mode: "debug",
-    label: "Debug a board on the bench",
-    detail: "It's built and misbehaves. Find the cause.",
-  },
-]
+const MODES: Mode[] = ["review", "debug"]
 
 function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => void }) {
+  const t = useMessages().input
   return (
-    <div role="radiogroup" aria-label="Mode" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      {MODES.map((m) => {
-        const active = m.mode === mode
+    <div
+      role="radiogroup"
+      aria-label={t.modeAria}
+      className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+    >
+      {MODES.map((key) => {
+        const active = key === mode
+        const m = t.modes[key]
         return (
           <button
-            key={m.mode}
+            key={key}
             type="button"
             role="radio"
             aria-checked={active}
-            onClick={() => onChange(m.mode)}
+            onClick={() => onChange(key)}
             className={cn(
               "flex items-start gap-[1ch] border px-[1ch] py-2 text-left hover:bg-accent",
               active && "border-foreground",
@@ -78,10 +67,13 @@ export function InputView({ actions }: { actions: DebugActions }) {
   const [dragging, setDragging] = useState(false)
   const [showFiles, setShowFiles] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const messages = useMessages()
+  const t = messages.input
+  const kind = review ? "review" : "debug"
 
   const name = projectName(files)
   const sheets = files.filter((f) => f.path.endsWith(".kicad_sch")).length
-  const hints = symptomHints(symptoms)
+  const hints = symptomHints(symptoms, messages)
   const lines = symptomLines(symptoms)
   const fragments = fragmentLines(symptoms)
 
@@ -100,14 +92,8 @@ export function InputView({ actions }: { actions: DebugActions }) {
   return (
     <div className="animate-fade-in space-y-6 sm:space-y-8">
       <div>
-        <h1 className="font-bold">
-          {review ? "Review a schematic before you order" : "Diagnose a board problem"}
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {review
-            ? "Drop your KiCad project folder. You get the design mistakes a reviewer would flag, most severe first, each with the evidence and the schematic fix."
-            : "Drop your KiCad project folder and describe what you see on the bench. You get the likely causes in your schematic, ranked, and how to check each one with a multimeter."}
-        </p>
+        <h1 className="font-bold">{t.heading[kind]}</h1>
+        <p className="mt-1 text-muted-foreground">{t.intro[kind]}</p>
       </div>
 
       <ModeSwitch mode={mode} onChange={setMode} />
@@ -129,15 +115,15 @@ export function InputView({ actions }: { actions: DebugActions }) {
         }}
       >
         <div className="flex flex-wrap items-center gap-[1ch]">
-          <h2 className="text-sm font-bold">Drop a KiCad project folder</h2>
-          <span className="text-xs text-muted-foreground">or</span>
+          <h2 className="text-sm font-bold">{t.dropTitle}</h2>
+          <span className="text-xs text-muted-foreground">{t.or}</span>
           <label
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
               "focus-within:outline-1 focus-within:outline-offset-2 focus-within:outline-foreground",
             )}
           >
-            Choose folder
+            {t.chooseFolder}
             <input
               type="file"
               className="hidden"
@@ -152,17 +138,18 @@ export function InputView({ actions }: { actions: DebugActions }) {
           </label>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Only <span className="text-foreground">.kicad_pro</span> and{" "}
-          <span className="text-foreground">.kicad_sch</span> are sent; the PCB stays here.
+          {t.sentBefore}
+          <span className="text-foreground">.kicad_pro</span>
+          {t.sentAnd}
+          <span className="text-foreground">.kicad_sch</span>
+          {t.sentAfter}
         </p>
 
         {name && (
           <div className="mt-2.5 flex flex-wrap items-center gap-[2ch] text-xs">
             <span>
               <span className="text-ok">✓</span> <span className="font-bold text-info">{name}</span>{" "}
-              <span className="text-muted-foreground">
-                · {sheets} {sheets === 1 ? "sheet" : "sheets"}
-              </span>
+              <span className="text-muted-foreground">· {t.sheets(sheets)}</span>
             </span>
             <button
               type="button"
@@ -170,14 +157,14 @@ export function InputView({ actions }: { actions: DebugActions }) {
               aria-expanded={showFiles}
               className="text-muted-foreground hover:text-foreground"
             >
-              {showFiles ? "▾ hide files" : "▸ show files"}
+              {showFiles ? t.hideFiles : t.showFiles}
             </button>
             <button
               type="button"
               onClick={() => setFiles([])}
               className="text-muted-foreground hover:text-bad"
             >
-              remove
+              {t.remove}
             </button>
           </div>
         )}
@@ -196,21 +183,15 @@ export function InputView({ actions }: { actions: DebugActions }) {
       <Card className="space-y-4 p-4 sm:p-5">
         <div className="flex items-start justify-between gap-[2ch]">
           <div>
-            <Title>
-              {review ? "What the board is for (optional)" : "What you see on the bench"}
-            </Title>
-            {!review && (
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                One observation per line: &ldquo;Fails on battery&rdquo;, not &ldquo;battery&rdquo;.
-              </p>
-            )}
+            <Title>{review ? t.notesTitle : t.benchTitle}</Title>
+            {!review && <p className="mt-1.5 text-xs text-muted-foreground">{t.oneObservation}</p>}
           </div>
           <button
             type="button"
             onClick={() => setSymptoms("")}
             className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
           >
-            clear
+            {t.clear}
           </button>
         </div>
 
@@ -218,7 +199,7 @@ export function InputView({ actions }: { actions: DebugActions }) {
           <>
             <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-baseline sm:gap-[2ch]">
               <span className="shrink-0 font-bold tracking-wider text-muted-foreground uppercase">
-                Covered {hints.filter((h) => h.done).length}/{hints.length}
+                {t.covered(hints.filter((h) => h.done).length, hints.length)}
               </span>
               <div className="flex flex-wrap gap-x-[1ch]">
                 {hints.map((h) => (
@@ -231,9 +212,9 @@ export function InputView({ actions }: { actions: DebugActions }) {
 
             <div className="flex flex-wrap items-baseline gap-x-[2ch] gap-y-1 text-xs">
               <span className="font-bold tracking-wider text-muted-foreground uppercase">
-                Start a line
+                {t.startLine}
               </span>
-              {SYMPTOM_PROMPTS.map((p) => (
+              {messages.symptoms.prompts.map((p) => (
                 <button
                   key={p.label}
                   type="button"
@@ -252,28 +233,20 @@ export function InputView({ actions }: { actions: DebugActions }) {
           rows={9}
           value={symptoms}
           onChange={(e) => setSymptoms(e.target.value)}
-          placeholder={review ? REVIEW_PLACEHOLDER : SYMPTOM_PLACEHOLDER}
+          placeholder={review ? messages.symptoms.reviewPlaceholder : messages.symptoms.placeholder}
           className="leading-relaxed"
         />
 
         {!review && (
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              {lines.length} {lines.length === 1 ? "symptom" : "symptoms"}
-            </span>
-            {fragments.length > 0 && (
-              <span className="text-warn">
-                Short line{fragments.length > 1 ? "s" : ""} &ldquo;
-                {fragments.slice(0, 2).join("”, “")}
-                &rdquo; may not stand on {fragments.length > 1 ? "their" : "its"} own.
-              </span>
-            )}
+            <span>{t.symptoms(lines.length)}</span>
+            {fragments.length > 0 && <span className="text-warn">{t.shortLines(fragments)}</span>}
           </div>
         )}
 
         {inputError && (
           <div className="text-sm" role="alert">
-            <span className="bg-bad px-[1ch] font-bold text-on-state">ERROR</span> {inputError}
+            <span className="bg-bad px-[1ch] font-bold text-on-state">{t.error}</span> {inputError}
           </div>
         )}
 
@@ -281,11 +254,11 @@ export function InputView({ actions }: { actions: DebugActions }) {
           <div className="flex w-full gap-[1ch] sm:w-auto">
             {hasRuns && (
               <Button variant="outline" onClick={showSession}>
-                Back to results
+                {t.backToResults}
               </Button>
             )}
             <Button size="lg" className="w-full sm:w-auto" onClick={() => void actions.analyze()}>
-              {review ? "Review schematic" : "Analyze schematic"} →
+              {t.submit[kind]} →
             </Button>
           </div>
         </div>

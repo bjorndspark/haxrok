@@ -4,6 +4,7 @@ import { Button } from "@/shared/ui/button"
 import { Card } from "@/shared/ui/card"
 import { Title } from "@/shared/ui/title"
 
+import { useMessages } from "../messages"
 import { isReview } from "../present"
 import { useDebugStore } from "../store"
 import type { Run } from "../types"
@@ -15,6 +16,7 @@ import { HypothesisCard } from "./HypothesisCard"
 import { SimulationsCard } from "./SimulationsCard"
 
 function RunHeader({ run, total }: { run: Run; total: number }) {
+  const t = useMessages().session
   const latest = run.number === total
   const took =
     run.finishedAt !== null
@@ -23,11 +25,11 @@ function RunHeader({ run, total }: { run: Run; total: number }) {
   return (
     <div className="mb-4 flex items-center gap-[1ch] text-sm">
       <span className={latest ? "font-bold" : "font-bold text-muted-foreground"}>
-        Run #{run.number}
+        {t.run(run.number)}
       </span>
       <span className="shrink-0 text-xs text-muted-foreground">
         {new Date(run.startedAt).toLocaleTimeString()}
-        {took && ` · took ${took}`}
+        {took && t.took(took)}
       </span>
       <span className="min-w-[2ch] flex-1 border-t" aria-hidden />
       <span className="truncate text-xs text-muted-foreground">{run.trigger}</span>
@@ -47,23 +49,24 @@ function RunBody({
   actions: DebugActions
 }) {
   const editInput = useDebugStore((s) => s.editInput)
+  const t = useMessages().session
   if (run.finishedAt === null) return <AnalyzingPanel run={run} onCancel={actions.cancel} />
   if (run.error !== null || run.result === null) {
     return (
       <div className="space-y-6">
         <Card className="space-y-3 border-bad p-4 sm:p-5">
           <p>
-            <span className="bg-bad px-[1ch] font-bold text-on-state">FAILED</span> This run
-            didn&apos;t finish
+            <span className="bg-bad px-[1ch] font-bold text-on-state">{t.failed}</span>{" "}
+            {t.didntFinish}
           </p>
-          <p className="text-sm">{run.error ?? "No result arrived."}</p>
+          <p className="text-sm">{run.error ?? t.noResultArrived}</p>
           {latest && (
             <div className="flex gap-2">
               <Button size="sm" disabled={busy} onClick={() => void actions.analyze()}>
-                Try again
+                {t.tryAgain}
               </Button>
               <Button size="sm" variant="outline" onClick={editInput}>
-                Edit input
+                {t.editInput}
               </Button>
             </div>
           )}
@@ -81,16 +84,11 @@ function RunBody({
       {result.hypotheses.length === 0 &&
         (isReview(run.summary) ? (
           <Card className="space-y-2 border-ok p-4 sm:p-5">
-            <p className="font-bold text-ok">✓ No schematic issues found</p>
-            <p className="text-muted-foreground">
-              The review traced each block and found nothing to change. It only reads the schematic:
-              layout, footprints and assembly aren&apos;t checked.
-            </p>
+            <p className="font-bold text-ok">{t.noIssuesTitle}</p>
+            <p className="text-muted-foreground">{t.noIssuesBody}</p>
           </Card>
         ) : (
-          <Card className="p-4 text-sm sm:p-5">
-            The model returned no hypotheses for this input.
-          </Card>
+          <Card className="p-4 text-sm sm:p-5">{t.noHypotheses}</Card>
         ))}
       {result.hypotheses.map((h) => (
         <HypothesisCard
@@ -121,7 +119,7 @@ function RunBody({
 
       {result.open_questions.length > 0 && (
         <Card className="space-y-3 p-4 sm:p-5">
-          <Title as="h3">Open questions</Title>
+          <Title as="h3">{t.openQuestions}</Title>
           <div className="divide-y">
             {result.open_questions.map((q, i) => (
               <div key={i} className="space-y-1 py-2.5 text-xs">
@@ -130,7 +128,7 @@ function RunBody({
                 </p>
                 {q.suggested_check && (
                   <p className="leading-relaxed">
-                    <span className="text-info">check:</span> {q.suggested_check}
+                    <span className="text-info">{t.check}</span> {q.suggested_check}
                   </p>
                 )}
               </div>
@@ -141,7 +139,7 @@ function RunBody({
 
       {result.glossary.length > 0 && (
         <Card className="space-y-3 p-4 sm:p-5">
-          <Title as="h3">Glossary</Title>
+          <Title as="h3">{t.glossary}</Title>
           <dl className="space-y-1.5 text-xs leading-relaxed">
             {result.glossary.map((g) => (
               <div key={g.term}>
@@ -161,6 +159,7 @@ function RunBody({
 function OlderRun({ run, total, actions }: { run: Run; total: number; actions: DebugActions }) {
   const [open, setOpen] = useState(false)
   const top = run.result?.hypotheses[0]
+  const t = useMessages().session
   return (
     <div>
       <RunHeader run={run} total={total} />
@@ -177,7 +176,7 @@ function OlderRun({ run, total, actions }: { run: Run; total: number; actions: D
               {top.title}
             </>
           ) : (
-            (run.error ?? "No result")
+            (run.error ?? t.noResult)
           )}
         </span>
         <span className="shrink-0" aria-hidden>
@@ -197,6 +196,7 @@ export function SessionView({ actions }: { actions: DebugActions }) {
   const runs = useDebugStore((s) => s.runs)
   const editInput = useDebugStore((s) => s.editInput)
   const mode = useDebugStore((s) => s.mode)
+  const t = useMessages().session
   if (runs.length === 0) return null
   const [latest, ...older] = runs
   const busy = latest.finishedAt === null
@@ -209,21 +209,21 @@ export function SessionView({ actions }: { actions: DebugActions }) {
         <div>
           <p className="text-xs text-muted-foreground">
             <span className={busy ? "font-bold text-warn" : "font-bold text-ok"}>
-              {busy ? "analyzing" : review ? "review ready" : "diagnosis ready"}
+              {busy ? t.status.analyzing : t.status[review ? "review" : "debug"]}
             </span>
             {" · "}
-            {runs.length} {runs.length === 1 ? "run" : "runs, newest first"}
+            {t.runs(runs.length)}
           </p>
-          <h1 className="mt-1 font-bold">{review ? "Design review" : "Ranked hypotheses"}</h1>
+          <h1 className="mt-1 font-bold">{t.heading[review ? "review" : "debug"]}</h1>
         </div>
         <div className="flex flex-wrap gap-[1ch]">
           {reportable && (
             <Button variant="outline" size="sm" onClick={() => actions.downloadReport(reportable)}>
-              Download report
+              {t.downloadReport}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={editInput}>
-            {review ? "Edit input" : "Edit observations"}
+            {review ? t.editInput : t.editObservations}
           </Button>
         </div>
       </div>

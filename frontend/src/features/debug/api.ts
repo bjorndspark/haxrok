@@ -1,4 +1,5 @@
 import { API_V1_PREFIX, apiPost, apiUrl, type ErrorResponse } from "@/shared/api/client"
+import type { Language } from "@/shared/lib/language"
 
 import type {
   AnalysisEvent,
@@ -51,10 +52,12 @@ export async function* streamAnalysis(
   symptoms: string,
   measurements: MeasurementInput[],
   mode: Mode,
+  language: Language,
   signal: AbortSignal,
 ): AsyncGenerator<AnalysisEvent> {
   const form = new FormData()
   form.append("mode", mode)
+  form.append("language", language)
   for (const f of files) form.append("files", f.file, f.path)
   form.append("symptoms", symptoms)
   form.append("measurements", JSON.stringify(measurements))

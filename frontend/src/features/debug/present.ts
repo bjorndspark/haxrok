@@ -1,64 +1,42 @@
 /** Presentation logic for results: evidence wording, glossary matching and
- *  the downloadable Markdown report. Pure functions, no React. */
+ *  the downloadable Markdown report. Pure functions, no React; wording comes
+ *  from the `Messages` table passed in. */
+import type { Messages } from "./messages"
 import type {
   Calculation,
   Simulation,
   CheckedAnalysis,
   DesignSummary,
   Diagram,
-  Evidence,
   GlossaryEntry,
   Hypothesis,
   Run,
   PinWarning,
-  Severity,
   WiringFinding,
 } from "./types"
 
-/** Labels say what a claim rests on, never that it was verified. */
-export const EVIDENCE_LABEL: Record<Evidence, string> = {
-  schematic: "Based on your schematic",
-  erc: "Based on KiCad's checker",
-  datasheet: "Based on the datasheet pin table",
-  reference: "Based on the manufacturer's design",
-  measurement: "Based on your measurement",
-  none: "No direct evidence",
-}
-
 export type Confidence = "verified" | "fits" | "speculative"
-
-export const CONFIDENCE_LABEL: Record<Confidence, string> = {
-  verified: "Verified design fault",
-  fits: "Fits the symptoms",
-  speculative: "Speculative",
-}
 
 /** In review mode there are no symptoms to fit, and the cited pins only
  *  show the topology, not that it is wrong: in the review evals a real fault
  *  and a false alarm cited the same mix of facts. So only the backend's
  *  wiring check verifies an issue; the rest is the model's reasoning. */
-export function confidenceLabel(c: Confidence, review: boolean): string {
-  return review && c === "speculative" ? "Reasoned: check it" : CONFIDENCE_LABEL[c]
+export function confidenceLabel(c: Confidence, review: boolean, m: Messages): string {
+  return review && c === "speculative" ? m.present.reasoned : m.present.confidence[c]
 }
 
 /** The badge on a calculation: its value and unit, or what's wrong when
  *  there is no value (a UART check has nothing to measure; a missing
  *  pull-up has nothing to compute), plus the expected value when given. */
-export function calculationBadge(c: Calculation): string {
+export function calculationBadge(c: Calculation, m: Messages): string {
   const value =
     c.value !== null
       ? `${String(c.value)} ${c.unit}`
       : c.kind === "uart" || c.kind === "enable_pin"
-        ? "miswired"
-        : "missing"
+        ? m.present.miswired
+        : m.present.missing
   if (c.expected === null) return value
   return value + (c.flagged ? ` ≠ ${String(c.expected)} ${c.unit}` : " ✓")
-}
-
-export const SEVERITY_LABEL: Record<Severity, string> = {
-  will_fail: "Won't work as drawn",
-  may_fail: "May fail",
-  improve: "Improvement",
 }
 
 export function isReview(summary: DesignSummary | null): boolean {
@@ -88,7 +66,8 @@ export interface Assessment {
  *  - fits: explains at least half the symptoms and at least one claim is
  *    backed by the input. Never in review mode (see confidenceLabel).
  *  - speculative: anything else. */
-export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment {
+export function assess(h: Hypothesis, summary: DesignSummary | null, m: Messages): Assessment {
+  const reason = m.present.reason
   const backedClaims = h.claims.filter((c) => c.evidence !== "none")
   const citedPins = new Set(backedClaims.flatMap((c) => c.cites.map((x) => x.pin ?? "")))
   const findings = (summary?.wiring ?? []).filter((f) => citedPins.has(f.pin))
@@ -110,38 +89,34 @@ export function assess(h: Hypothesis, summary: DesignSummary | null): Assessment
     return {
       ...base,
       confidence: "verified",
-      reason: `The backend's wiring check found ${pins} wired against the datasheet, and this hypothesis cites it.`,
+      reason: reason.wiring(pins),
     }
   }
   if (calculations.length > 0) {
     return {
       ...base,
       confidence: "verified",
-      reason: `The backend's calculation from your netlist flagged ${calculations.map((c) => c.ic).join(", ")}, and this hypothesis cites it.`,
+      reason: reason.calculation(calculations.map((c) => c.ic).join(", ")),
     }
   }
   if (isReview(summary)) {
     return {
       ...base,
       confidence: "speculative",
-      reason:
-        "The pins it cites are in your schematic, but that they are wrong is the model's reasoning. Settle it with the checks below.",
+      reason: reason.review,
     }
   }
   if (backedClaims.length > 0 && symptoms > 0 && h.explains.length * 2 >= symptoms) {
     return {
       ...base,
       confidence: "fits",
-      reason: "Explains at least half the symptoms, with claims backed by your input.",
+      reason: reason.fits,
     }
   }
   return {
     ...base,
     confidence: "speculative",
-    reason:
-      backedClaims.length === 0
-        ? "None of its claims is backed by your input."
-        : "Explains fewer than half the symptoms.",
+    reason: backedClaims.length === 0 ? reason.unbacked : reason.fewer,
   }
 }
 
@@ -182,75 +157,96 @@ export function symptomText(summary: DesignSummary | null, id: string): string {
   return summary?.symptoms.find((s) => s.id === id)?.text ?? id
 }
 
-/** The latest finished run as a Markdown bench report. */
-export function toMarkdown(run: Run, summary: DesignSummary, result: CheckedAnalysis): string {
+/** The latest finished run as a Markdown bench report, headed with `app`
+ *  (the project name, which is config). */
+export function toMarkdown(
+  run: Run,
+  summary: DesignSummary,
+  result: CheckedAnalysis,
+  m: Messages,
+  app: string,
+): string {
+  const t = m.report
   const review = isReview(summary)
   const lines: string[] = [
-    `# Häxrök ${review ? "design review" : "report"}: ${summary.project}`,
+    t.title(app, review, summary.project),
     "",
-    `Run #${String(run.number)} (${run.trigger}), ${new Date(run.startedAt).toLocaleString()}`,
-    `${String(summary.parts)} parts, ${String(summary.nets)} nets, ${String(summary.erc.length)} ERC findings.`,
+    t.run(run.number, run.trigger, new Date(run.startedAt).toLocaleString()),
+    t.counts(summary.parts, summary.nets, summary.erc.length),
   ]
   if (summary.symptoms.length > 0) {
     lines.push(
       "",
-      review ? "## Notes on the board" : "## Symptoms",
+      review ? t.notes : t.symptoms,
       ...summary.symptoms.map((s) => `- ${s.id}: ${s.text}`),
     )
   }
   if (review && result.hypotheses.length === 0) {
-    lines.push("", "No schematic issues found.")
+    lines.push("", t.noIssues)
   }
   if (summary.measurements.length > 0) {
-    lines.push("", "## Measurements", ...summary.measurements.map((m) => `- ${m.id}: ${m.value}`))
+    lines.push("", t.measurements, ...summary.measurements.map((x) => `- ${x.id}: ${x.value}`))
   }
   for (const h of result.hypotheses) {
-    const a = assess(h, summary)
+    const a = assess(h, summary, m)
     lines.push(
       "",
       `## #${String(h.rank)} ${h.title}`,
       "",
       review
-        ? `**${h.severity ? SEVERITY_LABEL[h.severity] : "Issue"}** · ${confidenceLabel(a.confidence, true)} · ${String(a.backed)} of ${String(a.claims)} claims backed`
-        : `**${CONFIDENCE_LABEL[a.confidence]}** · explains ${String(a.explained)} of ${String(a.symptoms)} symptoms · ${String(a.backed)} of ${String(a.claims)} claims backed`,
+        ? t.reviewLine(
+            h.severity ? m.present.severity[h.severity] : t.issue,
+            confidenceLabel(a.confidence, true, m),
+            a.backed,
+            a.claims,
+          )
+        : t.debugLine(
+            m.present.confidence[a.confidence],
+            a.explained,
+            a.symptoms,
+            a.backed,
+            a.claims,
+          ),
       "",
       h.summary,
       "",
     )
     if (h.explains.length > 0)
-      lines.push(`Explains: ${h.explains.map((id) => symptomText(summary, id)).join("; ")}`)
+      lines.push(`${t.explains} ${h.explains.map((id) => symptomText(summary, id)).join("; ")}`)
     if (h.does_not_explain.length > 0)
       lines.push(
-        `Doesn't explain: ${h.does_not_explain.map((id) => symptomText(summary, id)).join("; ")}`,
+        `${t.doesntExplain} ${h.does_not_explain.map((id) => symptomText(summary, id)).join("; ")}`,
       )
-    lines.push("", "### Evidence")
+    lines.push("", t.evidence)
     for (const c of h.claims) {
-      const note = c.downgraded && c.reason ? ` (label removed: ${c.reason})` : ""
-      lines.push(`- ${c.text} — *${EVIDENCE_LABEL[c.evidence]}*${note}`)
+      const note = c.downgraded && c.reason ? t.labelRemoved(c.reason) : ""
+      lines.push(`- ${c.text} — *${m.present.evidence[c.evidence]}*${note}`)
     }
-    lines.push("", review ? "### Check before ordering" : "### Confirm")
+    lines.push("", review ? t.check : t.confirm)
     for (const s of h.confirm) {
-      lines.push(`- **${s.id}** (${s.tool}, power ${s.power}): ${s.instruction}`)
+      lines.push(
+        t.step(s.id, m.hypothesis.tool[s.tool], m.hypothesis.power(s.power), s.instruction),
+      )
       for (const r of s.readings) lines.push(`  - ${r.reading} → ${r.establishes}`)
     }
-    lines.push("", "### Fix")
-    for (const r of h.fix.rework) lines.push(`- Rework: ${r.text}`)
-    for (const s of h.fix.schematic) lines.push(`- Next revision: ${s}`)
+    lines.push("", t.fix)
+    for (const r of h.fix.rework) lines.push(`- ${t.rework} ${r.text}`)
+    for (const s of h.fix.schematic) lines.push(`- ${t.nextRevision} ${s}`)
   }
   if (run.simulations.length > 0) {
-    lines.push("", "## Simulations")
+    lines.push("", t.simulations)
     for (const sim of run.simulations) {
       lines.push("", `### ${sim.title}`, "", sim.text, "", "```spice", sim.deck.trim(), "```")
-      for (const t of run.chats[sim.id] ?? []) lines.push("", `**Q:** ${t.question}`, "", t.answer)
+      for (const q of run.chats[sim.id] ?? []) lines.push("", `**Q:** ${q.question}`, "", q.answer)
     }
   }
   if (result.open_questions.length > 0) {
-    lines.push("", "## Open questions")
+    lines.push("", t.openQuestions)
     for (const q of result.open_questions)
-      lines.push(`- ${q.text}${q.suggested_check ? ` (check: ${q.suggested_check})` : ""}`)
+      lines.push(`- ${q.text}${q.suggested_check ? t.suggestedCheck(q.suggested_check) : ""}`)
   }
   if (result.glossary.length > 0) {
-    lines.push("", "## Glossary", ...result.glossary.map((g) => `- **${g.term}**: ${g.definition}`))
+    lines.push("", t.glossary, ...result.glossary.map((g) => `- **${g.term}**: ${g.definition}`))
   }
   return lines.join("\n") + "\n"
 }
@@ -284,7 +280,7 @@ const MIN_BOX = 170
 /** Where everything in a wiring diagram goes: the IC's pins down the right
  *  edge of its box, grouped by net, each group joined by a bus with the
  *  net's name and its other notable parts beside it. */
-export function diagramLayout(d: Diagram): DiagramLayout {
+export function diagramLayout(d: Diagram, m: Messages): DiagramLayout {
   const pins: DiagramLayout["pins"] = []
   const nets: DiagramLayout["nets"] = []
   let y = HEADER
@@ -297,8 +293,8 @@ export function diagramLayout(d: Diagram): DiagramLayout {
       pins.push({ pin: p.pin, label: `${number} ${p.name}`.trim(), y, flagged: p.flagged })
       y += ROW
     }
-    const labels = net.members.map((m) =>
-      m.inductor ? `${m.pin} (inductor)` : m.name ? `${m.pin}(${m.name})` : m.pin,
+    const labels = net.members.map((x) =>
+      x.inductor ? `${x.pin} ${m.diagram.inductor}` : x.name ? `${x.pin}(${x.name})` : x.pin,
     )
     // Fit the line beside the bus; whatever doesn't fit joins "+N more".
     const members: string[] = []
@@ -307,7 +303,7 @@ export function diagramLayout(d: Diagram): DiagramLayout {
       members.push(label)
     }
     const more = net.more + labels.length - members.length
-    if (more > 0) members.push(`+${String(more)} more`)
+    if (more > 0) members.push(m.diagram.more(more))
     nets.push({
       name: net.name,
       label: net.name.replace(/\/+$/, "").split("/").pop() ?? net.name,

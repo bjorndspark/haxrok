@@ -4,6 +4,7 @@ import { Badge } from "@/shared/ui/badge"
 import { Card } from "@/shared/ui/card"
 import { Title } from "@/shared/ui/title"
 
+import { useMessages } from "../messages"
 import { calculationBadge, findingTokens } from "../present"
 import type { DesignSummary } from "../types"
 import { MarkedText } from "./MarkedText"
@@ -25,24 +26,25 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
   const [showSymptoms, setShowSymptoms] = useState(true)
   const [showRefs, setShowRefs] = useState(false)
   const refParts = new Set(summary.references.map((n) => n.part))
+  const m = useMessages()
+  const t = m.summary
   return (
     <Card className="space-y-5 p-4 sm:p-5">
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
         <div>
-          <Title>Design summary</Title>
+          <Title>{t.title}</Title>
           <span className="ml-[1ch] font-bold text-info">{summary.project}</span>
         </div>
         <p className="text-xs text-muted-foreground">
-          {summary.sheets} sheets · {summary.parts} parts · {summary.nets} nets ·{" "}
-          {summary.ics.length} ICs ·{" "}
+          {t.counts(summary.sheets, summary.parts, summary.nets, summary.ics.length)}
           <span className={summary.erc.length > 0 ? "text-warn" : "text-ok"}>
-            {summary.erc.length} ERC
+            {t.erc(summary.erc.length)}
           </span>
         </p>
       </div>
 
       <div className="space-y-2">
-        <Rule>ICs and pin data</Rule>
+        <Rule>{t.icsAndPinData}</Rule>
         <ul className="space-y-0.5 text-xs">
           {summary.ics.map((ic) => (
             <li key={ic.ref} className="flex min-w-0 items-baseline gap-[2ch]">
@@ -50,30 +52,25 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
                 {ic.ref} · {ic.value}
               </span>
               <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                {ic.footprint || "no footprint"}
+                {ic.footprint || t.noFootprint}
               </span>
               <span className="flex shrink-0 gap-[1ch]">
-                {refParts.has(ic.value) && <Badge tone="ok">ref design</Badge>}
+                {refParts.has(ic.value) && <Badge tone="ok">{t.refDesign}</Badge>}
                 <Badge tone={ic.pin_data ? "ok" : "neutral"}>
-                  {ic.pin_data ? "pin table" : "no pin data"}
+                  {ic.pin_data ? t.pinTable : t.noPinData}
                 </Badge>
               </span>
             </li>
           ))}
         </ul>
         {summary.ics.some((ic) => !ic.pin_data) && (
-          <p className="text-xs text-muted-foreground">
-            ICs without pin data are still analyzed; facts about their pins come from the
-            model&apos;s memory and are marked unverified.
-          </p>
+          <p className="text-xs text-muted-foreground">{t.noPinDataNote}</p>
         )}
       </div>
 
       {summary.wiring.length > 0 && (
         <div className="space-y-2 border-l-2 border-bad pl-[1ch] text-xs">
-          <span className="font-bold text-bad">
-            ! Wired against the datasheet ({summary.wiring.length})
-          </span>
+          <span className="font-bold text-bad">{t.wired(summary.wiring.length)}</span>
           {summary.wiring.map((f) => (
             <p key={f.id} className="leading-relaxed">
               <MarkedText text={f.text} tokens={findingTokens(f)} />
@@ -84,10 +81,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
 
       {summary.pin_warnings.length > 0 && (
         <div className="space-y-2 border-l-2 border-warn pl-[1ch] text-xs">
-          <span className="font-bold text-warn">
-            ! Pin order to check against the package&apos;s usual pinout (
-            {summary.pin_warnings.length})
-          </span>
+          <span className="font-bold text-warn">{t.pinOrder(summary.pin_warnings.length)}</span>
           {summary.pin_warnings.map((w) => (
             <p key={w.id} className="leading-relaxed">
               <MarkedText text={w.text} tokens={findingTokens(w)} />
@@ -98,7 +92,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
 
       {summary.calculations.length > 0 && (
         <div className="space-y-2 text-xs">
-          <Rule>Calculated from your netlist ({summary.calculations.length})</Rule>
+          <Rule>{t.calculated(summary.calculations.length)}</Rule>
           {summary.calculations.map((c) => (
             <div
               key={c.id}
@@ -109,7 +103,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
               }
             >
               <Badge tone={c.flagged ? "alert" : "ok"} className="shrink-0 self-start">
-                {calculationBadge(c)}
+                {calculationBadge(c, m)}
               </Badge>
               <p className="min-w-0 flex-1 leading-relaxed">{c.text}</p>
             </div>
@@ -127,8 +121,9 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           >
             <span className="text-xs font-bold">
               <span className="mr-[1ch]">{showRefs ? "▾" : "▸"}</span>
-              Reference designs ({summary.references.length} notes for{" "}
-              <span className="text-info">{[...refParts].join(", ")}</span>)
+              {t.references(summary.references.length)}
+              <span className="text-info">{[...refParts].join(", ")}</span>
+              {t.referencesEnd}
             </span>
           </button>
           {showRefs && (
@@ -151,7 +146,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
 
       <div className="border-l-2 border-warn pl-[1ch] text-xs">
         <div className="flex items-center justify-between gap-[1ch]">
-          <span className="font-bold text-warn">KiCad ERC findings ({summary.erc.length})</span>
+          <span className="font-bold text-warn">{t.ercFindings(summary.erc.length)}</span>
           {summary.erc.length > 0 && (
             <button
               type="button"
@@ -159,7 +154,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
               aria-expanded={showErc}
               className="text-warn hover:underline"
             >
-              {showErc ? "▾ hide" : "▸ inspect"}
+              {showErc ? t.hide : t.inspect}
             </button>
           )}
         </div>
@@ -188,8 +183,8 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           >
             <span className="text-xs font-bold tracking-wider uppercase">
               <span className="mr-[1ch]">{showSymptoms ? "▾" : "▸"}</span>
-              {summary.mode === "review" ? "Notes on the board" : "Symptoms"}
-              {summary.measurements.length > 0 ? " and measurements" : ""}
+              {summary.mode === "review" ? t.notes : t.symptoms}
+              {summary.measurements.length > 0 ? t.andMeasurements : ""}
             </span>
           </button>
           {showSymptoms && (
@@ -200,13 +195,13 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
                   <span>{s.text}</span>
                 </li>
               ))}
-              {summary.measurements.map((m) => (
-                <li key={m.id} className="flex gap-[1ch]">
-                  <span className="w-[4ch] shrink-0 font-bold text-muted-foreground">{m.id}</span>
+              {summary.measurements.map((x) => (
+                <li key={x.id} className="flex gap-[1ch]">
+                  <span className="w-[4ch] shrink-0 font-bold text-muted-foreground">{x.id}</span>
                   <span>
-                    <span className="text-value">{m.value}</span>
-                    {m.step_id && (
-                      <span className="text-muted-foreground"> (step {m.step_id})</span>
+                    <span className="text-value">{x.value}</span>
+                    {x.step_id && (
+                      <span className="text-muted-foreground">{t.step(x.step_id)}</span>
                     )}
                   </span>
                 </li>

@@ -208,8 +208,10 @@ def mentioned_nets(text: str, design: Design) -> dict[str, str]:
 
 
 def _names(name: str, text: str) -> bool:
-    """Whole-token match: '+3V3' matches in 'the +3V3 rail', not in '+3V30'."""
-    return re.search(rf"(?<![\w+/-]){re.escape(name)}(?![\w+-])", text) is not None
+    """Whole-token match: '+3V3' matches in 'the +3V3 rail', not in '+3V30'.
+    ASCII word characters only, so Japanese prose glued to a name ('+3V3に')
+    still names it."""
+    return re.search(rf"(?<![\w+/-]){re.escape(name)}(?![\w+-])", text, re.ASCII) is not None
 
 
 def _known(

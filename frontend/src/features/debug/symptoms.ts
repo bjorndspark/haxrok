@@ -4,37 +4,49 @@
  * battery", not "battery". These checks are hints, never a gate.
  */
 
+import type { Messages } from "./messages"
+
 export interface SymptomHint {
-  key: string
+  key: keyof Messages["symptoms"]["hints"]
   label: string
   done: boolean
 }
 
-const TOPICS: { key: string; label: string; pattern: RegExp }[] = [
+// English words need \b so "ok" doesn't match inside "book"; Japanese has no
+// word boundaries, so its keywords are a second, unbounded alternative.
+const TOPICS: { key: SymptomHint["key"]; pattern: RegExp }[] = [
   {
     key: "power",
-    label: "What powers it",
     pattern:
-      /\b(usb|batter|nimh|li-?ion|lipo|alkaline|bench supply|supply|power(ed)?|\d+(\.\d+)?\s?v)\b/i,
+      /\b(usb|batter|nimh|li-?ion|lipo|alkaline|bench supply|supply|power(ed)?|\d+(\.\d+)?\s?v)\b|電源|電池|バッテリ|給電|安定化電源/i,
   },
-  { key: "works", label: "What works", pattern: /\b(works?|boots?|ok|fine|runs?)\b/i },
+  {
+    key: "works",
+    pattern: /\b(works?|boots?|ok|fine|runs?)\b|動く|動作する|起動する|正常/i,
+  },
   {
     key: "fails",
-    label: "What doesn't",
     pattern:
-      /\b(fails?|doesn'?t|does not|won'?t|no(t)? boot|dead|stuck|resets?|drops?|collapses?)\b/i,
+      /\b(fails?|doesn'?t|does not|won'?t|no(t)? boot|dead|stuck|resets?|drops?|collapses?)\b|動かない|起動しない|しない|止まる|リセット|落ちる|不具合|ダメ/i,
   },
   {
     key: "measured",
-    label: "What you measured",
-    pattern: /(\d+(\.\d+)?\s?(m?a|m?v|v|ω|ohm|ohms|k|°c)\b|measur|reads?|multimeter|dmm)/i,
+    pattern:
+      /(\d+(\.\d+)?\s?(m?a|m?v|v|ω|ohm|ohms|k|°c)\b|measur|reads?|multimeter|dmm)|測定|測っ|計測|テスター|マルチメータ/i,
   },
-  { key: "hot", label: "Anything hot", pattern: /\b(hot|warm|heat|burn|smok|°c|cool)\b/i },
+  {
+    key: "hot",
+    pattern: /\b(hot|warm|heat|burn|smok|°c|cool)\b|熱|温か|発熱|焦げ|煙/i,
+  },
 ]
 
 /** Which of the questions the placeholder asks the text already answers. */
-export function symptomHints(text: string): SymptomHint[] {
-  return TOPICS.map((t) => ({ key: t.key, label: t.label, done: t.pattern.test(text) }))
+export function symptomHints(text: string, m: Messages): SymptomHint[] {
+  return TOPICS.map((t) => ({
+    key: t.key,
+    label: m.symptoms.hints[t.key],
+    done: t.pattern.test(text),
+  }))
 }
 
 /** Non-empty lines, as the backend will number them. */
@@ -45,28 +57,13 @@ export function symptomLines(text: string): string[] {
     .filter((l) => l.length > 0)
 }
 
-/** Lines too short to stand on their own (likely a fragment of the line above). */
+const CJK = /[\u3040-\u30ff\u3400-\u9fff]/
+
+/** Lines too short to stand on their own (likely a fragment of the line
+ *  above): under three words, or for Japanese, which has no spaces, under
+ *  six characters. */
 export function fragmentLines(text: string): string[] {
-  return symptomLines(text).filter((l) => l.split(/\s+/).length < 3)
+  return symptomLines(text).filter((l) =>
+    CJK.test(l) ? l.replace(/\s/g, "").length < 6 : l.split(/\s+/).length < 3,
+  )
 }
-
-export const SYMPTOM_PLACEHOLDER = `One observation per line, each standing on its own:
-Powered from a battery through the regulator.
-Works on USB 5 V: the microcontroller boots.
-Fails on battery: the microcontroller does not boot.
-When it fails, the 3.3 V rail measures 2.3 V and the supply draws 400 mA.
-When it fails, the regulator gets warm.`
-
-/** Review mode: optional notes on what the board is for. */
-export const REVIEW_PLACEHOLDER = `Optional. What the board is for, one note per line:
-Powered from a 1S LiPo (3.0-4.2 V) or USB-C 5 V.
-Drives a 12 V, 1 A solenoid.
-Used outdoors, so it may see -10 °C.`
-
-export const SYMPTOM_PROMPTS: { label: string; prefix: string }[] = [
-  { label: "Power source", prefix: "Powered from" },
-  { label: "What works", prefix: "Works on" },
-  { label: "What fails", prefix: "Fails on" },
-  { label: "Measurement", prefix: "When it fails, I measured" },
-  { label: "Hot part", prefix: "When it fails, this part gets hot:" },
-]

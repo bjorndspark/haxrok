@@ -125,6 +125,15 @@ def test_prose_pin_form_is_recognised(ctx):
     assert "U2.8" in (c.reason or "")
 
 
+def test_names_glued_to_japanese_prose_still_count(ctx):
+    # Japanese has no spaces: "+3V3に" must name +3V3, and "U2.8が" U2.8.
+    ok = check_claim(claim("U2.9は+3V3に接続。", "schematic", pin("U2.9", "+3V3")), ctx)
+    assert not ok.downgraded
+    c = check_claim(claim("U2.7とU2.8が+3V3に接続。", "schematic", pin("U2.7", "+3V3")), ctx)
+    assert c.downgraded
+    assert "U2.8" in (c.reason or "")
+
+
 def test_mentioned_but_uncited_net_is_downgraded(ctx):
     c = check_claim(claim("U2.9 is on +3V3, next to VDD.", "schematic", pin("U2.9", "+3V3")), ctx)
     assert c.downgraded

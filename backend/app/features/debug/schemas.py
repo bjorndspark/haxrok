@@ -33,6 +33,10 @@ Mode = Literal["debug", "review"]
 mistakes before the board is ordered; there are no symptoms, only optional
 notes on what the board is for."""
 
+Language = Literal["en", "ja"]
+"""The language the user reads the answer in. Only the model's prose
+follows it; ids, refs, nets and the backend's own check text stay as they are."""
+
 Severity = Literal["will_fail", "may_fail", "improve"]
 """Review mode only. will_fail: the board won't work as drawn. may_fail: it
 fails under some conditions (a supply, a load, a tolerance). improve: works,
@@ -457,6 +461,7 @@ class AskRequest(BaseModel):
     simulation: Simulation
     question: str = Field(min_length=1, max_length=1000)
     history: list[AskTurn] = Field(default_factory=list, max_length=10)
+    language: Language = "en"
 
 
 class AskAnswer(BaseModel):

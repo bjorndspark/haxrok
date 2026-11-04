@@ -5,15 +5,15 @@ import { Card } from "@/shared/ui/card"
 import { Prompt } from "@/shared/ui/prompt"
 import { Title } from "@/shared/ui/title"
 
+import { useMessages } from "../messages"
 import type { Run, Simulation } from "../types"
 import { useSimulationChat } from "../useDebug"
 import { SimulationPlot } from "./SimulationPlot"
 
-const SUGGESTIONS = ["What does this show?", "Is there enough margin?", "What should I check?"]
-
 function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation }) {
   const chat = useSimulationChat(runNumber, sim)
   const [question, setQuestion] = useState("")
+  const t = useMessages().simulations
   const busy = chat.pending !== null
   const send = (q: string) => {
     chat.ask(q)
@@ -37,14 +37,14 @@ function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation
             {chat.pending}
           </p>
           <p className="text-muted-foreground">
-            <span className="animate-pulse">●</span> reading the waveform…
+            <span className="animate-pulse">●</span> {t.reading}
           </p>
         </div>
       )}
       {chat.error && <p className="text-bad">{chat.error}</p>}
       {chat.turns.length === 0 && !busy && (
         <div className="flex flex-wrap gap-x-[2ch] gap-y-1">
-          {SUGGESTIONS.map((s) => (
+          {t.suggestions.map((s) => (
             <button
               key={s}
               type="button"
@@ -66,12 +66,12 @@ function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation
         <Prompt
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask about this simulation"
+          placeholder={t.askPlaceholder}
           maxLength={1000}
-          aria-label="Ask about this simulation"
+          aria-label={t.askPlaceholder}
         >
           <Button type="submit" size="sm" disabled={busy || !question.trim()}>
-            Ask
+            {t.ask}
           </Button>
         </Prompt>
       </form>
@@ -82,17 +82,18 @@ function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation
 /** Every ngspice simulation of a run, each with its own questions. Shown
  *  while the model works (they arrive first) and on the finished run. */
 export function SimulationsCard({ run }: { run: Run }) {
+  const t = useMessages().simulations
   if (run.simulations.length === 0) return null
   return (
     <Card className="space-y-4 p-4 sm:p-5">
-      <Title as="h3">Simulations ({run.simulations.length})</Title>
+      <Title as="h3">{t.title(run.simulations.length)}</Title>
       <div className="space-y-4">
         {run.simulations.map((sim) => (
           <div key={sim.id} className="min-w-0 space-y-3 border p-3">
             <p className="text-sm font-bold">{sim.title}</p>
             <SimulationPlot sim={sim} />
             <details className="text-xs text-muted-foreground">
-              <summary className="cursor-pointer">ngspice netlist</summary>
+              <summary className="cursor-pointer">{t.netlist}</summary>
               <pre className="mt-1.5 overflow-x-auto border-l-2 pl-[1ch]">{sim.deck}</pre>
             </details>
             <SimulationChat runNumber={run.number} sim={sim} />

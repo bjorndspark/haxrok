@@ -744,6 +744,10 @@ async def test_ask_sends_the_deck_samples_and_conversation():
     assert await service.ask(req, answer) == "It crosses 2.09 V at about 10 ms."
     system, user = seen[0]
     assert system == prompt.ASK_SIMULATION
+
+    seen.clear()
+    await service.ask(req.model_copy(update={"language": "ja"}), answer)
+    assert seen[0][0] == prompt.in_language(prompt.ASK_SIMULATION, "ja") != prompt.ASK_SIMULATION
     assert "Rpull rail pin 10000" in user and "63% 2.09 V" in user
     assert "50 ms\t3.278 V" in user  # the last sample is always in the table
     assert user.index("Q: What is this?") < user.index("## Question\nWhen does EN pass 63%?")
@@ -776,6 +780,24 @@ async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
     assert "## Symptoms" not in users[0]
     assert "what the board is for\n(none given)" in users[0]
     assert events[-1][0] == "result" and events[-1][1]["hypotheses"] == []
+
+
+async def test_japanese_changes_only_the_write_up_and_ask_prompts():
+    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), language="ja")
+    systems: list[str] = []
+
+    async def diagnose(system: str, user: str) -> str:
+        systems.append(system)
+        return "1. L2 tied to VOUT."
+
+    async def structure(system: str, user: str) -> Analysis[Claim]:
+        systems.append(system)
+        return Analysis[Claim](hypotheses=[], open_questions=[], glossary=[])
+
+    await _collect(prepared, service.Model(diagnose=diagnose, structure=structure))
+    assert systems[0] == prompt.DIAGNOSE
+    assert systems[1].startswith(prompt.STRUCTURE) and "Japanese" in systems[1]
+    assert prompt.in_language(prompt.STRUCTURE, "en") == prompt.STRUCTURE
 
 
 # --- route ------------------------------------------------------------------------------------

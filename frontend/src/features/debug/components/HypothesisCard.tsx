@@ -5,13 +5,12 @@ import { Badge, type BadgeProps } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Prompt } from "@/shared/ui/prompt"
 
+import { useMessages } from "../messages"
 import {
   assess,
   confidenceLabel,
-  EVIDENCE_LABEL,
   findingTokens,
   isReview,
-  SEVERITY_LABEL,
   symptomText,
   type Assessment,
   type Confidence,
@@ -86,14 +85,15 @@ function Meter({ label, value, of }: { label: string; value: number; of: number 
 }
 
 function ConfidenceLine({ assessment: a, review }: { assessment: Assessment; review: boolean }) {
+  const m = useMessages()
   return (
     <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-[3ch]">
       <Badge tone={CONFIDENCE_TONE[a.confidence]} className="self-start font-bold" title={a.reason}>
-        {CONFIDENCE_GLYPH[a.confidence]} {confidenceLabel(a.confidence, review)}
+        {CONFIDENCE_GLYPH[a.confidence]} {confidenceLabel(a.confidence, review, m)}
       </Badge>
       <div className="flex flex-wrap gap-x-[3ch] gap-y-1">
-        {!review && <Meter label="Explains" value={a.explained} of={a.symptoms} />}
-        <Meter label="Claims backed" value={a.backed} of={a.claims} />
+        {!review && <Meter label={m.hypothesis.explains} value={a.explained} of={a.symptoms} />}
+        <Meter label={m.hypothesis.claimsBacked} value={a.backed} of={a.claims} />
       </div>
     </div>
   )
@@ -138,17 +138,18 @@ function Disclosure({
 }
 
 function ClaimRow({ claim }: { claim: CheckedClaim }) {
+  const m = useMessages()
+  const label = m.present.evidence
   return (
     <div className="flex flex-col gap-1 border-l-2 pl-[1ch] sm:flex-row sm:items-start sm:gap-[1ch]">
       <Badge tone={EVIDENCE_TONE[claim.evidence]} bracket className="self-start">
-        {EVIDENCE_LABEL[claim.evidence]}
+        {label[claim.evidence]}
       </Badge>
       <div className="space-y-1">
         <p className="leading-relaxed">{claim.text}</p>
         {claim.downgraded && claim.claimed_evidence && (
           <p className="text-warn">
-            ! Labelled &ldquo;{EVIDENCE_LABEL[claim.claimed_evidence]}&rdquo; by the model, but the
-            check failed: {claim.reason}
+            {m.hypothesis.labelledBy(label[claim.claimed_evidence], claim.reason ?? "")}
           </p>
         )}
       </div>
@@ -169,40 +170,43 @@ function StepView({
   onRerun: (step: ConfirmStep, value: string) => void
 }) {
   const [value, setValue] = useState("")
+  const t = useMessages().hypothesis
   return (
     <div className="space-y-3 border p-3">
       <div className="flex flex-wrap items-center gap-[1ch]">
         <Badge tone="solid">{step.id}</Badge>
-        <Badge tone={step.power === "off" ? "neutral" : "bad"}>power {step.power}</Badge>
-        <Badge>· {step.tool === "look" ? "look" : step.tool}</Badge>
+        <Badge tone={step.power === "off" ? "neutral" : "bad"}>{t.power(step.power)}</Badge>
+        <Badge>· {t.tool[step.tool]}</Badge>
         <Badge tone={step.purpose === "test_cause" ? "info" : "neutral"}>
-          ·{" "}
-          {step.purpose === "test_cause"
-            ? "tests the cause"
-            : "checks the board matches the schematic"}
+          · {step.purpose === "test_cause" ? t.testsCause : t.checksBoard}
         </Badge>
-        {!step.practical && <Badge tone="warn">! hard by hand</Badge>}
+        {!step.practical && <Badge tone="warn">{t.hardByHand}</Badge>}
       </div>
       <p className="text-sm leading-relaxed">{step.instruction}</p>
       {step.practical_note && <p className="text-xs text-warn">{step.practical_note}</p>}
       {step.setup.length > 0 && (
         <div>
           <p className="mb-1 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-            Rewire before power
+            {t.rewireBeforePower}
           </p>
           <ul className="space-y-0.5 text-xs">
-            {step.setup.map((c, i) => (
-              <li key={i}>
-                {c.action === "disconnect" ? "✂ " : "↔ "}
-                <span className="text-info">{c.pin}</span>
-                {c.action === "disconnect" ? " from " : " to "}
-                {c.action === "connect" && c.to_pin ? (
-                  <span className="text-info">{c.to_pin}</span>
-                ) : (
-                  <span className="text-net">{c.net ?? "?"}</span>
-                )}
-              </li>
-            ))}
+            {step.setup.map((c, i) => {
+              const [before, between, after] = t.setup[c.action]
+              return (
+                <li key={i}>
+                  {c.action === "disconnect" ? "✂ " : "↔ "}
+                  {before}
+                  <span className="text-info">{c.pin}</span>
+                  {between}
+                  {c.action === "connect" && c.to_pin ? (
+                    <span className="text-info">{c.to_pin}</span>
+                  ) : (
+                    <span className="text-net">{c.net ?? "?"}</span>
+                  )}
+                  {after}
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
@@ -210,8 +214,8 @@ function StepView({
         <table className="w-full border-collapse text-left">
           <thead className="bg-foreground text-xs text-background uppercase">
             <tr>
-              <th className="px-[1ch] py-0.5 font-bold">If you see</th>
-              <th className="px-[1ch] py-0.5 font-bold">It means</th>
+              <th className="px-[1ch] py-0.5 font-bold">{t.ifYouSee}</th>
+              <th className="px-[1ch] py-0.5 font-bold">{t.itMeans}</th>
             </tr>
           </thead>
           <tbody>
@@ -224,12 +228,12 @@ function StepView({
                     <span className="mt-1 flex flex-wrap gap-[1ch]">
                       {r.supports.map((id) => (
                         <Badge key={`s-${id}`} tone="ok">
-                          supports {id}
+                          {t.supports(id)}
                         </Badge>
                       ))}
                       {r.rules_out.map((id) => (
                         <Badge key={`r-${id}`} tone="bad">
-                          rules out {id}
+                          {t.rulesOut(id)}
                         </Badge>
                       ))}
                     </span>
@@ -251,17 +255,17 @@ function StepView({
         >
           <label className="block">
             <span className="block text-xs font-bold tracking-wider text-muted-foreground uppercase">
-              Your reading
+              {t.yourReading}
             </span>
             <span className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Prompt
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder="e.g. 3.28 V at TP11"
+                placeholder={t.readingPlaceholder}
                 maxLength={500}
               />
               <Button type="submit" size="sm" disabled={busy || !value.trim()}>
-                Re-run with this reading
+                {t.rerun}
               </Button>
             </span>
           </label>
@@ -297,8 +301,11 @@ export function HypothesisCard({
   const primary = h.rank === 1
   const stepIds = new Set(h.confirm.map((s) => s.id))
   const ownProblems = problems.filter((p) => p.where === h.id || stepIds.has(p.where))
-  const assessment = assess(h, summary)
+  const m = useMessages()
+  const t = m.hypothesis
+  const assessment = assess(h, summary, m)
   const review = isReview(summary)
+  const kind = review ? "review" : "debug"
   return (
     <div className={cn("border bg-card", primary && "border-foreground")}>
       <div className="p-4 sm:p-5">
@@ -308,7 +315,7 @@ export function HypothesisCard({
           </Badge>
           {h.severity && (
             <Badge tone={SEVERITY_TONE[h.severity]} className="mt-0.5 shrink-0 font-bold">
-              {SEVERITY_LABEL[h.severity]}
+              {m.present.severity[h.severity]}
             </Badge>
           )}
           <h3 className="text-sm font-bold">{h.title}</h3>
@@ -327,8 +334,8 @@ export function HypothesisCard({
       <div className="divide-y border-t">
         {(h.explains.length > 0 || h.does_not_explain.length > 0) && (
           <Disclosure
-            title="Symptoms"
-            aside={`${String(h.explains.length)} explained, ${String(h.does_not_explain.length)} not`}
+            title={t.symptoms}
+            aside={t.symptomsAside(h.explains.length, h.does_not_explain.length)}
           >
             <ul className="space-y-1.5 leading-relaxed">
               {h.explains.map((id) => (
@@ -341,8 +348,7 @@ export function HypothesisCard({
                 <li key={id} className="flex gap-[1ch]" title={id}>
                   <span className="shrink-0 font-bold text-bad">!</span>
                   <span>
-                    <span className="font-bold">Doesn&apos;t explain:</span>{" "}
-                    {symptomText(summary, id)}
+                    <span className="font-bold">{t.doesntExplain}</span> {symptomText(summary, id)}
                   </span>
                 </li>
               ))}
@@ -351,8 +357,8 @@ export function HypothesisCard({
         )}
 
         <Disclosure
-          title="Evidence and claims"
-          aside={`${String(assessment.backed)} of ${String(assessment.claims)} backed by your input`}
+          title={t.evidence}
+          aside={t.evidenceAside(assessment.backed, assessment.claims)}
         >
           {assessment.findings.map((f) => (
             <div
@@ -361,7 +367,7 @@ export function HypothesisCard({
             >
               <span className="shrink-0 text-ok">✓</span>
               <span>
-                <span className="font-bold text-ok">Backend wiring check:</span>{" "}
+                <span className="font-bold text-ok">{t.backendWiring}</span>{" "}
                 <MarkedText text={f.text} tokens={findingTokens(f)} />
               </span>
             </div>
@@ -374,7 +380,7 @@ export function HypothesisCard({
               <span className="shrink-0 text-ok">✓</span>
               <div className="min-w-0 flex-1 space-y-2">
                 <p>
-                  <span className="font-bold text-ok">Backend calculation:</span> {c.text}
+                  <span className="font-bold text-ok">{t.backendCalc}</span> {c.text}
                 </p>
                 {simulations
                   .filter((s) => s.calc_id === c.id)
@@ -391,8 +397,8 @@ export function HypothesisCard({
 
         {h.confirm.length > 0 && (
           <Disclosure
-            title={review ? "Check before you order" : "Check this with a multimeter"}
-            aside={`${String(h.confirm.length)} ${h.confirm.length === 1 ? "step" : "steps"}`}
+            title={t.checkTitle[kind]}
+            aside={t.steps(h.confirm.length)}
             defaultOpen={primary && latest}
             accent
           >
@@ -405,28 +411,20 @@ export function HypothesisCard({
                 onRerun={onRerun}
               />
             ))}
-            {!latest && !review && (
-              <p className="text-muted-foreground">Enter readings on the latest run.</p>
-            )}
+            {!latest && !review && <p className="text-muted-foreground">{t.enterOnLatest}</p>}
           </Disclosure>
         )}
 
-        <Disclosure
-          title={
-            review
-              ? "Fix in the schematic before ordering"
-              : "Fix on the bench and in the next revision"
-          }
-        >
+        <Disclosure title={t.fixTitle[kind]}>
           {h.fix.rework.length > 0 && (
             <div className="space-y-1.5 border-l-2 border-warn pl-[1ch]">
-              <span className="font-bold text-warn">Rework on this board</span>
+              <span className="font-bold text-warn">{t.reworkOnBoard}</span>
               <ol className="list-decimal space-y-1 pl-4 leading-relaxed">
                 {h.fix.rework.map((r, i) => (
                   <li key={i}>
                     {r.text}
                     {!r.practical && r.practical_note && (
-                      <span className="block text-warn">! Hard by hand: {r.practical_note}</span>
+                      <span className="block text-warn">{t.hardByHandNote(r.practical_note)}</span>
                     )}
                   </li>
                 ))}
@@ -435,9 +433,7 @@ export function HypothesisCard({
           )}
           {h.fix.schematic.length > 0 && (
             <div className="space-y-1.5 border-l-2 border-info pl-[1ch]">
-              <span className="font-bold text-info">
-                {review ? "Schematic change" : "Next schematic revision"}
-              </span>
+              <span className="font-bold text-info">{t.schematicChange[kind]}</span>
               <ul className="list-disc space-y-1 pl-4 leading-relaxed">
                 {h.fix.schematic.map((s, i) => (
                   <li key={i}>{s}</li>
@@ -445,11 +441,7 @@ export function HypothesisCard({
               </ul>
             </div>
           )}
-          <p className="text-muted-foreground">
-            {review
-              ? "Unverified: settle the issue with the checks above before changing the design."
-              : "Rework is unverified: confirm the cause with the steps above first."}
-          </p>
+          <p className="text-muted-foreground">{t.unverified[kind]}</p>
         </Disclosure>
       </div>
 

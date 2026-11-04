@@ -1,3 +1,5 @@
+import type { Language } from "@/shared/lib/language"
+
 /** Wire shapes mirroring backend app/features/debug/schemas.py. */
 
 /** debug: bench symptoms -> causes. review: pre-fab design review, no symptoms. */
@@ -308,6 +310,8 @@ export interface AskRequest {
   simulation: Simulation
   question: string
   history: AskTurn[]
+  /** The language the answer is written in. */
+  language: Language
 }
 
 export interface AskAnswer {

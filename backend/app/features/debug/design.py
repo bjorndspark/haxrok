@@ -20,7 +20,8 @@ LIBRARY_ONLY_RULES = frozenset(
 
 _TOKEN = re.compile(r'\(|\)|"(?:[^"\\]|\\.)*"|[^\s()]+')
 # "U2.9", "U2.9(L2)", "U2 pin 9", "U2 pin 9 (L2)". The ref must start with letters.
-PIN_MENTION = re.compile(r"\b([A-Z]{1,4}\d{1,4})(?:\.|\s+pin\s+)([A-Za-z0-9]{1,5})\b")
+# ASCII word boundaries, so "U2.9が" (Japanese prose) still counts as a mention.
+PIN_MENTION = re.compile(r"\b([A-Z]{1,4}\d{1,4})(?:\.|\s+pin\s+)([A-Za-z0-9]{1,5})\b", re.ASCII)
 
 
 @dataclass(frozen=True)

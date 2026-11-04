@@ -1,5 +1,6 @@
 import { cn } from "@/shared/lib/utils"
 
+import { useMessages } from "../messages"
 import { diagramLayout } from "../present"
 import type { Diagram } from "../types"
 
@@ -7,14 +8,15 @@ import type { Diagram } from "../types"
  *  netlist by the backend: the IC in cyan, its value yellow, nets magenta. A
  *  pin the wiring check flagged is red. */
 export function WiringDiagram({ diagram }: { diagram: Diagram }) {
-  const layout = diagramLayout(diagram)
+  const m = useMessages()
+  const layout = diagramLayout(diagram, m)
   return (
     <figure className="space-y-1.5">
       <svg
         viewBox={`0 0 ${String(layout.width)} ${String(layout.height)}`}
         className="w-full max-w-2xl font-mono text-xs"
         role="img"
-        aria-label={`${diagram.ic} pins and the nets they are on`}
+        aria-label={m.diagram.aria(diagram.ic)}
       >
         <rect
           x={layout.box.x}

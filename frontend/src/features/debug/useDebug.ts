@@ -6,10 +6,12 @@
 import { useMutation } from "@tanstack/react-query"
 import { useCallback, useEffect, useState } from "react"
 
+import { useLanguage } from "@/shared/lib/language"
 import { errorMessage } from "@/shared/lib/utils"
 
 import { askSimulation, streamAnalysis } from "./api"
 import { fromDataTransfer, fromFileList } from "./files"
+import { currentMessages, useMessages } from "./messages"
 import { toMarkdown } from "./present"
 import { useDebugStore } from "./store"
 import type { AnalysisEvent, AskTurn, ConfirmStep, Run, Simulation } from "./types"
@@ -41,7 +43,7 @@ export interface DebugActions {
 function setProject(files: ReturnType<typeof fromFileList>): void {
   const store = useDebugStore.getState()
   if (files.length === 0) {
-    store.setInputError("No .kicad_pro or .kicad_sch files found. Drop the KiCad project folder.")
+    store.setInputError(currentMessages().run.errors.noProjectFiles)
     return
   }
   store.setFiles(files)
@@ -50,12 +52,13 @@ function setProject(files: ReturnType<typeof fromFileList>): void {
 export function useDebugActions(): DebugActions {
   const run = useCallback(async (trigger: string) => {
     const store = useDebugStore.getState()
+    const errors = currentMessages().run.errors
     if (store.files.length === 0) {
-      store.setInputError("Drop your KiCad project folder first.")
+      store.setInputError(errors.dropFirst)
       return
     }
     if (store.mode === "debug" && !store.symptoms.trim()) {
-      store.setInputError("Describe what you see on the bench first.")
+      store.setInputError(errors.describeFirst)
       return
     }
     store.controller?.abort()
@@ -68,39 +71,35 @@ export function useDebugActions(): DebugActions {
         store.symptoms,
         useDebugStore.getState().measurements,
         store.mode,
+        useLanguage.getState().language,
         controller.signal,
       )) {
         update(number, (r) => applyEvent(r, ev))
       }
       update(number, (r) =>
-        r.finishedAt === null
-          ? { error: "The connection closed before a result arrived.", finishedAt: Date.now() }
-          : {},
+        r.finishedAt === null ? { error: errors.closedEarly, finishedAt: Date.now() } : {},
       )
     } catch (e) {
       const cancelled = controller.signal.aborted
       update(number, () => ({
-        error: cancelled ? "Cancelled." : errorMessage(e, "The analysis failed."),
+        error: cancelled ? errors.cancelled : errorMessage(e, errors.failed),
         finishedAt: Date.now(),
         stage: null,
       }))
     }
   }, [])
 
-  const analyze = useCallback(
-    () =>
-      run(
-        useDebugStore.getState().mode === "review" ? "Review before ordering" : "Initial analysis",
-      ),
-    [run],
-  )
+  const analyze = useCallback(() => {
+    const trigger = currentMessages().run.trigger
+    return run(useDebugStore.getState().mode === "review" ? trigger.review : trigger.initial)
+  }, [run])
 
   const rerunWithMeasurement = useCallback(
     async (step: ConfirmStep, value: string) => {
       const store = useDebugStore.getState()
       const id = `m${String(store.measurements.length + 1)}`
       store.addMeasurement({ step_id: step.id, context: step.instruction, value })
-      await run(`${id}: ${value} (step ${step.id})`)
+      await run(currentMessages().run.trigger.measurement(id, value, step.id))
     },
     [run],
   )
@@ -117,13 +116,17 @@ export function useDebugActions(): DebugActions {
     try {
       setProject(await fromDataTransfer(dt))
     } catch (e) {
-      useDebugStore.getState().setInputError(errorMessage(e, "Couldn't read the dropped folder."))
+      useDebugStore
+        .getState()
+        .setInputError(errorMessage(e, currentMessages().run.errors.readFolder))
     }
   }, [])
 
   const downloadReport = useCallback((run: Run) => {
     if (!run.summary || !run.result) return
-    const blob = new Blob([toMarkdown(run, run.summary, run.result)], { type: "text/markdown" })
+    // index.html's <title> carries PROJECT_NAME, so the name stays config.
+    const md = toMarkdown(run, run.summary, run.result, currentMessages(), document.title)
+    const blob = new Blob([md], { type: "text/markdown" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
@@ -147,8 +150,15 @@ export interface SimulationChat {
 export function useSimulationChat(runNumber: number, sim: Simulation): SimulationChat {
   const turns = useDebugStore((s) => s.runs.find((r) => r.number === runNumber)?.chats[sim.id])
   const history = turns ?? []
+  const m = useMessages()
   const mutation = useMutation({
-    mutationFn: (question: string) => askSimulation({ simulation: sim, question, history }),
+    mutationFn: (question: string) =>
+      askSimulation({
+        simulation: sim,
+        question,
+        history,
+        language: useLanguage.getState().language,
+      }),
     onSuccess: (answer, question) => {
       useDebugStore.getState().addAskTurn(runNumber, sim.id, { question, answer })
     },
@@ -159,7 +169,7 @@ export function useSimulationChat(runNumber: number, sim: Simulation): Simulatio
       if (question.trim() && !mutation.isPending) mutation.mutate(question.trim())
     },
     pending: mutation.isPending ? mutation.variables : null,
-    error: mutation.isError ? errorMessage(mutation.error, "The question failed.") : null,
+    error: mutation.isError ? errorMessage(mutation.error, m.run.errors.question) : null,
   }
 }
 

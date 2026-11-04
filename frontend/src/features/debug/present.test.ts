@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { isSchematicFile, projectName } from "./files"
+import { MESSAGES } from "./messages"
 import {
   findingTokens,
   markTokens,
@@ -23,6 +24,8 @@ import type {
   Simulation,
 } from "./types"
 
+const en = MESSAGES.en
+
 describe("symptoms", () => {
   it("numbers non-empty lines the way the backend does", () => {
     expect(symptomLines("- Fails on battery\n\n* Works on USB 5 V ")).toEqual([
@@ -35,8 +38,19 @@ describe("symptoms", () => {
     expect(fragmentLines("Fails on battery\nbattery")).toEqual(["battery"])
   })
 
+  it("judges Japanese lines, which have no spaces, by length", () => {
+    expect(fragmentLines("電池だと起動しない\n電池")).toEqual(["電池"])
+  })
+
+  it("notices Japanese answers too", () => {
+    const done = symptomHints("USB では動く。電池だと起動しない。レギュレータが熱い。", en)
+      .filter((h) => h.done)
+      .map((h) => h.key)
+    expect(done).toEqual(["power", "works", "fails", "hot"])
+  })
+
   it("notices which questions the text answers", () => {
-    const done = symptomHints("Powered from USB. When it fails, +3V3 reads 2.3 V.")
+    const done = symptomHints("Powered from USB. When it fails, +3V3 reads 2.3 V.", en)
       .filter((h) => h.done)
       .map((h) => h.key)
     expect(done).toEqual(["power", "fails", "measured"])
@@ -117,13 +131,17 @@ describe("assess", () => {
   } as DesignSummary
 
   it("calls a backed claim on a flagged pin a verified wiring fault", () => {
-    const a = assess(hypothesis([claim("schematic", "U2.9"), claim("none", null)], ["s1"]), summary)
+    const a = assess(
+      hypothesis([claim("schematic", "U2.9"), claim("none", null)], ["s1"]),
+      summary,
+      en,
+    )
     expect(a.confidence).toBe("verified")
     expect([a.explained, a.symptoms, a.backed, a.claims]).toEqual([1, 4, 1, 2])
   })
 
   it("ignores a flagged pin cited only by a downgraded claim", () => {
-    expect(assess(hypothesis([claim("none", "U2.9")], ["s1"]), summary).confidence).toBe(
+    expect(assess(hypothesis([claim("none", "U2.9")], ["s1"]), summary, en).confidence).toBe(
       "speculative",
     )
   })
@@ -150,23 +168,27 @@ describe("assess", () => {
       ...claim("reference", null),
       cites: [{ kind: "reference", pin: null, net: null, id: "cf1" }],
     }
-    expect(assess(hypothesis([byId], []), review).confidence).toBe("verified")
-    expect(assess(hypothesis([claim("schematic", "R3.1")], []), review).confidence).toBe("verified")
+    expect(assess(hypothesis([byId], []), review, en).confidence).toBe("verified")
+    expect(assess(hypothesis([claim("schematic", "R3.1")], []), review, en).confidence).toBe(
+      "verified",
+    )
   })
 
   it("verifies a review issue only through the wiring check", () => {
     const review = { ...summary, mode: "review", symptoms: [] } as DesignSummary
-    expect(assess(hypothesis([claim("schematic", "U2.9")], []), review).confidence).toBe("verified")
-    expect(assess(hypothesis([claim("schematic", "U1.2")], []), review).confidence).toBe(
+    expect(assess(hypothesis([claim("schematic", "U2.9")], []), review, en).confidence).toBe(
+      "verified",
+    )
+    expect(assess(hypothesis([claim("schematic", "U1.2")], []), review, en).confidence).toBe(
       "speculative",
     )
   })
 
   it("needs half the symptoms and a backed claim to fit", () => {
     const backed = [claim("schematic", "U1.2")]
-    expect(assess(hypothesis(backed, ["s1", "s2"]), summary).confidence).toBe("fits")
-    expect(assess(hypothesis(backed, ["s1"]), summary).confidence).toBe("speculative")
-    expect(assess(hypothesis([claim("none", null)], ["s1", "s2"]), summary).confidence).toBe(
+    expect(assess(hypothesis(backed, ["s1", "s2"]), summary, en).confidence).toBe("fits")
+    expect(assess(hypothesis(backed, ["s1"]), summary, en).confidence).toBe("speculative")
+    expect(assess(hypothesis([claim("none", null)], ["s1", "s2"]), summary, en).confidence).toBe(
       "speculative",
     )
   })
@@ -174,19 +196,22 @@ describe("assess", () => {
 
 describe("diagramLayout", () => {
   it("groups pins by net, one bus per net, flagged net marked", () => {
-    const layout = diagramLayout({
-      ic: "U2",
-      value: "TPS63070",
-      pins: [
-        { pin: "U2.9", name: "L2", net: "+3V3", flagged: true },
-        { pin: "U2.7", name: "VOUT", net: "+3V3", flagged: false },
-        { pin: "U2.11", name: "L1", net: "/Power/SW1", flagged: false },
-      ],
-      nets: [
-        { name: "+3V3", members: [{ pin: "L1.2", name: "", inductor: true }], more: 30 },
-        { name: "/Power/SW1", members: [{ pin: "L1.1", name: "", inductor: true }], more: 1 },
-      ],
-    })
+    const layout = diagramLayout(
+      {
+        ic: "U2",
+        value: "TPS63070",
+        pins: [
+          { pin: "U2.9", name: "L2", net: "+3V3", flagged: true },
+          { pin: "U2.7", name: "VOUT", net: "+3V3", flagged: false },
+          { pin: "U2.11", name: "L1", net: "/Power/SW1", flagged: false },
+        ],
+        nets: [
+          { name: "+3V3", members: [{ pin: "L1.2", name: "", inductor: true }], more: 30 },
+          { name: "/Power/SW1", members: [{ pin: "L1.1", name: "", inductor: true }], more: 1 },
+        ],
+      },
+      en,
+    )
     expect(layout.pins.map((p) => p.label)).toEqual(["9 L2", "7 VOUT", "11 L1"])
     const [rail, node] = layout.nets
     expect(rail.label).toBe("+3V3")
@@ -203,12 +228,15 @@ describe("diagramLayout", () => {
 describe("diagramLayout members", () => {
   it("folds members that don't fit into +N more", () => {
     const member = (n: number) => ({ pin: `U${String(n)}.1`, name: "VDD", inductor: false })
-    const layout = diagramLayout({
-      ic: "U2",
-      value: "",
-      pins: [{ pin: "U2.7", name: "VOUT", net: "+3V3", flagged: false }],
-      nets: [{ name: "+3V3", members: [1, 2, 3, 4, 5, 6].map(member), more: 30 }],
-    })
+    const layout = diagramLayout(
+      {
+        ic: "U2",
+        value: "",
+        pins: [{ pin: "U2.7", name: "VOUT", net: "+3V3", flagged: false }],
+        nets: [{ name: "+3V3", members: [1, 2, 3, 4, 5, 6].map(member), more: 30 }],
+      },
+      en,
+    )
     const text = layout.nets[0].members
     expect(text.endsWith("+33 more")).toBe(true)
     expect(text.length).toBeLessThanOrEqual(56)
@@ -218,12 +246,15 @@ describe("diagramLayout members", () => {
 describe("diagramLayout box", () => {
   it("widens the IC box so a long pin name isn't clipped", () => {
     const diagram = (name: string) =>
-      diagramLayout({
-        ic: "U3",
-        value: "ESP32-C3-MINI-1",
-        pins: [{ pin: "U3.6", name, net: "IO0", flagged: false }],
-        nets: [{ name: "IO0", members: [], more: 0 }],
-      })
+      diagramLayout(
+        {
+          ic: "U3",
+          value: "ESP32-C3-MINI-1",
+          pins: [{ pin: "U3.6", name, net: "IO0", flagged: false }],
+          nets: [{ name: "IO0", members: [], more: 0 }],
+        },
+        en,
+      )
     const short = diagram("EN")
     const long = diagram("GPIO0/ADC1_CH0/XTAL_32K_P")
     expect(short.box.width).toBe(170)
@@ -294,15 +325,15 @@ describe("calculationBadge", () => {
   })
 
   it("compares against the expected value in the calculation's own unit", () => {
-    expect(calculationBadge(calc({}))).toBe("56000 Ω ≠ 5100 Ω")
-    expect(calculationBadge(calc({ value: 5100, flagged: false }))).toBe("5100 Ω ✓")
+    expect(calculationBadge(calc({}), en)).toBe("56000 Ω ≠ 5100 Ω")
+    expect(calculationBadge(calc({ value: 5100, flagged: false }), en)).toBe("5100 Ω ✓")
   })
 
   it("says miswired for a UART flag and missing for a value that isn't there", () => {
-    expect(calculationBadge(calc({ kind: "uart", value: null, unit: "", expected: null }))).toBe(
-      "miswired",
-    )
-    expect(calculationBadge(calc({ kind: "i2c_pullup", value: null, expected: null }))).toBe(
+    expect(
+      calculationBadge(calc({ kind: "uart", value: null, unit: "", expected: null }), en),
+    ).toBe("miswired")
+    expect(calculationBadge(calc({ kind: "i2c_pullup", value: null, expected: null }), en)).toBe(
       "missing",
     )
   })
@@ -347,7 +378,7 @@ describe("toMarkdown", () => {
       open_questions: [],
       glossary: [],
     } as unknown as CheckedAnalysis
-    const md = toMarkdown(run, summary, result)
+    const md = toMarkdown(run, summary, result, en, "Häxrök")
     expect(md).toContain("## Simulations\n\n### EN rising through its RC delay")
     expect(md).toContain("```spice\nRC on EN\nRpull rail pin 10000\n```")
     expect(md).toContain("**Q:** When does it pass 63%?\n\nAt 10 ms.")

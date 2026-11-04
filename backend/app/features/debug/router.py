@@ -21,6 +21,7 @@ from app.features.debug.schemas import (
     AskAnswer,
     AskRequest,
     Claim,
+    Language,
     MeasurementInput,
     Mode,
 )
@@ -66,6 +67,9 @@ async def analyze(
     ] = "",
     measurements: Annotated[str, Form(description="JSON list of MeasurementInput")] = "[]",
     mode: Annotated[Mode, Form(description="debug (bench symptoms) or review (pre-fab)")] = "debug",
+    language: Annotated[
+        Language, Form(description="Language of the written-up answer: en or ja")
+    ] = "en",
 ) -> EventSourceResponse:
     """Analyze a KiCad project against bench symptoms, or (``mode=review``)
     review it for design mistakes before the board is ordered.
@@ -94,7 +98,7 @@ async def analyze(
             )
         raw.append((f.filename or "", data))
 
-    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), mode)
+    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), mode, language)
     return EventSourceResponse(
         service.stream(prepared, service.Model(diagnose=_diagnose, structure=_structure), Ngspice())
     )
