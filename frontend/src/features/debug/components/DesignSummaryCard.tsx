@@ -42,24 +42,24 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
 
       <div className="space-y-2">
         <Rule>ICs and pin data</Rule>
-        <div className="grid grid-cols-1 gap-x-[3ch] gap-y-2 sm:grid-cols-2">
+        <ul className="space-y-0.5 text-xs">
           {summary.ics.map((ic) => (
-            <div key={ic.ref} className="min-w-0 text-xs">
-              <div className="flex items-center justify-between gap-[1ch]">
-                <span className="truncate font-bold text-info">
-                  {ic.ref} · {ic.value}
-                </span>
-                <span className="flex shrink-0 gap-[1ch]">
-                  {refParts.has(ic.value) && <Badge tone="ok">ref design</Badge>}
-                  <Badge tone={ic.pin_data ? "ok" : "neutral"}>
-                    {ic.pin_data ? "pin table" : "no pin data"}
-                  </Badge>
-                </span>
-              </div>
-              <p className="truncate text-muted-foreground">{ic.footprint || "no footprint"}</p>
-            </div>
+            <li key={ic.ref} className="flex min-w-0 items-baseline gap-[2ch]">
+              <span className="shrink-0 font-bold text-info">
+                {ic.ref} · {ic.value}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                {ic.footprint || "no footprint"}
+              </span>
+              <span className="flex shrink-0 gap-[1ch]">
+                {refParts.has(ic.value) && <Badge tone="ok">ref design</Badge>}
+                <Badge tone={ic.pin_data ? "ok" : "neutral"}>
+                  {ic.pin_data ? "pin table" : "no pin data"}
+                </Badge>
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
         {summary.ics.some((ic) => !ic.pin_data) && (
           <p className="text-xs text-muted-foreground">
             ICs without pin data are still analyzed; facts about their pins come from the

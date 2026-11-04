@@ -183,7 +183,7 @@ export function InputView({ actions }: { actions: DebugActions }) {
         )}
 
         {showFiles && files.length > 0 && (
-          <ul className="mt-3 grid grid-cols-1 gap-x-[3ch] gap-y-0.5 border-t pt-3 text-xs sm:grid-cols-2">
+          <ul className="mt-3 space-y-0.5 border-t pt-3 text-xs">
             {files.map((f) => (
               <li key={f.path} className="truncate">
                 {f.path}

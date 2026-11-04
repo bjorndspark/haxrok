@@ -142,11 +142,11 @@ function RunBody({
       {result.glossary.length > 0 && (
         <Card className="space-y-3 p-4 sm:p-5">
           <Title as="h3">Glossary</Title>
-          <dl className="grid grid-cols-1 gap-x-[3ch] gap-y-2.5 sm:grid-cols-2">
+          <dl className="space-y-1.5 text-xs leading-relaxed">
             {result.glossary.map((g) => (
-              <div key={g.term} className="space-y-0.5 text-xs">
-                <dt className="font-bold text-info">{g.term}</dt>
-                <dd className="leading-relaxed text-muted-foreground">{g.definition}</dd>
+              <div key={g.term}>
+                <dt className="inline font-bold text-info">{g.term}</dt>{" "}
+                <dd className="inline">{g.definition}</dd>
               </div>
             ))}
           </dl>
