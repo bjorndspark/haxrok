@@ -12,8 +12,9 @@ Two phases, so failures land where the UI can show them:
 
 The model is called twice (see ``prompt``): a free-text diagnosis, then a
 conversion of it into the structured answer. ``ask`` answers a question
-about one simulation afterwards. The kicad and ngspice runners and the
-model calls are passed in, so tests fake them.
+about one simulation afterwards, ``ask_result`` a follow-up about the run.
+The kicad and ngspice runners and the model calls are passed in, so tests
+fake them.
 """
 
 import asyncio
@@ -49,6 +50,7 @@ from app.features.debug.schemas import (
     Mode,
     ProgressEvent,
     ReferenceNote,
+    ResultAskRequest,
     Symptom,
 )
 
@@ -311,6 +313,25 @@ async def ask(req: AskRequest, answer: Answerer) -> str:
         "ask about %s (%s) in %.1fs: %r",
         req.simulation.id,
         req.simulation.title,
+        time.monotonic() - start,
+        req.question,
+    )
+    return text.strip()
+
+
+async def ask_result(req: ResultAskRequest, answer: Answerer) -> str:
+    """The model's answer to a follow-up question about a finished run,
+    from the design summary and checked result the browser sent back."""
+    start = time.monotonic()
+    text = await answer(
+        prompt.in_language(prompt.ASK_RESULT, req.language),
+        prompt.build_result_ask_message(req.summary, req.result, req.history, req.question),
+    )
+    logger.info(
+        "ask about %s (%s run, %d findings) in %.1fs: %r",
+        req.summary.project,
+        req.summary.mode,
+        len(req.result.hypotheses),
         time.monotonic() - start,
         req.question,
     )

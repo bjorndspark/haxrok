@@ -13,6 +13,7 @@ import { AnalyzingPanel } from "./AnalyzingPanel"
 import { DesignSummaryCard } from "./DesignSummaryCard"
 import { GlossaryText } from "./GlossaryText"
 import { HypothesisCard } from "./HypothesisCard"
+import { ResultChatCard } from "./ResultChatCard"
 import { SimulationsCard } from "./SimulationsCard"
 
 function RunHeader({ run, total }: { run: Run; total: number }) {
@@ -104,6 +105,8 @@ function RunBody({
           onRerun={(step, value) => void actions.rerunWithMeasurement(step, value)}
         />
       ))}
+
+      {run.summary && <ResultChatCard run={run} summary={run.summary} result={result} />}
 
       <SimulationsCard run={run} />
 

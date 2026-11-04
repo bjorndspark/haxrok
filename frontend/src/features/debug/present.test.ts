@@ -363,6 +363,7 @@ describe("toMarkdown", () => {
       error: null,
       simulations: [sim],
       chats: { sim1: [{ question: "When does it pass 63%?", answer: "At 10 ms." }] },
+      resultChat: [{ question: "Which finding first?", answer: "None were found." }],
     }
     const summary = {
       mode: "review",
@@ -382,6 +383,9 @@ describe("toMarkdown", () => {
     expect(md).toContain("## Simulations\n\n### EN rising through its RC delay")
     expect(md).toContain("```spice\nRC on EN\nRpull rail pin 10000\n```")
     expect(md).toContain("**Q:** When does it pass 63%?\n\nAt 10 ms.")
+    expect(md).toContain(
+      "## Follow-up questions\n\n**Q:** Which finding first?\n\nNone were found.",
+    )
   })
 })
 

@@ -298,6 +298,8 @@ export interface Run {
   simulations: Simulation[]
   /** Questions asked about each simulation, by simulation id. */
   chats: Record<string, AskTurn[]>
+  /** Follow-up questions asked about the finished run. */
+  resultChat: AskTurn[]
 }
 
 /** A question about a simulation and the model's answer. */
@@ -311,6 +313,16 @@ export interface AskRequest {
   question: string
   history: AskTurn[]
   /** The language the answer is written in. */
+  language: Language
+}
+
+/** A follow-up question about a finished run; the summary and result go
+ *  back with it, since the server keeps nothing. */
+export interface ResultAskRequest {
+  summary: DesignSummary
+  result: CheckedAnalysis
+  question: string
+  history: AskTurn[]
   language: Language
 }
 

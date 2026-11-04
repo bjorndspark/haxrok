@@ -8,6 +8,7 @@ import type {
   CheckedAnalysis,
   DesignSummary,
   MeasurementInput,
+  ResultAskRequest,
   Mode,
   ProgressEvent,
   ProjectFile,
@@ -95,4 +96,10 @@ export async function* streamAnalysis(
 /** Ask about one simulation; the conversation so far goes with it. */
 export async function askSimulation(req: AskRequest): Promise<string> {
   return (await apiPost<AskAnswer>("/debug/ask", req)).answer
+}
+
+/** Ask a follow-up about a finished run; its summary, result and the
+ *  conversation so far go with it. */
+export async function askResult(req: ResultAskRequest): Promise<string> {
+  return (await apiPost<AskAnswer>("/debug/ask-result", req)).answer
 }

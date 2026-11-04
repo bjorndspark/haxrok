@@ -772,6 +772,46 @@ async def test_ask_sends_the_deck_samples_and_conversation():
     assert user.index("Q: What is this?") < user.index("## Question\nWhen does EN pass 63%?")
 
 
+async def _finished_run() -> tuple[dict, dict]:
+    """The design summary and checked result of a faked run, as the browser holds them."""
+    prepared = await service.prepare(_files(), "Dead", [], FakeKicad())
+    events = await _collect(prepared, service.Model(diagnose=_diagnose, structure=_structure))
+    assert events[0][0] == "design_summary" and events[-1][0] == "result"
+    return events[0][1], events[-1][1]
+
+
+async def test_ask_result_sends_the_checks_findings_and_conversation():
+    from app.features.debug.schemas import AskTurn, ResultAskRequest
+
+    summary, result = await _finished_run()
+    seen: list[tuple[str, str]] = []
+
+    async def answer(system: str, user: str) -> str:
+        seen.append((system, user))
+        return " Move U2.9 to the switch node.\n"
+
+    req = ResultAskRequest.model_validate(
+        {
+            "summary": summary,
+            "result": result,
+            "question": "How do I fix h1?",
+            "history": [AskTurn(question="Is h1 real?", answer="Yes.").model_dump()],
+        }
+    )
+    assert await service.ask_result(req, answer) == "Move U2.9 to the switch node."
+    system, user = seen[0]
+    assert system == prompt.ASK_RESULT
+    assert "## Symptoms\n- s1: Dead" in user
+    assert "### h1 (#1): L2 is on the output rail" in user
+    assert "U2.9 (L2) is on +3V3." in user
+    assert "downgraded): It reads 0 ohm." in user  # m2 was never measured
+    assert user.index("Q: Is h1 real?") < user.index("## Question\nHow do I fix h1?")
+
+    seen.clear()
+    await service.ask_result(req.model_copy(update={"language": "ja"}), answer)
+    assert seen[0][0] == prompt.in_language(prompt.ASK_RESULT, "ja")
+
+
 async def test_blank_symptoms_are_refused_before_kicad_runs():
     kicad = FakeKicad()
     with pytest.raises(BadRequestError, match="bench"):
@@ -871,6 +911,18 @@ async def test_ask_answers_in_the_envelope(client, monkeypatch):
 
     res = await client.post("/api/v1/debug/ask", json=body | {"question": ""})
     assert res.status_code == 422 and res.json()["success"] is False
+
+
+async def test_ask_result_answers_in_the_envelope(client, monkeypatch):
+    async def answer(system: str, user: str) -> str:
+        return "Rewire U2.9."
+
+    monkeypatch.setattr(router, "_answer", answer)
+    summary, result = await _finished_run()
+    body = {"summary": summary, "result": result, "question": "Fix?", "history": []}
+    res = await client.post("/api/v1/debug/ask-result", json=body)
+    assert res.status_code == 200
+    assert res.json() == {"success": True, "data": {"answer": "Rewire U2.9."}}
 
 
 # --- reference designs ------------------------------------------------------------------------

@@ -240,6 +240,10 @@ export function toMarkdown(
       for (const q of run.chats[sim.id] ?? []) lines.push("", `**Q:** ${q.question}`, "", q.answer)
     }
   }
+  if (run.resultChat.length > 0) {
+    lines.push("", t.followUps)
+    for (const q of run.resultChat) lines.push("", `**Q:** ${q.question}`, "", q.answer)
+  }
   if (result.open_questions.length > 0) {
     lines.push("", t.openQuestions)
     for (const q of result.open_questions)

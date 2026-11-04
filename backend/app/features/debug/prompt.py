@@ -10,13 +10,16 @@
 Both are worded for hobbyists with a multimeter (plan 001, "Who it's for").
 Review mode (``REVIEW_DIAGNOSE``, ``REVIEW_STRUCTURE``) is the same pair
 before the board is built: no symptoms, look for design mistakes.
-``ASK_SIMULATION`` answers a question about one ngspice simulation.
+``ASK_SIMULATION`` answers a question about one ngspice simulation;
+``ASK_RESULT`` answers a follow-up question about a finished run.
 ``in_language`` makes the user-facing calls (structure, ask) write in the
 user's language; the diagnosis stays English, since it is internal reasoning.
 """
 
 from app.features.debug.schemas import (
     AskTurn,
+    CheckedAnalysis,
+    DesignSummary,
     Language,
     Measurement,
     Mode,
@@ -395,8 +398,82 @@ def build_ask_message(sim: Simulation, history: list[AskTurn], question: str) ->
         "## Reference lines\n" + (levels or "(none)"),
         f"## Samples (time, voltage)\n{_samples(sim)}",
     ]
+    return _with_question(parts, history, question)
+
+
+def _with_question(parts: list[str], history: list[AskTurn], question: str) -> str:
+    """``parts``, then the conversation so far, then the question."""
     if history:
         turns = "\n\n".join(f"Q: {h.question}\nA: {h.answer}" for h in history)
         parts.append("## Conversation so far\n" + turns)
     parts.append("## Question\n" + question.strip())
     return "\n\n".join(parts)
+
+
+ASK_RESULT = """\
+You answer a hardware engineer's follow-up question about an analysis of \
+their KiCad schematic that has already run. You get what the backend parsed \
+and checked (verified: ERC, wiring findings, calculations, reference notes; \
+unverified: pin warnings) and the findings the analysis reported, each with \
+its claims, tests and fixes.
+
+- Answer from that input. Name the finding (h1, ...), part, pin or net you \
+mean, and say which entry you used.
+- You don't see the full netlist or the datasheets. When the answer depends \
+on a connection or part fact the input doesn't show, say so and say what to \
+check, and don't make it up.
+- A claim marked downgraded didn't hold up against the input; don't repeat it \
+as fact.
+- When asked to change a fix or a part value, work it out and say it is a \
+suggestion to check, not a re-run of the analysis.
+- Short and plain: a few sentences, or a short list. No headings."""
+
+
+def build_result_ask_message(
+    summary: DesignSummary, result: CheckedAnalysis, history: list[AskTurn], question: str
+) -> str:
+    """The user turn for a follow-up about a finished run: what the backend
+    checked, every finding with its claims, tests and fixes, the open
+    questions, the conversation so far, then the question."""
+    review = summary.mode == "review"
+    parts = [
+        f"## Project: {summary.project} ({summary.mode}; {summary.parts} parts, "
+        f"{summary.nets} nets)",
+        ("## What the board is for" if review else "## Symptoms")
+        + "\n"
+        + ("\n".join(f"- {s.id}: {s.text}" for s in summary.symptoms) or "(none given)"),
+    ]
+    if summary.measurements:
+        parts.append(
+            "## Measurements\n" + "\n".join(f"- {m.id}: {m.value}" for m in summary.measurements)
+        )
+    checked = [
+        *(f"- {e.id} ERC {e.severity} {e.rule}: {e.message}" for e in summary.erc),
+        *(f"- {w.id} (verified): {w.text}" for w in summary.wiring),
+        *(f"- {w.id} (unverified): {w.text}" for w in summary.pin_warnings),
+        *(f"- {c.id}{' FLAGGED' if c.flagged else ''}: {c.text}" for c in summary.calculations),
+        *(f"- {r.id} {r.part} ({r.source}): {r.text}" for r in summary.references),
+    ]
+    parts.append("## Checked by the backend\n" + ("\n".join(checked) or "(nothing)"))
+    findings = []
+    for h in result.hypotheses:
+        lines = [
+            f"### {h.id} (#{h.rank}"
+            + (f", {h.severity.replace('_', ' ')}" if h.severity else "")
+            + f"): {h.title}",
+            h.summary,
+        ]
+        lines += [
+            f"- claim ({c.evidence}{', downgraded' if c.downgraded else ''}): {c.text}"
+            for c in h.claims
+        ]
+        lines += [f"- test {s.id}: {s.instruction}" for s in h.confirm]
+        lines += [f"- fix: {f}" for f in h.fix.schematic]
+        lines += [f"- rework: {r.text}" for r in h.fix.rework]
+        findings.append("\n".join(lines))
+    parts.append("## Findings\n" + ("\n\n".join(findings) or "(none: no issues found)"))
+    if result.open_questions:
+        parts.append(
+            "## Open questions\n" + "\n".join(f"- {q.text}" for q in result.open_questions)
+        )
+    return _with_question(parts, history, question)

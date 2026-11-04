@@ -464,5 +464,17 @@ class AskRequest(BaseModel):
     language: Language = "en"
 
 
+class ResultAskRequest(BaseModel):
+    """A follow-up question about a finished run: the design summary and the
+    checked result it produced. Nothing is stored, so both and the
+    conversation so far come with every question, as with ``AskRequest``."""
+
+    summary: DesignSummary
+    result: CheckedAnalysis
+    question: str = Field(min_length=1, max_length=1000)
+    history: list[AskTurn] = Field(default_factory=list, max_length=10)
+    language: Language = "en"
+
+
 class AskAnswer(BaseModel):
     answer: str

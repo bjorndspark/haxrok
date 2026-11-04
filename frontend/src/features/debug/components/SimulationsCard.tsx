@@ -1,80 +1,17 @@
-import { useState } from "react"
-
-import { Button } from "@/shared/ui/button"
 import { Card } from "@/shared/ui/card"
-import { Prompt } from "@/shared/ui/prompt"
 import { Title } from "@/shared/ui/title"
 
 import { useMessages } from "../messages"
 import type { Run, Simulation } from "../types"
 import { useSimulationChat } from "../useDebug"
+import { ChatThread } from "./ChatThread"
 import { SimulationPlot } from "./SimulationPlot"
 
 function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation }) {
   const chat = useSimulationChat(runNumber, sim)
-  const [question, setQuestion] = useState("")
-  const t = useMessages().simulations
-  const busy = chat.pending !== null
-  const send = (q: string) => {
-    chat.ask(q)
-    setQuestion("")
-  }
   return (
-    <div className="space-y-2 border-t pt-3 text-xs">
-      {chat.turns.map((t, i) => (
-        <div key={i} className="space-y-1">
-          <p className="font-bold">
-            <span className="text-muted-foreground">&gt; </span>
-            {t.question}
-          </p>
-          <p className="leading-relaxed whitespace-pre-line">{t.answer}</p>
-        </div>
-      ))}
-      {chat.pending !== null && (
-        <div className="space-y-1">
-          <p className="font-bold">
-            <span className="text-muted-foreground">&gt; </span>
-            {chat.pending}
-          </p>
-          <p className="text-muted-foreground">
-            <span className="animate-pulse">●</span> {t.reading}
-          </p>
-        </div>
-      )}
-      {chat.error && <p className="text-bad">{chat.error}</p>}
-      {chat.turns.length === 0 && !busy && (
-        <div className="flex flex-wrap gap-x-[2ch] gap-y-1">
-          {t.suggestions.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => send(s)}
-              className="text-info underline decoration-dotted underline-offset-2 hover:no-underline"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-      <form
-        className="flex"
-        onSubmit={(e) => {
-          e.preventDefault()
-          send(question)
-        }}
-      >
-        <Prompt
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder={t.askPlaceholder}
-          maxLength={1000}
-          aria-label={t.askPlaceholder}
-        >
-          <Button type="submit" size="sm" disabled={busy || !question.trim()}>
-            {t.ask}
-          </Button>
-        </Prompt>
-      </form>
+    <div className="border-t pt-3">
+      <ChatThread chat={chat} text={useMessages().simulations} />
     </div>
   )
 }

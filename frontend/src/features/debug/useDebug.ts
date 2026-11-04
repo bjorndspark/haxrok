@@ -6,15 +6,23 @@
 import { useMutation } from "@tanstack/react-query"
 import { useCallback, useEffect, useState } from "react"
 
-import { useLanguage } from "@/shared/lib/language"
+import { useLanguage, type Language } from "@/shared/lib/language"
 import { errorMessage } from "@/shared/lib/utils"
 
-import { askSimulation, streamAnalysis } from "./api"
+import { askResult, askSimulation, streamAnalysis } from "./api"
 import { fromDataTransfer, fromFileList } from "./files"
 import { currentMessages, useMessages } from "./messages"
 import { toMarkdown } from "./present"
 import { useDebugStore } from "./store"
-import type { AnalysisEvent, AskTurn, ConfirmStep, Run, Simulation } from "./types"
+import type {
+  AnalysisEvent,
+  AskTurn,
+  CheckedAnalysis,
+  ConfirmStep,
+  DesignSummary,
+  Run,
+  Simulation,
+} from "./types"
 
 function applyEvent(run: Run, ev: AnalysisEvent): Partial<Run> {
   switch (ev.type) {
@@ -138,39 +146,65 @@ export function useDebugActions(): DebugActions {
   return { analyze, rerunWithMeasurement, cancel, pickFiles, dropFiles, downloadReport }
 }
 
-export interface SimulationChat {
+/** A conversation with the model: answered turns, the question in flight
+ *  and its error. */
+export interface Chat {
   turns: AskTurn[]
   ask: (question: string) => void
   pending: string | null
   error: string | null
 }
 
-/** Questions about one simulation of run `runNumber`. Answered turns live
- *  in the run (the store); the call in flight is a TanStack mutation. */
-export function useSimulationChat(runNumber: number, sim: Simulation): SimulationChat {
-  const turns = useDebugStore((s) => s.runs.find((r) => r.number === runNumber)?.chats[sim.id])
-  const history = turns ?? []
+/** The shared chat mechanics: answered turns live in the run (the store),
+ *  the call in flight is a TanStack mutation. `send` gets the question and
+ *  the history; `record` stores the answered turn. */
+function useChat(
+  turns: AskTurn[],
+  send: (question: string, history: AskTurn[], language: Language) => Promise<string>,
+  record: (turn: AskTurn) => void,
+): Chat {
   const m = useMessages()
   const mutation = useMutation({
-    mutationFn: (question: string) =>
-      askSimulation({
-        simulation: sim,
-        question,
-        history,
-        language: useLanguage.getState().language,
-      }),
+    mutationFn: (question: string) => send(question, turns, useLanguage.getState().language),
     onSuccess: (answer, question) => {
-      useDebugStore.getState().addAskTurn(runNumber, sim.id, { question, answer })
+      record({ question, answer })
     },
   })
   return {
-    turns: history,
+    turns,
     ask: (question) => {
       if (question.trim() && !mutation.isPending) mutation.mutate(question.trim())
     },
     pending: mutation.isPending ? mutation.variables : null,
     error: mutation.isError ? errorMessage(mutation.error, m.run.errors.question) : null,
   }
+}
+
+const NO_TURNS: AskTurn[] = []
+
+/** Questions about one simulation of run `runNumber`. */
+export function useSimulationChat(runNumber: number, sim: Simulation): Chat {
+  const turns = useDebugStore((s) => s.runs.find((r) => r.number === runNumber)?.chats[sim.id])
+  return useChat(
+    turns ?? NO_TURNS,
+    (question, history, language) =>
+      askSimulation({ simulation: sim, question, history, language }),
+    (turn) => {
+      useDebugStore.getState().addAskTurn(runNumber, sim.id, turn)
+    },
+  )
+}
+
+/** Follow-up questions about a finished run: its summary and checked
+ *  result go back with every question. */
+export function useResultChat(run: Run, summary: DesignSummary, result: CheckedAnalysis): Chat {
+  return useChat(
+    run.resultChat,
+    (question, history, language) => askResult({ summary, result, question, history, language }),
+    (turn) => {
+      useDebugStore.getState().addResultTurn(run.number, turn)
+    },
+  )
 }
 
 /** Seconds since `startedAt`, ticking until `finishedAt` is set. */

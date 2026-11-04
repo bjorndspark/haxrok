@@ -1,6 +1,6 @@
 """Debug routes. Thin: read the multipart upload, hand it to the service,
 stream the result as SSE (exempt from the envelope, see app.core.responses);
-answer questions about a simulation in the envelope."""
+answer questions about a simulation or a finished run in the envelope."""
 
 import json
 from typing import Annotated
@@ -24,6 +24,7 @@ from app.features.debug.schemas import (
     Language,
     MeasurementInput,
     Mode,
+    ResultAskRequest,
 )
 from app.features.debug.spice import Ngspice
 
@@ -110,3 +111,11 @@ async def ask(req: AskRequest) -> SuccessResponse[AskAnswer]:
     browser sends the simulation and the conversation so far each time;
     nothing is stored."""
     return ok(AskAnswer(answer=await service.ask(req, _answer)))
+
+
+@router.post("/ask-result")
+async def ask_result(req: ResultAskRequest) -> SuccessResponse[AskAnswer]:
+    """Answer a follow-up question about a finished run. The browser sends
+    the design summary, the checked result and the conversation so far each
+    time; nothing is stored."""
+    return ok(AskAnswer(answer=await service.ask_result(req, _answer)))

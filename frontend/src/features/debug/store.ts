@@ -29,6 +29,8 @@ interface DebugState {
   updateRun: (number: number, patch: (run: Run) => Partial<Run>) => void
   /** Record an answered question about simulation `simId` of run `number`. */
   addAskTurn: (number: number, simId: string, turn: AskTurn) => void
+  /** Record an answered follow-up question about run `number`. */
+  addResultTurn: (number: number, turn: AskTurn) => void
   editInput: () => void
   showSession: () => void
   reset: () => void
@@ -61,6 +63,7 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       error: null,
       simulations: [],
       chats: {},
+      resultChat: [],
     }
     set((s) => ({ view: "session", runs: [run, ...s.runs], controller, inputError: null }))
     return number
@@ -71,6 +74,9 @@ export const useDebugStore = create<DebugState>((set, get) => ({
     get().updateRun(number, (r) => ({
       chats: { ...r.chats, [simId]: [...(r.chats[simId] ?? []), turn] },
     }))
+  },
+  addResultTurn: (number, turn) => {
+    get().updateRun(number, (r) => ({ resultChat: [...r.resultChat, turn] }))
   },
   editInput: () => set({ view: "input" }),
   showSession: () => set({ view: "session" }),
