@@ -145,7 +145,9 @@ function RunBody({
           <dl className="space-y-1.5 text-xs leading-relaxed">
             {result.glossary.map((g) => (
               <div key={g.term}>
-                <dt className="inline font-bold text-info">{g.term}</dt>{" "}
+                <dt className="inline font-bold text-info after:text-foreground after:content-[':']">
+                  {g.term}
+                </dt>{" "}
                 <dd className="inline">{g.definition}</dd>
               </div>
             ))}
