@@ -464,3 +464,29 @@ from the vendor's data. An I/O supply skips core-only rails (`DVDD`,
 an RP2040 look like over-voltage. Measured offline on all seven eval
 cases: `uart` flags only `orbit-uart-swapped`, and `overvoltage_pullup`
 flags nothing.
+
+## Japanese changes the write-up, not the diagnosis
+
+**Decision:** with the UI in Japanese, only the user-facing model calls
+(structure and the simulation questions) get a rule to write in Japanese
+(`prompt.in_language`). The diagnosis call stays English, and so does the
+backend's own text: wiring findings, calculations, ERC and downgrade
+reasons. Refs, pins, nets, ids and units stay in ASCII in the Japanese
+prose. The evidence check matches names on ASCII word boundaries
+(`re.ASCII`), because Japanese has no spaces.
+
+**Why:** the diagnosis prompt is the one the evals tuned to find real
+bugs, and the user never reads its output, so translating it risks
+accuracy for nothing. The check cites refs and nets, so they must stay
+exactly as the netlist writes them. Under Python's Unicode `\w`, `+3V3に`
+didn't name `+3V3`, so every Japanese claim would have lost its label.
+
+**Alternatives rejected:** running the whole pipeline in Japanese (would
+need the evals re-run in Japanese). Translating the model's English answer
+afterwards (a third call of about 90 s, and a translator can mangle names).
+Translating the backend's check text (message keys across about 1,800
+lines of tested code, right before the hackathon deadline).
+
+**Consequence:** a Japanese page still shows English check text. One live
+review of `rust-board-i2c-vbus` in Japanese found the planted bug at #1
+and kept every claim's label.
