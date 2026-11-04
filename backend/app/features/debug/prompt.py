@@ -66,7 +66,12 @@ its consequence. Calculated values (cf...) are exact arithmetic on the \
 netlist's part values; trust them over your own arithmetic. One marked \
 FLAGGED is a verified problem in the netlist as drawn (an output named +3V3 \
 set to 0.73 V, an LED with no resistor, an I²C line with no pull-up); keep \
-any caveat its text gives (a pull-up may sit on a connected module)."""
+any caveat its text gives (a pull-up may sit on a connected module).
+
+Pin warnings (pw...) are not verified: they compare a transistor's symbol \
+with the pinout most parts in its package share, not with its own \
+datasheet. Report each as a likely error whose first confirm step is \
+reading the part's pin diagram; never call one verified."""
 
 DIAGNOSE = f"""\
 You are an expert hardware engineer debugging a PCB from its KiCad schematic \
@@ -278,11 +283,12 @@ def build_user_message(
     erc: str,
     pin_table: str,
     findings: str,
+    warnings: str = "",
     references: str = "",
     calculations: str = "",
 ) -> str:
     """The user turn: symptoms (review: the designer's notes), measurements,
-    netlist, ERC, pin table, verified findings."""
+    netlist, ERC, pin table, verified findings, unverified pin warnings."""
     parts = []
     if mode == "debug":
         parts.append("## Symptoms\n" + "\n".join(f"{s.id}: {s.text}" for s in symptoms))
@@ -301,6 +307,11 @@ def build_user_message(
         "## Pin table (from datasheets)\n" + pin_table,
         "## Verified findings (netlist checked against the pin table)\n" + findings,
     ]
+    if warnings:
+        parts.append(
+            "## Pin warnings (UNVERIFIED: a common package pinout, not this part's "
+            "datasheet)\n" + warnings
+        )
     if references:
         parts.append("## Reference notes (copied from the manufacturers' documents)\n" + references)
     if calculations:

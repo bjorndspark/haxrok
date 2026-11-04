@@ -90,6 +90,7 @@ def build_input(
         erc=erc.read_text() if erc.exists() else "(none)",
         pin_table=lookup.text,
         findings=pins.format_findings(lookup.findings),
+        warnings=pins.format_warnings(lookup.warnings),
         references=reference.format_notes(reference.lookup(design)),
         calculations=calc.format_calculations(calc.lookup(design)),
     )

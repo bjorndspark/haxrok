@@ -276,6 +276,17 @@ class WiringFinding(BaseModel):
     text: str
 
 
+class PinWarning(BaseModel):
+    """A transistor whose symbol pin order breaks the common SOT-23 pinout,
+    found by ``pins.check_convention``. Unverified: a convention, not the
+    part's datasheet. ``id`` (pw1, …) is how the model's input names it."""
+
+    id: str
+    ref: str
+    pins: list[str] = Field(description="REF.PIN refs whose net would land on another pad.")
+    text: str
+
+
 class ReferenceNote(BaseModel):
     """A fact from a manufacturer's reference design, datasheet or app note
     (``reference.REFERENCES``). ``id`` (rd1, …) is what claims cite."""
@@ -357,6 +368,7 @@ class DesignSummary(BaseModel):
     ics: list[IcSummary]
     erc: list[ErcEntry]
     wiring: list[WiringFinding]
+    pin_warnings: list[PinWarning]
     references: list[ReferenceNote]
     calculations: list[Calculation]
     symptoms: list[Symptom] = Field(

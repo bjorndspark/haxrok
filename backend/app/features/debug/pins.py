@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.features.debug.design import Design, Label, Part, short_net_name
-from app.features.debug.schemas import ErcEntry, IcSummary, WiringFinding
+from app.features.debug.schemas import ErcEntry, IcSummary, PinWarning, WiringFinding
 
 
 @dataclass(frozen=True)
@@ -228,17 +228,22 @@ class Pinout:
         )
 
 
-_AO3400 = Pinout(
-    value_prefix="AO3400",
-    source="AOS AO3400A datasheet, SOT23 pin diagram (pin 1 dot on G)",
-    pins={
-        "1": ("G", "Gate."),
-        "2": ("S", "Source."),
-        "3": ("D", "Drain."),
-    },
+# The datasheets draw the SOT-23 top view with lettered leads, not numbered
+# ones: G and S on the two-lead side, D alone. Pin 1 is the lead under the
+# pin-1 dot (AOS) or, by the JEDEC SOT-23 outline, the left lead of the
+# two-lead side; pin 3 is the lone lead.
+_SOT23_GSD = {"1": ("G", "Gate."), "2": ("S", "Source."), "3": ("D", "Drain.")}
+
+PINOUTS: tuple[Pinout, ...] = (
+    Pinout("AO3400", "AOS AO3400A datasheet, SOT23 top view (pin 1 dot on G)", _SOT23_GSD),
+    Pinout("AO3401", "AOS AO3401A datasheet, SOT23 top view (pin 1 dot on G)", _SOT23_GSD),
+    Pinout("2N7002", "Diodes 2N7002 datasheet DS11303 Rev. 33-2, SOT23 top view", _SOT23_GSD),
+    Pinout("BSS138", "Diodes BSS138 datasheet DS30144 Rev. 25-2, SOT23 top view", _SOT23_GSD),
 )
 
-PINOUTS: tuple[Pinout, ...] = (_AO3400,)
+# The pinout most SOT-23 MOSFETs share, for parts with no PINOUTS entry.
+# A convention, not a datasheet: ``check_convention`` only warns.
+_CONVENTION = {"1": "G", "2": "S", "3": "D"}
 
 
 @dataclass(frozen=True)
@@ -248,7 +253,8 @@ class PinLookup:
     ics: list[IcSummary]
     pin_refs: frozenset[str]  # REF.PIN covered by the table, for the checker
     text: str  # what the model reads
-    findings: list[WiringFinding]  # from check_wiring, verified
+    findings: list[WiringFinding]  # from check_wiring and check_pinout, verified
+    warnings: list[PinWarning]  # from check_convention, unverified
 
 
 def is_ic(ref: str) -> bool:
@@ -264,6 +270,7 @@ def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label]
     pin_refs: set[str] = set()
     lines: list[str] = []
     findings: list[WiringFinding] = []
+    warnings: list[PinWarning] = []
     used_pins = {n.pin_ref for nodes in design.nets.values() for n in nodes}
     for part in sorted(design.parts.values(), key=lambda p: _ref_key(p.ref)):
         if not is_ic(part.ref):
@@ -271,6 +278,8 @@ def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label]
             if pinout is not None:
                 findings += check_pinout(design, part.ref, pinout)
                 lines += _table_lines(part, pinout.source, pinout.pins, used_pins, pin_refs)
+            elif warning := check_convention(design, part.ref):
+                warnings.append(warning)
             continue
         entry = next(
             (e for e in PIN_TABLE if e.matches(part.value, part.lib_part, part.footprint)), None
@@ -288,11 +297,13 @@ def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label]
     if missing:
         lines.append(f"No pin table for: {', '.join(missing)}.")
     findings = [f.model_copy(update={"id": f"wf{i}"}) for i, f in enumerate(findings, start=1)]
+    warnings = [w.model_copy(update={"id": f"pw{i}"}) for i, w in enumerate(warnings, start=1)]
     return PinLookup(
         ics=ics,
         pin_refs=frozenset(pin_refs),
         text="\n".join(lines) + "\n",
         findings=findings,
+        warnings=warnings,
     )
 
 
@@ -361,6 +372,50 @@ def check_pinout(design: Design, ref: str, pinout: Pinout) -> list[WiringFinding
             ),
         )
     ]
+
+
+def check_convention(design: Design, ref: str) -> PinWarning | None:
+    """A warning when ``ref`` is a three-pin transistor on a SOT-23
+    footprint, its symbol names its pins G, S and D, and the order isn't
+    the 1=G, 2=S, 3=D most SOT-23 MOSFETs use. For parts ``PINOUTS`` doesn't
+    cover; unverified, since a few parts do use another order.
+
+    Bipolar transistors (B, C, E) and unnamed pins are left alone.
+    """
+    part = design.parts.get(ref)
+    if part is None or not _SOT23.search(part.footprint):
+        return None
+    drawn = {n: _TERMINALS.get(design.pin_name(f"{ref}.{n}").strip().upper()) for n in _CONVENTION}
+    if sorted(t or "" for t in drawn.values()) != ["D", "G", "S"] or drawn == _CONVENTION:
+        return None
+    order = ", ".join(f"{n}={t}" for n, t in drawn.items())
+    usual = ", ".join(f"{n}={t}" for n, t in _CONVENTION.items())
+    wrong = [n for n in _CONVENTION if drawn[n] != _CONVENTION[n]]
+    pads = "; ".join(
+        f"net {design.net_of(f'{ref}.{n}')} (drawn on {drawn[n]}) would land on the "
+        f"{_CONVENTION[n]} pad ({ref}.{n})"
+        for n in wrong
+        if design.net_of(f"{ref}.{n}")
+    )
+    symbol = part.lib_part or "its symbol"
+    return PinWarning(
+        id="",
+        ref=ref,
+        pins=[f"{ref}.{n}" for n in wrong],
+        text=(
+            f"{ref} ({part.value}) is drawn with {symbol}, numbered {order}, on SOT-23 "
+            f"footprint {part.footprint}. Most SOT-23 MOSFETs are {usual}; if this one is, "
+            f"{pads}. UNVERIFIED: the pin table has no pinout for {part.value}; check the "
+            "pin diagram in its datasheet before ordering or reworking."
+        ),
+    )
+
+
+def format_warnings(warnings: list[PinWarning]) -> str:
+    """The warnings as the model reads them, with ids."""
+    if not warnings:
+        return "(none)\n"
+    return "\n".join(f"{w.id}: {w.text}" for w in warnings) + "\n"
 
 
 # How many other pins a finding names before it says "and N more": a

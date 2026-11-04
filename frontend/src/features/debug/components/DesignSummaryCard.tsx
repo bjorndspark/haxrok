@@ -1,4 +1,13 @@
-import { BookCheck, Calculator, ChevronDown, ChevronUp, Cpu, ShieldAlert, Zap } from "lucide-react"
+import {
+  BookCheck,
+  Calculator,
+  ChevronDown,
+  ChevronUp,
+  Cpu,
+  ShieldAlert,
+  TriangleAlert,
+  Zap,
+} from "lucide-react"
 import { useState } from "react"
 
 import { Badge } from "@/shared/ui/badge"
@@ -83,6 +92,24 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           ))}
           <p className="text-[11px] text-muted-foreground">
             Found by checking your netlist against the pin table, before the model runs.
+          </p>
+        </div>
+      )}
+
+      {summary.pin_warnings.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 text-xs dark:border-amber-900 dark:bg-amber-950/30">
+          <span className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
+            <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            Pin order to check ({summary.pin_warnings.length})
+          </span>
+          {summary.pin_warnings.map((w) => (
+            <p key={w.id} className="leading-relaxed">
+              {w.text}
+            </p>
+          ))}
+          <p className="text-[11px] text-muted-foreground">
+            Compared with the pinout most parts in this package use, not with this part&apos;s
+            datasheet.
           </p>
         </div>
       )}

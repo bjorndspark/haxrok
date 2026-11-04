@@ -122,6 +122,7 @@ async def prepare(
         ics=lookup.ics,
         erc=erc,
         wiring=lookup.findings,
+        pin_warnings=lookup.warnings,
         references=notes,
         calculations=calcs,
         symptoms=symptoms,
@@ -137,6 +138,9 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
     conflicts = len(prepared.pin_lookup.findings)
     plural = "s" if conflicts > 1 else ""
     found = f" {conflicts} pin{plural} wired against the datasheet." if conflicts else ""
+    n_warn = len(prepared.pin_lookup.warnings)
+    if n_warn:
+        found += f" {n_warn} transistor{'s' if n_warn > 1 else ''} with a pin order to check."
     n_calcs = len(prepared.calculations)
     flagged = sum(1 for c in prepared.calculations if c.flagged)
     calcs = (
@@ -165,6 +169,7 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         erc=format_erc(prepared.erc),
         pin_table=prepared.pin_lookup.text,
         findings=pins.format_findings(prepared.pin_lookup.findings),
+        warnings=pins.format_warnings(prepared.pin_lookup.warnings),
         references=reference.format_notes(prepared.references),
         calculations=calc.format_calculations(prepared.calculations),
     )

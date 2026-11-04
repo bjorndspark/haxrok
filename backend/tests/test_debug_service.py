@@ -351,12 +351,16 @@ def test_pin_table_needs_the_right_package():
     assert not entry.matches("TPS2121YFP", "", "")
 
 
-def _mosfet(names: tuple[str, str, str], footprint: str = "Package_TO_SOT_SMD:SOT-23") -> Design:
-    """An AO3400 low-side switch whose symbol names pins 1-3 ``names``,
-    wired by name: GATE to G, LOAD to D, GND to S."""
+def _mosfet(
+    names: tuple[str, str, str],
+    footprint: str = "Package_TO_SOT_SMD:SOT-23",
+    value: str = "AO3400A",
+) -> Design:
+    """A low-side switch whose symbol names pins 1-3 ``names``, wired by
+    name: GATE to G, LOAD to D, GND to S."""
     by_name = {"G": "/GATE", "D": "/LOAD", "S": "GND"}
     return Design(
-        parts={"Q1": Part("Q1", "AO3400A", "Simulation_SPICE:NMOS", footprint)},
+        parts={"Q1": Part("Q1", value, "Simulation_SPICE:NMOS", footprint)},
         nets={
             by_name[name[0]]: [Node("Q1", str(number), name)]
             for number, name in enumerate(names, start=1)
@@ -383,6 +387,48 @@ def test_mosfet_check_is_quiet_on_a_matching_or_unnamed_symbol_or_other_package(
     assert pins.lookup(Design(unnamed.parts, unnamed.nets)).findings == []
     assert pins.lookup(_mosfet(("D", "G", "S"), "SOT-23-6")).findings == []
     assert pins.lookup(_mosfet(("D", "G", "S"), "AO3400A:SOT95P280X125-3N")).findings
+
+
+def test_every_sot23_mosfet_in_the_table_is_checked():
+    for value in ("AO3400A", "AO3401A", "2N7002", "BSS138"):
+        lookup = pins.lookup(_mosfet(("D", "G", "S"), value=value))
+        assert [f.pin for f in lookup.findings] == ["Q1.1"], value
+        assert lookup.warnings == [], value
+
+
+def test_unknown_sot23_mosfet_in_another_order_is_an_unverified_warning():
+    lookup = pins.lookup(_mosfet(("D", "G", "S"), value="SI2302"))
+    assert lookup.findings == []
+    [warning] = lookup.warnings
+    assert (warning.id, warning.ref, warning.pins) == ("pw1", "Q1", ["Q1.1", "Q1.2", "Q1.3"])
+    assert "net /LOAD (drawn on D) would land on the G pad (Q1.1)" in warning.text
+    assert "UNVERIFIED" in warning.text
+    assert pins.format_warnings(lookup.warnings).startswith("pw1: Q1 (SI2302)")
+
+
+def test_convention_warning_skips_the_usual_order_bipolars_and_other_packages():
+    assert pins.lookup(_mosfet(("G", "S", "D"), value="SI2302")).warnings == []
+    assert pins.lookup(_mosfet(("D", "G", "S"), "SOT-23-6", "SI2302")).warnings == []
+    assert pins.lookup(_mosfet(("D", "G", "S"), "", "SI2302")).warnings == []
+    bjt = Design(
+        parts={"Q1": Part("Q1", "MMBT3904", "Device:Q_NPN_BEC", "SOT-23")},
+        nets={f"/N{i}": [Node("Q1", str(i), name)] for i, name in enumerate("BEC", start=1)},
+    )
+    assert pins.lookup(bjt).warnings == []
+
+
+def test_pin_warnings_reach_the_model_as_unverified():
+    user = prompt.build_user_message(
+        symptoms=[],
+        measurements=[],
+        netlist="",
+        erc="",
+        pin_table="",
+        findings="",
+        warnings="pw1: Q1 ...\n",
+    )
+    assert "## Pin warnings (UNVERIFIED" in user
+    assert "pw1: Q1" in user
 
 
 # --- spice ---------------------------------------------------------------------------------

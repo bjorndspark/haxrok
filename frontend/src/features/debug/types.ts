@@ -152,6 +152,15 @@ export interface WiringFinding {
   text: string
 }
 
+/** A transistor whose symbol pin order breaks the common SOT-23 pinout
+ *  (pins.check_convention). Unverified: a convention, not its datasheet. */
+export interface PinWarning {
+  id: string
+  ref: string
+  pins: string[]
+  text: string
+}
+
 /** A fact from a manufacturer's reference design or datasheet (rd1, …). */
 export interface ReferenceNote {
   id: string
@@ -227,6 +236,7 @@ export interface DesignSummary {
   ics: IcSummary[]
   erc: ErcEntry[]
   wiring: WiringFinding[]
+  pin_warnings: PinWarning[]
   references: ReferenceNote[]
   calculations: Calculation[]
   /** Bench symptoms; in review mode, the designer's notes on the board. */
