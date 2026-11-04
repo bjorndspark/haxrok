@@ -4,8 +4,10 @@ else sits on each net. The UI draws it; the backend builds it because only
 the backend has the netlist.
 
 Drawn from the netlist, never from the model's words, so a diagram can't
-show a connection the schematic doesn't have. Pins the wiring check flagged
-are marked, so the UI can draw them in red.
+show a connection the schematic doesn't have. Pins wired against their
+datasheet function are marked, so the UI can draw them in red: those the
+pin-table check found, and those a flagged UART or enable-pin calculation
+names.
 """
 
 from collections import Counter
@@ -14,6 +16,7 @@ from app.features.debug.design import Design, normalize_pin
 from app.features.debug.evidence import mentioned_pins
 from app.features.debug.pins import is_ic, is_inductor
 from app.features.debug.schemas import (
+    Calculation,
     CheckedClaim,
     Diagram,
     DiagramMember,
@@ -28,11 +31,24 @@ from app.features.debug.schemas import (
 MAX_PINS = 6
 MAX_MEMBERS = 4
 
+# Calculations that are wiring faults, not values: each pin they name is
+# wired against its function (TX on TX, EN on its own output). The UI's
+# "miswired" badge is the same pair.
+_MISWIRED_KINDS = {"uart", "enable_pin"}
 
-def build(
-    h: Hypothesis[CheckedClaim], design: Design, findings: list[WiringFinding]
-) -> Diagram | None:
-    """The diagram for ``h``, or None when it cites no IC pin."""
+
+def miswired_pins(findings: list[WiringFinding], calculations: list[Calculation]) -> set[str]:
+    """REF.PINs a check proved wired against their function, to draw red."""
+    pins = {f.pin for f in findings}
+    for c in calculations:
+        if c.flagged and c.kind in _MISWIRED_KINDS:
+            pins.update(c.pins)
+    return pins
+
+
+def build(h: Hypothesis[CheckedClaim], design: Design, miswired: set[str]) -> Diagram | None:
+    """The diagram for ``h``, or None when it cites no IC pin. ``miswired``
+    (from ``miswired_pins``) are drawn red."""
     cited = _cited_pins(h)
     cited_nets = {
         net
@@ -44,7 +60,6 @@ def build(
     if not ic_counts:
         return None
     ic = ic_counts.most_common(1)[0][0]
-    flagged = {f.pin: f for f in findings}
 
     pins = [p for p in cited if p.startswith(f"{ic}.")]
     # Pins of the IC that share a net with a cited pin belong in the
@@ -53,7 +68,7 @@ def build(
     for net in sorted(n for n in shown_nets if n):
         pins += [n.pin_ref for n in design.nets[net] if n.ref == ic and n.pin_ref not in pins]
     # Grouped by net, the flagged pin's net first, so each net is one bus.
-    flagged_nets = {f.net for f in findings if f.pin in pins}
+    flagged_nets = {design.net_of(p) for p in pins if p in miswired}
     pins = sorted(
         dict.fromkeys(pins),
         key=lambda p: (design.net_of(p) not in flagged_nets, _net_order(design, p)),
@@ -89,7 +104,7 @@ def build(
                 pin=p,
                 name=design.pin_name(p),
                 net=design.net_of(p) or "",
-                flagged=p in flagged,
+                flagged=p in miswired,
             )
             for p in pins
         ],

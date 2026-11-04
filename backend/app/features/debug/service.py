@@ -284,10 +284,9 @@ async def _review(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         ),
     )
     checked = check(analysis, ctx)
+    miswired = diagram.miswired_pins(prepared.pin_lookup.findings, prepared.calculations)
     checked.diagrams = {
-        h.id: d
-        for h in checked.hypotheses
-        if (d := diagram.build(h, prepared.design, prepared.pin_lookup.findings))
+        h.id: d for h in checked.hypotheses if (d := diagram.build(h, prepared.design, miswired))
     }
     yield _event("result", checked.model_dump_json())
 

@@ -203,7 +203,9 @@ class DiagramPin(BaseModel):
     pin: str = Field(description="REF.PIN of the diagram's IC.")
     name: str = Field(description="The pin's name in the netlist, e.g. L2.")
     net: str
-    flagged: bool = Field(description="The wiring check flagged this pin.")
+    flagged: bool = Field(
+        description="A check proved this pin wired against its datasheet function."
+    )
 
 
 class DiagramMember(BaseModel):

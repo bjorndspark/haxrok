@@ -318,7 +318,7 @@ def test_diagram_shows_the_cited_ic_its_nets_and_the_flagged_pin():
         )
         for h in _analysis().hypotheses
     ]
-    d = diagram.build(h, design, findings)
+    d = diagram.build(h, design, diagram.miswired_pins(findings, []))
     assert d is not None
     assert (d.ic, d.value) == ("U2", "TPS63070RNMR")
     # U2.7 isn't cited, but it is on the flagged pin's net, so it is shown.
@@ -345,7 +345,7 @@ def test_no_diagram_without_an_ic_pin():
         confirm=[],
         fix=Fix(schematic=[], rework=[]),
     )
-    assert diagram.build(h, parse_netlist(NETLIST), []) is None
+    assert diagram.build(h, parse_netlist(NETLIST), set()) is None
 
 
 def test_pin_table_needs_the_right_package():
@@ -1044,6 +1044,43 @@ def test_uart_swapped_between_an_stm32_and_a_bridge_is_one_flag():
 
     # Correctly crossed: nothing to say.
     assert calc.lookup(_uart(["U1.30(PA9)", "U2.25(RXD)"], ["U1.31(PA10)", "U2.26(TXD)"])) == []
+
+
+def test_a_uart_flag_draws_its_pins_red_in_the_diagram():
+    design = _uart(["U1.30(PA9)", "U2.26(TXD)"], ["U1.31(PA10)", "U2.25(RXD)"])
+    miswired = diagram.miswired_pins([], calc_lookup(design))
+    h = Hypothesis[CheckedClaim](
+        id="h1",
+        rank=1,
+        severity="will_fail",
+        title="UART TX to TX",
+        summary="s",
+        claims=[
+            CheckedClaim(
+                text="U1.30 (PA9) drives USART1_TX, as does U2.26.", evidence="schematic", cites=[]
+            )
+        ],
+        explains=[],
+        does_not_explain=[],
+        confirm=[],
+        fix=Fix(schematic=[], rework=[]),
+    )
+    d = diagram.build(h, design, miswired)
+    assert d is not None and d.ic == "U1"
+    assert [(p.pin, p.flagged) for p in d.pins] == [("U1.30", True)]
+    # A value calculation, flagged or not, isn't a miswired pin.
+    value = Calculation(
+        id="cf1",
+        kind="i2c_pullup",
+        ic="U1",
+        pins=["U1.30"],
+        value=1.0,
+        unit="",
+        expected=None,
+        flagged=True,
+        text="",
+    )
+    assert diagram.miswired_pins([], [value]) == set()
 
 
 def test_uart_direction_comes_from_pin_names_or_the_rp2040_table():
