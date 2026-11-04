@@ -7,6 +7,10 @@ name pins differently from datasheets (the ESP32 module's symbol says
 ``GPIO4/TOUCH4/ADC1_CH3`` where the datasheet says ``IO4``). A part matches
 on its value prefix and package, since pin numbers differ per package.
 
+Three-pin discrete parts (``PINOUTS``) are checked the other way round:
+their symbols name pins after the datasheet (D, G, S), so the names the
+netlist carries are compared with the datasheet's numbering.
+
 This is the MVP source of datasheet evidence. Per-part datasheet retrieval
 replaces it (plan 001, "After the hackathon").
 """
@@ -15,7 +19,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from app.features.debug.design import Design, Label, short_net_name
+from app.features.debug.design import Design, Label, Part, short_net_name
 from app.features.debug.schemas import ErcEntry, IcSummary, WiringFinding
 
 
@@ -198,6 +202,45 @@ def _esp32_s3_wroom_1() -> PartPins:
 PIN_TABLE: tuple[PartPins, ...] = (_TPS63070, _TPS2121, _TPS3839, _esp32_s3_wroom_1())
 
 
+# SOT-23 footprints by KiCad's name (SOT-23, SOT-23-3) or the IPC-7351 one
+# vendor libraries use (SOT95P280X125-3N); not SOT-23-5/6 or SOT-323.
+_SOT23 = re.compile(r"SOT-?23(?![-_]?[4-9])|SOT95P\d+X\d+-3", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class Pinout:
+    """A three-pin discrete part's datasheet pinout. ``pins`` maps pin
+    number to (terminal, function); terminals are G, S and D.
+
+    ``check_pinout`` holds the symbol's pin names to it. A generic symbol
+    (Simulation_SPICE:NMOS is numbered 1=D, 2=G, 3=S) on a SOT-23 footprint
+    puts every net on the wrong pad while the schematic and the netlist
+    still read correctly, so neither ERC nor the model sees it."""
+
+    value_prefix: str
+    source: str
+    pins: dict[str, tuple[str, str]]
+
+    def matches(self, value: str, footprint: str) -> bool:
+        # No footprint yet: the part only comes in SOT-23, so check anyway.
+        return value.upper().startswith(self.value_prefix) and (
+            not footprint or _SOT23.search(footprint) is not None
+        )
+
+
+_AO3400 = Pinout(
+    value_prefix="AO3400",
+    source="AOS AO3400A datasheet, SOT23 pin diagram (pin 1 dot on G)",
+    pins={
+        "1": ("G", "Gate."),
+        "2": ("S", "Source."),
+        "3": ("D", "Drain."),
+    },
+)
+
+PINOUTS: tuple[Pinout, ...] = (_AO3400,)
+
+
 @dataclass(frozen=True)
 class PinLookup:
     """The pin table applied to one design."""
@@ -224,6 +267,10 @@ def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label]
     used_pins = {n.pin_ref for nodes in design.nets.values() for n in nodes}
     for part in sorted(design.parts.values(), key=lambda p: _ref_key(p.ref)):
         if not is_ic(part.ref):
+            pinout = next((p for p in PINOUTS if p.matches(part.value, part.footprint)), None)
+            if pinout is not None:
+                findings += check_pinout(design, part.ref, pinout)
+                lines += _table_lines(part, pinout.source, pinout.pins, used_pins, pin_refs)
             continue
         entry = next(
             (e for e in PIN_TABLE if e.matches(part.value, part.lib_part, part.footprint)), None
@@ -236,13 +283,7 @@ def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label]
         if entry is None:
             continue
         findings += check_wiring(design, part.ref, entry, erc, labels)
-        lines.append(f"{part.ref} ({part.value}), from {entry.source}:")
-        for number, (name, function) in sorted(entry.pins.items(), key=lambda kv: int(kv[0])):
-            pin_ref = f"{part.ref}.{number}"
-            if pin_ref not in used_pins:
-                continue
-            pin_refs.add(pin_ref)
-            lines.append(f"  {pin_ref} {name}: {function}")
+        lines += _table_lines(part, entry.source, entry.pins, used_pins, pin_refs)
     missing = [ic.ref for ic in ics if not ic.pin_data]
     if missing:
         lines.append(f"No pin table for: {', '.join(missing)}.")
@@ -253,6 +294,73 @@ def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label]
         text="\n".join(lines) + "\n",
         findings=findings,
     )
+
+
+def _table_lines(
+    part: Part,
+    source: str,
+    table: dict[str, tuple[str, str]],
+    used_pins: set[str],
+    pin_refs: set[str],
+) -> list[str]:
+    """The pin table's lines for one part, its connected pins only; adds
+    each listed pin to ``pin_refs``, the pins a claim may cite as datasheet."""
+    lines = [f"{part.ref} ({part.value}), from {source}:"]
+    for number, (name, function) in sorted(table.items(), key=lambda kv: int(kv[0])):
+        pin_ref = f"{part.ref}.{number}"
+        if pin_ref not in used_pins:
+            continue
+        pin_refs.add(pin_ref)
+        lines.append(f"  {pin_ref} {name}: {function}")
+    return lines
+
+
+_TERMINALS = {"G": "G", "GATE": "G", "S": "S", "SOURCE": "S", "D": "D", "DRAIN": "D"}
+
+
+def check_pinout(design: Design, ref: str, pinout: Pinout) -> list[WiringFinding]:
+    """One finding when any pin of ``ref`` has a symbol name (from the
+    netlist) other than the datasheet's terminal for that pin number. Pins
+    the symbol leaves unnamed can't be judged and are skipped.
+
+    Deterministic, like ``check_wiring``. It exists because a board's
+    AO3400s were drawn with Simulation_SPICE:NMOS (1=D, 2=G, 3=S) on a SOT-23
+    footprint (1=G, 2=S, 3=D): every pad wrong, and nothing caught it.
+    """
+    part = design.parts[ref]
+    wrong: list[tuple[str, str, str, str]] = []  # pin_ref, datasheet terminal, drawn, net
+    drawn_order: list[str] = []
+    for number, (terminal, _function) in sorted(pinout.pins.items(), key=lambda kv: int(kv[0])):
+        pin_ref = f"{ref}.{number}"
+        net = design.net_of(pin_ref)
+        drawn = _TERMINALS.get(design.pin_name(pin_ref).strip().upper())
+        drawn_order.append(f"{number}={drawn or '?'}")
+        if net is not None and drawn is not None and drawn != terminal:
+            wrong.append((pin_ref, terminal, drawn, net))
+    if not wrong:
+        return []
+    order = ", ".join(f"{n}={t}" for n, (t, _) in sorted(pinout.pins.items()))
+    symbol = part.lib_part or "its symbol"
+    footprint = f" On footprint {part.footprint}" if part.footprint else " On the footprint"
+    pads = "; ".join(
+        f"net {net} (drawn on {drawn}) lands on the {terminal} pad ({pin_ref})"
+        for pin_ref, terminal, drawn, net in wrong
+    )
+    return [
+        WiringFinding(
+            id="",
+            pin=wrong[0][0],
+            pin_name=wrong[0][1],
+            net=wrong[0][3],
+            conflicts=[w[0] for w in wrong[1:]],
+            inductors=[],
+            text=(
+                f"{ref} ({part.value}) is drawn with {symbol}, numbered "
+                f"{', '.join(drawn_order)}, but the {part.value} is {order} "
+                f"({pinout.source}).{footprint}, {pads}. Use a symbol numbered {order}."
+            ),
+        )
+    ]
 
 
 # How many other pins a finding names before it says "and N more": a
@@ -395,7 +503,10 @@ def _cause(e: ErcEntry, merged: str, short: str, pin_name: str, labels: Sequence
 def format_findings(findings: list[WiringFinding]) -> str:
     """The findings as the model reads them, with ids."""
     if not findings:
-        return "(none: no inductor pin in the pin table shares a net with anything else)\n"
+        return (
+            "(none: no inductor pin in the pin table shares a net with anything else, "
+            "and no transistor's symbol pins disagree with its datasheet pinout)\n"
+        )
     return "\n".join(f"{f.id}: {f.text}" for f in findings) + "\n"
 
 

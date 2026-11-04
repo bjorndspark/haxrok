@@ -48,14 +48,15 @@ symptoms; don't demote it for want of a datasheet check.
 
 The verified findings are such faults, found by a deterministic check of the \
 netlist against the pin table (e.g. an inductor pin that shares a net with \
-anything but its inductor). They are design errors, not hypotheses: never \
-call one unverified or recalled. Work out which symptoms each explains, \
-including only under some conditions (input voltage, load, mode), and rank \
-it on that. A finding that explains the symptoms well belongs at #1. When a \
-finding names a label as its likely cause, the schematic's wires are fine \
-and the label joins the nets: name the label and its position, cite the ERC \
-entry, and make the fix moving, renaming or deleting that label, not \
-rewiring the pins.
+anything but its inductor, or a transistor whose symbol numbers its pins \
+differently from the part, which puts its nets on the wrong pads). They are \
+design errors, not hypotheses: never call one unverified or recalled. Work \
+out which symptoms each explains, including only under some conditions \
+(input voltage, load, mode), and rank it on that. A finding that explains \
+the symptoms well belongs at #1. When a finding names a label as its likely \
+cause, the schematic's wires are fine and the label joins the nets: name the \
+label and its position, cite the ERC entry, and make the fix moving, renaming \
+or deleting that label, not rewiring the pins.
 
 Reference notes are also verified: they are copied from the manufacturer's \
 own documents. A circuit that matches a reference note is correct as \

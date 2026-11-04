@@ -351,6 +351,40 @@ def test_pin_table_needs_the_right_package():
     assert not entry.matches("TPS2121YFP", "", "")
 
 
+def _mosfet(names: tuple[str, str, str], footprint: str = "Package_TO_SOT_SMD:SOT-23") -> Design:
+    """An AO3400 low-side switch whose symbol names pins 1-3 ``names``,
+    wired by name: GATE to G, LOAD to D, GND to S."""
+    by_name = {"G": "/GATE", "D": "/LOAD", "S": "GND"}
+    return Design(
+        parts={"Q1": Part("Q1", "AO3400A", "Simulation_SPICE:NMOS", footprint)},
+        nets={
+            by_name[name[0]]: [Node("Q1", str(number), name)]
+            for number, name in enumerate(names, start=1)
+        },
+    )
+
+
+def test_mosfet_symbol_numbered_against_the_part_is_one_finding():
+    lookup = pins.lookup(_mosfet(("D", "G", "S")))
+    [finding] = lookup.findings
+    assert (finding.pin, finding.pin_name, finding.net) == ("Q1.1", "G", "/LOAD")
+    assert finding.conflicts == ["Q1.2", "Q1.3"]
+    assert "numbered 1=D, 2=G, 3=S, but the AO3400A is 1=G, 2=S, 3=D" in finding.text
+    assert "net /GATE (drawn on G) lands on the S pad (Q1.2)" in finding.text
+    assert {"Q1.1", "Q1.2", "Q1.3"} <= lookup.pin_refs
+    assert lookup.ics == []  # a transistor isn't counted as an IC
+
+
+def test_mosfet_check_is_quiet_on_a_matching_or_unnamed_symbol_or_other_package():
+    assert pins.lookup(_mosfet(("G", "S", "D"))).findings == []
+    assert pins.lookup(_mosfet(("GATE", "SOURCE", "DRAIN"))).findings == []
+    unnamed = _mosfet(("D", "G", "S"))
+    unnamed.nets = {net: [Node(n.ref, n.pin, "")] for net, [n] in unnamed.nets.items()}
+    assert pins.lookup(Design(unnamed.parts, unnamed.nets)).findings == []
+    assert pins.lookup(_mosfet(("D", "G", "S"), "SOT-23-6")).findings == []
+    assert pins.lookup(_mosfet(("D", "G", "S"), "AO3400A:SOT95P280X125-3N")).findings
+
+
 # --- spice ---------------------------------------------------------------------------------
 
 
