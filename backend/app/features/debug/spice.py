@@ -98,9 +98,13 @@ def _deck(title: str, v: float, r: float, c: float, node: str) -> str:
     """The transient deck: rail → resistor → node, capacitor to ground,
     starting at 0 V and run to 5 RC."""
     stop = _TAUS * r * c
+    # The title carries a net name from the uploaded netlist. A line break in
+    # it would start a new deck line, and a ``.control`` block can run shell
+    # commands, so keep the title to one line of printable text.
+    safe_title = "".join(ch if ch.isprintable() else " " for ch in title)
     return "\n".join(
         [
-            title,
+            safe_title,
             f"Vpull rail 0 DC {v:g}",
             f"Rpull rail {node} {r:g}",
             f"Cbus {node} 0 {c:g} IC=0",

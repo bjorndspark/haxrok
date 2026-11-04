@@ -584,6 +584,25 @@ async def test_simulations_run_in_parallel_up_to_the_limit():
     assert fake.peak == spice._PARALLEL
 
 
+def test_net_name_cannot_add_lines_to_the_deck():
+    from app.features.debug.calc import I2cLine
+    from app.features.debug.spice import netlist
+
+    # A crafted label could smuggle a .control block (and its `shell`
+    # command) into the deck through the title line.
+    line = I2cLine(
+        net="SDA\n.control\nshell touch pwned\n.endc",
+        r_ohm=4700,
+        v_pull=3.3,
+        v_supply=3.3,
+        c_farad=50e-12,
+    )
+    deck = netlist(line).splitlines()
+    assert deck[0].startswith("I2C SDA .control shell touch pwned .endc")
+    assert not any(row.startswith("shell") for row in deck)
+    assert deck.count(".control") == 1
+
+
 def _script(tmp_path, body: str) -> str:
     path = tmp_path / "ngspice"
     path.write_text("#!/bin/sh\n" + body)
