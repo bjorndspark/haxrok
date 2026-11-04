@@ -480,7 +480,7 @@ _CORE_PIN = re.compile(r"^(DVDD|VDD_?CORE|VCORE)$", re.IGNORECASE)
 def _supply(design: Design, ref: str) -> tuple[str, float] | None:
     """The lowest named supply rail on an IC's I/O power pins, e.g.
     ("+3V3", 3.3). A core-only rail is skipped, unless it's all there is."""
-    rails = [
+    found = [
         (net, v, bool(_CORE_PIN.match(n.function)))
         for net, nodes in design.nets.items()
         for n in nodes
