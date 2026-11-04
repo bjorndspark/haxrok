@@ -11,12 +11,11 @@ make dev
 ```
 
 That's it. `make dev` generates `.env` (with non-conflicting ports), starts
-the shared postgres/redis infra (a no-op if already running), creates this
-copy's database, runs migrations, and starts backend + frontend with hot
-reload. Open the printed frontend port (default http://localhost:5173).
+the shared Redis infra (a no-op if already running), and starts backend +
+frontend with hot reload. Open the printed frontend port (default http://localhost:5173).
 
 - Swagger UI: `http://localhost:$BACKEND_HOST_PORT/docs`
-- Chat won't work until `.env` points at an OpenAI-compatible gateway —
+- Debug runs won't work until `.env` points at an OpenAI-compatible gateway —
   set `AI_BASE_URL` + `AI_API_KEY` (Bifrost recommended; see README).
 
 ## Daily
@@ -37,22 +36,11 @@ Log files on the host (current session only; rotated on restart):
 `logs/backend/app.log` for the server, `logs/frontend/app.log` for browser
 console/errors. Check both when debugging.
 
-## Changing the schema
-
-```sh
-# 1. edit backend/app/features/<name>/models.py
-make revision m='add widgets table'   # autogenerate migration
-make migrate                          # apply it
-```
-
-Never edit an applied migration — always a new revision. Column defaults use
-`server_default=func.now()`; code reads the clock via `get_clock().now()`.
-
 ## Adding a feature
 
-- Backend: `backend/app/features/<name>/` — `models.py`, `schemas.py`,
-  `repository.py` (flush only), `service.py` (owns commit), `router.py`
-  (thin). Skip files the feature doesn't need. Register the router in
+- Backend: `backend/app/features/<name>/` — `schemas.py`, `service.py`,
+  `router.py` (thin). Skip files the feature doesn't need. Code reads the
+  clock via `get_clock().now()`. Register the router in
   `app/main.py`.
 - Frontend: `frontend/src/features/<name>/` — `index.ts` is the public API;
   internals stay private. Server state in TanStack Query, UI state in Zustand.
@@ -72,27 +60,12 @@ make install                            # resync after pulling lockfile changes
 Deps are managed inside the containers against the pinned lockfiles — never
 `pip install` / `pnpm add` on the host.
 
-## Database ops
-
-```sh
-make db            # create this copy's DB (usually already done by make dev)
-make db-backup     # dump to data/backups/<db>-<timestamp>.sql.gz
-make db-restore f=data/backups/….sql.gz   # drop + recreate from a dump
-```
-
-Postgres is shared per machine (`docker-compose.infra.yml`); each copy gets
-its own database. Reach it directly at `localhost:55432` (user/pass in
-`.env`).
-
 ## Cleanup
 
 ```sh
-make clean       # dev artifacts (logs, caches, build output); DB + containers survive
-make purge       # clean + app containers + volumes; DB still survives in shared infra
+make clean       # dev artifacts (logs, caches, build output); containers survive
+make purge       # clean + app containers + volumes; shared infra keeps running
 ```
-
-The DB lives in shared infra, so even `purge` leaves it alone — drop it by
-hand if needed (command in the Makefile).
 
 ## Issues
 
@@ -113,7 +86,7 @@ make docs          # regenerate docs/architecture/api/routes.md
 make docs-serve    # browse all of docs/ with mkdocs (live reload)
 ```
 
-Generated from the FastAPI route table — no DB needed. Rerun after changing
+Generated from the FastAPI route table. Rerun after changing
 routes. Other docs: trade-offs go in `DECISIONS.md`, runbooks here in
 `docs/operations/`, plans in `docs/plans/`.
 

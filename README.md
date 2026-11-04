@@ -50,12 +50,13 @@ Scope, the go/no-go result and the ideas weighed against this one are in
 - [ ] Stretch: agent loop, what-if re-runs ("try C5 = 1 µF")
 
 The app started from a FastAPI, React and Postgres template. Its seed chat,
-voice and image features have been removed; `debug` is the only feature.
+voice and image features and its database have been removed; `debug` is the
+only feature.
 
 ## Quick start
 
 ```sh
-make dev        # generates .env, starts shared infra, creates the DB,
+make dev        # generates .env, starts shared infra (Redis),
                 # then starts backend + frontend
 ```
 
@@ -175,8 +176,7 @@ evals/               # known-bug cases and the go/no-go harness
 
 ## Commands
 
-`make dev` · `make lint` · `make test` · `make migrate` · `make revision m='…'` ·
-`make docs` · `make down` · `make purge`
+`make dev` · `make lint` · `make test` · `make docs` · `make down` · `make purge`
 
 Dependencies: `./scripts/docker/uv.sh add <pkg>` / `./scripts/docker/pnpm.sh add <pkg>`
 (they run inside the containers, against the pinned lockfiles).

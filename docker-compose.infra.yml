@@ -1,48 +1,16 @@
 # Shared infrastructure — runs ONCE per machine, across every project copy.
 #
 # Rules for editing this file:
-#   - PostgreSQL and Redis belong here, never in docker-compose.yml.
-#   - Do NOT interpolate POSTGRES_DB from .env. It is hardcoded to `starter_kit`
-#     so a per-project name can't recreate the shared postgres; per-project DBs
-#     are created lazily by scripts/db/create.sh on `make dev`.
-#   - Keep this file identical to the other projects' docker-compose.infra.yml
-#     (fulcrum, volundr, ...): `name: infra` makes them the same compose
-#     project, so `make infra` from any repo converges on the same containers.
+#   - Redis belongs here, never in docker-compose.yml.
+#   - `name: infra` makes this the machine's one shared infra compose project,
+#     so `make infra` from any copy converges on the same containers.
 #   - Infra ports are machine-level. App ports are auto-picked per copy by
 #     scripts/setup/env.sh — see docker-compose.yml.
 name: infra
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    # POSTGRES_DB is intentionally hardcoded (not interpolated from .env) so
-    # that per-project POSTGRES_DB values in a project's .env don't trigger a
-    # container recreate of this shared infra postgres. The initial `starter_kit`
-    # DB is created on first volume init; per-project DBs are created on demand
-    # by scripts/db/create.sh (invoked from `make dev`).
-    environment:
-      POSTGRES_DB: starter_kit
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "${POSTGRES_HOST_PORT:-55432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-postgres}", "-d", "starter_kit"]
-      interval: 3s
-      timeout: 3s
-      retries: 30
-      start_period: 5s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: 1.0
-
-  # The app doesn't consume Redis; it ships here so this file stays identical
-  # to the shared infra file used by the other projects on the machine.
+  # Caches gateway answers (app/core/ai/cache.py); the app fails open
+  # without it.
   redis:
     image: redis:8-alpine
     restart: unless-stopped
@@ -63,5 +31,4 @@ services:
           cpus: 0.5
 
 volumes:
-  postgres_data:
   redis_data:

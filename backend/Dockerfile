@@ -32,8 +32,6 @@ RUN --mount=type=cache,target=/uv-cache \
 # Copy app source (ignored in local dev — bind-mounts override at runtime).
 COPY docker-entrypoint.sh ./
 COPY app ./app
-COPY alembic ./alembic
-COPY alembic.ini ./alembic.ini
 
 EXPOSE 8000
 

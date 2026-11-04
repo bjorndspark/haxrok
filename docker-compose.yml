@@ -1,13 +1,12 @@
 # App containers — one set per project copy.
 #
 # Rules for editing this file:
-#   - Do NOT add PostgreSQL or Redis here; they live in docker-compose.infra.yml
-#     and are shared across every copy on this machine.
+#   - Do NOT add Redis here; it lives in docker-compose.infra.yml and is
+#     shared across every copy on this machine.
 #   - Do NOT hardcode host ports. They come from .env, which scripts/setup/env.sh
 #     generates with non-conflicting values so several copies can run at once.
-#   - Postgres is reached via the shared infra_default network using the compose
-#     service name (postgres) as hostname. The per-copy database
-#     (POSTGRES_DB in .env) is created by scripts/db/create.sh on `make dev`.
+#   - Redis is reached via the shared infra_default network using the compose
+#     service name (redis) as hostname.
 #   - The AI gateway is NOT a service here. The app talks to any
 #     OpenAI-compatible endpoint via AI_BASE_URL; where that endpoint lives
 #     (Bifrost, a cloud provider, ...) is deployment config, not repo code.
@@ -17,9 +16,6 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      # Internal DSN — reaches the shared infra postgres by service name on
-      # the infra_default network. POSTGRES_DB is this copy's database.
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app}
       # Internal URL — shared infra redis by service name on infra_default.
       REDIS_URL: redis://redis:6379/0
       BACKEND_CORS_ORIGINS: http://localhost:${FRONTEND_HOST_PORT:-5173}
@@ -27,8 +23,6 @@ services:
       - "${BACKEND_HOST_PORT:-8000}:8000"
     volumes:
       - ./backend/app:/app/app
-      - ./backend/alembic:/app/alembic
-      - ./backend/alembic.ini:/app/alembic.ini
       - ./backend/tests:/app/tests
       - ./backend/pyproject.toml:/app/pyproject.toml
       - ./backend/uv.lock:/app/uv.lock

@@ -3,15 +3,14 @@
 # env.sh — create .env with host ports that won't conflict with other
 # running copies of this project.
 #
-# Infra ports (PostgreSQL) are machine-level and shared across all copies —
-# they are never auto-picked. App ports (backend + frontend) are per copy.
+# App ports (backend, frontend, docs) are per copy. The shared infra port
+# (Redis) is machine-level and not touched here.
 #
 # Usage:
 #   ./scripts/setup/env.sh                    # auto-pick free app ports
 #   ./scripts/setup/env.sh --no-auto          # keep default ports
 #   ./scripts/setup/env.sh --backend 8001 --frontend 5174
 #   ./scripts/setup/env.sh --docs 8002        # mkdocs preview port
-#   ./scripts/setup/env.sh --postgres 55433   # override the shared infra port
 #   ./scripts/setup/env.sh --force            # overwrite .env from .env.example
 #
 set -euo pipefail
@@ -24,9 +23,6 @@ EXAMPLE_FILE="$ROOT_DIR/.env.example"
 DEFAULT_BACKEND=8000
 DEFAULT_FRONTEND=5173
 DEFAULT_DOCS=8001
-# Machine-level: the shared infra postgres binds this on the host (see
-# docker-compose.infra.yml). Every copy on the machine must agree on it.
-DEFAULT_POSTGRES=55432
 
 # --- port helpers ------------------------------------------------------------
 
@@ -85,19 +81,6 @@ set_env_var() {
   fi
 }
 
-sanitize_db_name() {
-  # lowercase [a-z0-9_], starts with a letter, max 63 chars.
-  local name="$1"
-  name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]_\n' '_')"
-  name="$(printf '%s' "$name" | sed 's/__*/_/g; s/^_//; s/_$//')"
-  case "$name" in
-    [a-z]*) ;;
-    "") name="app" ;;
-    *) name="db_$name" ;;
-  esac
-  printf '%s' "${name:0:63}"
-}
-
 # --- args ------------------------------------------------------------------------
 
 FORCE=no
@@ -105,18 +88,16 @@ NO_AUTO=no
 BACKEND_PORT=""
 FRONTEND_PORT=""
 DOCS_PORT=""
-POSTGRES_PORT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --backend)  BACKEND_PORT="$2"; shift 2;;
     --frontend) FRONTEND_PORT="$2"; shift 2;;
     --docs)     DOCS_PORT="$2"; shift 2;;
-    --postgres) POSTGRES_PORT="$2"; shift 2;;
     --no-auto)  NO_AUTO=yes; shift;;
     --force|-f) FORCE=yes; shift;;
     -h|--help)
-      sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
       exit 0;;
     *) echo "unknown arg: $1 (see --help)" >&2; exit 1;;
   esac
@@ -136,10 +117,6 @@ fi
 
 # --- resolve ports -----------------------------------------------------------------
 
-# Infra port is machine-level: fixed default, overridable with --postgres,
-# never auto-picked — a per-copy value would rebind the shared container.
-[ -z "$POSTGRES_PORT" ] && POSTGRES_PORT="$DEFAULT_POSTGRES"
-
 if [ "$NO_AUTO" = "no" ]; then
   # Explicit ports are reserved first so auto-picks steer around them.
   TAKEN_PORTS=" $BACKEND_PORT $FRONTEND_PORT $DOCS_PORT "
@@ -154,24 +131,19 @@ else
   [ -z "$DOCS_PORT" ]     && DOCS_PORT="$DEFAULT_DOCS"
 fi
 
-DB_NAME="$(sanitize_db_name "$(basename "$ROOT_DIR")")"
 # Display name seeded from the directory name ("my-app" -> "My-app"); the
 # .env knob is PROJECT_NAME — edit there to override.
 APP_NAME="$(basename "$ROOT_DIR")"
 APP_NAME="${APP_NAME^}"
 
 echo "==> Resolved:"
-echo "      postgres : $POSTGRES_PORT  (shared infra; host tooling only)"
 echo "      backend  : $BACKEND_PORT"
 echo "      frontend : $FRONTEND_PORT"
 echo "      docs     : $DOCS_PORT"
-echo "      database : $DB_NAME"
 echo "      name     : $APP_NAME"
 
 # --- write vars -----------------------------------------------------------------
 
-set_env_var "POSTGRES_HOST_PORT"  "$POSTGRES_PORT"  "$ENV_FILE"
-set_env_var "POSTGRES_DB"         "$DB_NAME"        "$ENV_FILE"
 set_env_var "PROJECT_NAME"        "$APP_NAME"       "$ENV_FILE"
 set_env_var "BACKEND_HOST_PORT"   "$BACKEND_PORT"   "$ENV_FILE"
 set_env_var "FRONTEND_HOST_PORT"  "$FRONTEND_PORT"  "$ENV_FILE"

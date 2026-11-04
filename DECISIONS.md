@@ -61,25 +61,24 @@ is one sentence, not a contract file).
 grows past ~10 feature packages, revisit — retrofitting one contract is cheap
 when the structure is clean.
 
-## Shared infra, per-project database
+## No database; Redis is shared infra
 
-**Decision:** PostgreSQL (and Redis) live in `docker-compose.infra.yml` —
-`name: infra`, identical to the same file in the sibling projects (fulcrum,
-volundr), so one infra stack runs per machine regardless of which repo starts
-it. `docker-compose.yml` holds only the app containers; the backend reaches
-postgres by service name on the external `infra_default` network. Each copy's
-database is created lazily by `scripts/db/create.sh` (`make dev` → `db` →
-`infra`). `POSTGRES_HOST_PORT` is machine-level (55432), never auto-picked.
+**Decision:** the app stores nothing between requests. A debug run takes
+an upload and streams back its result, so there is no database: no
+Postgres, no SQLAlchemy, no migrations. The only stateful service is Redis,
+which caches gateway answers. It lives in `docker-compose.infra.yml`
+(`name: infra`, one stack per machine whichever copy starts it); the
+backend reaches it by service name on the external `infra_default` network.
 
-**Alternatives rejected:** per-clone postgres inside the app compose (the
-original choice — every copy/worktree paid for its own postgres container and
-volume, and recreating it per clone was the annoyance that motivated this).
+**Alternatives rejected:** keeping the template's Postgres + Alembic with an
+empty schema. It would be scaffolding with no tables behind it, and a
+migration chain whose only steps created the template's chat tables and then
+dropped them.
 
 **Consequence:** `docker compose up` alone fails without the infra stack —
-`make dev` is the entry point, not the compose file. `make purge` removes app
-containers only; the project DB survives in shared infra. Redis is reached
-the same way — `REDIS_URL` (compose sets the internal service name), one
-shared async client in `app/core/redis.py`.
+`make dev` is the entry point, not the compose file. A feature that needs to
+persist data brings the database back: add the dependencies, an `app/core/`
+engine, Alembic, and a CI job that applies migrations to a real Postgres.
 
 ## Envelope responses
 
@@ -113,8 +112,7 @@ redundant: every sanctioned dep path already syncs the venv
 
 **Consequence:** if `uv.lock` is edited out-of-band (host `uv`, manual
 edits), `make test`/`lint` run against the stale venv with no warning —
-run `make install` to resync. Runtime targets (`migrate`, `revision`, the
-uvicorn command) keep plain `uv run`.
+run `make install` to resync. The uvicorn command keeps plain `uv run`.
 
 ## Commit to `main`; CI gates on push
 
@@ -138,13 +136,11 @@ PR diff. Revisit if a second maintainer joins.
 committed. Hand-written design notes may still live alongside it.
 
 **Alternatives rejected:** hand-maintained docs — they drift and become the
-broken windows AGENTS.md bans. Generated DB schema and ER pages — dropped
-while the app has no tables; they rendered empty. Bring them back with the
-first model.
+broken windows AGENTS.md bans. Generated DB schema and ER pages — the app
+has no database (see "No database").
 
-**Consequence:** `make docs` is part of the route change loop. No DB
-connection is needed — generation reads the route table, not a live
-database.
+**Consequence:** `make docs` is part of the route change loop; generation
+reads the route table only.
 
 
 ## Frontend style: Prettier + typescript-eslint strict, not a style guide

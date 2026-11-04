@@ -1,7 +1,7 @@
 # AGENTS.md
 
 The engineering contract for this repo. Häxrök is a schematic debugger built
-on FastAPI + React + Postgres, with AI delegated to an external
+on FastAPI + React, with AI delegated to an external
 OpenAI-compatible gateway. It is deliberately simple — the rules below are
 the whole contract. `DECISIONS.md` holds the few trade-offs worth recording.
 
@@ -25,10 +25,10 @@ the whole contract. `DECISIONS.md` holds the few trade-offs worth recording.
 ```
 backend/app/
   main.py                # composition root — routers, middleware, mounts
-  core/                  # platform plumbing: config, db, clock, logging,
+  core/                  # platform plumbing: config, clock, logging,
                          # errors, responses, middleware, redis, ai/
-  features/<name>/       # models.py, schemas.py, repository.py, service.py, router.py
-backend/tests/           # mirrors features; fake the gateway, never mock the DB schema away
+  features/<name>/       # schemas.py, service.py, router.py
+backend/tests/           # mirrors features; fake the gateway
 frontend/src/
   app/                   # shell: routes, providers, index.css
   features/<name>/       # index.ts is the public API; internals are private
@@ -39,24 +39,21 @@ frontend/src/
 
 **Backend**
 
-- One package per feature: `models.py` (SQLAlchemy), `schemas.py` (Pydantic),
-  `repository.py` (queries — flush, never commit), `service.py` (orchestration
-  — owns the commit boundary), `router.py` (thin). Skip a file when a feature
-  genuinely doesn't need it; don't create it empty.
+- One package per feature: `schemas.py` (Pydantic), `service.py` (logic and
+  orchestration), `router.py` (thin). Skip a file when a feature genuinely
+  doesn't need it; don't create it empty. The app keeps no database (see
+  `DECISIONS.md`, "No database").
 - **Features never import other features.** Shared code goes up a level
   (`app/core/`). main.py wires everything.
 - All AI calls go through `app/core/ai/`. Never construct SDK clients elsewhere,
   never add provider-specific logic — the gateway owns that.
 - Wall-clock reads go through `get_clock().now()`, never `datetime.now()`.
-  Column defaults use `server_default=func.now()`.
 - All JSON responses use the envelope in `app/core/responses.py`: endpoints
   return `SuccessResponse[T]` (wrap payloads with `ok(...)`) or
   `PaginatedResponse[T]` for paginated lists. Errors raise `AppError`
   subclasses from `app/core/errors.py`; handlers emit
   `{"success": false, "error": {code, message}, "request_id"}`. Non-JSON
   responses (SSE streams, file mounts) are exempt.
-- Schema changes = `make revision m='…'` then `make migrate`. Never edit
-  applied migrations.
 - `ruff format` owns formatting (`make format`); `ruff check` owns lint.
 
 **Frontend**
@@ -89,25 +86,23 @@ frontend/src/
 
 ## Stack
 
-- **Backend**: FastAPI + SQLAlchemy 2.0 (async) + Pydantic v2 + Alembic,
-  Python 3.12, `uv`
+- **Backend**: FastAPI + Pydantic v2, Python 3.12, `uv`
 - **Frontend**: React 19 + Vite + TypeScript + Tailwind 4 + shadcn/ui, `pnpm`
-- **DB**: PostgreSQL + Redis — shared infra per machine
-  (`docker-compose.infra.yml`, `name: infra`); each copy gets its own
-  database via `scripts/db/create.sh`. Redis client: `app/core/redis.py`
-  (`get_redis()`, async, `REDIS_URL`).
+- **Cache**: Redis — shared infra per machine (`docker-compose.infra.yml`,
+  `name: infra`), caching gateway answers. Client: `app/core/redis.py`
+  (`get_redis()`, async, `REDIS_URL`). No database.
 - **AI**: external OpenAI-compatible gateway via `AI_BASE_URL` (Bifrost
   recommended). Model names are env vars, not code.
 
 ## Commands
 
-- `make dev` — starts shared infra (`make infra`), creates this copy's DB
-  (`scripts/db/create.sh`), then backend + frontend with hot reload, auto-`.env`
+- `make dev` — starts shared infra (`make infra`), then backend + frontend
+  with hot reload, auto-`.env`
 - Logs on the host: `logs/backend/app.log` (server) and `logs/frontend/app.log`
   (browser console/errors shipped to `POST /api/v1/logs/frontend`) — check both
   when debugging. Each holds the current session only; every backend (re)start
   rotates the previous file into `archive/<date>/`.
-- `make lint` / `make test` / `make migrate` / `make format` — run inside containers
+- `make lint` / `make test` / `make format` — run inside containers
 - `make eval-app case=<name> [mode=review]` — run an `evals/cases/` case
   through the app's debug (or pre-fab review) prompts
   (`evals/app_prompts.py`); `evals/README.md` has the rest

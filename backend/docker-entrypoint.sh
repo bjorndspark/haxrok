@@ -31,10 +31,4 @@ if [ "${ENVIRONMENT:-}" = "development" ]; then
   fi
 fi
 
-# Apply migrations on dev startup so `make dev` is self-contained. Idempotent.
-if [ "${ENVIRONMENT:-}" = "development" ]; then
-  echo "[entrypoint] Applying alembic migrations..."
-  uv run alembic upgrade head
-fi
-
 exec "$@"

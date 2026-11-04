@@ -2,7 +2,7 @@
 
 Run via `make docs`. Executes inside the backend container, where /app is the
 backend dir and /docs is the repo's docs/ mount. Reads the FastAPI route
-table — no database connection is needed.
+table.
 
 Outputs: api/routes.md (endpoint inventory) under docs/architecture/.
 """

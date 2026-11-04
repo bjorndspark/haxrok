@@ -1,7 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -26,11 +25,8 @@ class Settings(BaseSettings):
     # Empty = the endpoint accepts and discards.
     FRONTEND_LOG_FILE: str = "logs/frontend/app.log"
 
-    # Host-run default reaches the shared infra postgres on its machine-level
-    # port; in Docker the compose service sets the internal DSN instead.
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:55432/app"
-    # Same pattern for shared-infra Redis: host-run default hits the
-    # machine-level port; compose overrides with redis://redis:6379/0.
+    # Host-run default reaches the shared infra Redis on its machine-level
+    # port; compose overrides it with redis://redis:6379/0.
     REDIS_URL: str = "redis://localhost:56379/0"
     BACKEND_CORS_ORIGINS: str = ""
 
@@ -63,18 +59,6 @@ class Settings(BaseSettings):
     NGSPICE_TIMEOUT_S: float = 10.0
     DEBUG_MAX_FILES: int = 200
     DEBUG_MAX_UPLOAD_BYTES: int = 20 * 1024 * 1024
-
-    @field_validator("DATABASE_URL")
-    @classmethod
-    def _rewrite_postgres_scheme(cls, v: str) -> str:
-        # Hosted Postgres URLs are often bare `postgresql://`; the app needs the
-        # asyncpg driver. Rewrite exactly the two driver-less prefixes and pass
-        # everything else through — `postgresql+asyncpg://` (dev) and
-        # `sqlite+aiosqlite://` (tests) must reach the engine untouched.
-        for bare in ("postgresql://", "postgres://"):
-            if v.startswith(bare):
-                return f"postgresql+asyncpg://{v[len(bare) :]}"
-        return v
 
     @property
     def cors_origins(self) -> list[str]:

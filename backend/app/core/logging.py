@@ -88,7 +88,7 @@ def setup_logging() -> None:
                 "Cannot rotate frontend log %s", settings.FRONTEND_LOG_FILE
             )
 
-    for name in ("uvicorn.access", "sqlalchemy.engine", "httpx", "openai"):
+    for name in ("uvicorn.access", "httpx", "openai"):
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
