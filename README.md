@@ -49,9 +49,8 @@ Scope, the go/no-go result and the ideas weighed against this one are in
       about each one (`docs/plans/001-100/003-simulate-and-ask.md`)
 - [ ] Stretch: agent loop, what-if re-runs ("try C5 = 1 µF")
 
-The app started from a FastAPI, React and Postgres template. Its
-seed chat, voice and image features have been removed; `debug` is the only
-feature.
+The app started from a FastAPI, React and Postgres template. Its seed chat,
+voice and image features have been removed; `debug` is the only feature.
 
 ## Quick start
 

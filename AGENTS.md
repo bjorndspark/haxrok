@@ -1,7 +1,7 @@
 # AGENTS.md
 
-The engineering contract for this repo. Häxrök is an application-layer
-template: FastAPI + React + Postgres, with AI delegated to an external
+The engineering contract for this repo. Häxrök is a schematic debugger built
+on FastAPI + React + Postgres, with AI delegated to an external
 OpenAI-compatible gateway. It is deliberately simple — the rules below are
 the whole contract. `DECISIONS.md` holds the few trade-offs worth recording.
 
