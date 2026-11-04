@@ -7,5 +7,6 @@ The full machine-readable spec is served at `/openapi.json`.
 | Method | Path | Handler | Tags | Summary |
 |---|---|---|---|---|
 | POST | `/api/v1/debug/analyze` | `analyze_api_v1_debug_analyze_post` | debug | Analyze |
+| POST | `/api/v1/debug/ask` | `ask_api_v1_debug_ask_post` | debug | Ask |
 | GET | `/api/v1/health` | `health_api_v1_health_get` | health | Health |
 | POST | `/api/v1/logs/frontend` | `ingest_frontend_logs_api_v1_logs_frontend_post` | logs | Ingest Frontend Logs |
