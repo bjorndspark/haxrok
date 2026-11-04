@@ -35,6 +35,7 @@ import type {
   Hypothesis,
   Problem,
   Severity,
+  Simulation,
 } from "../types"
 import { GlossaryText } from "./GlossaryText"
 import { SimulationPlot } from "./SimulationPlot"
@@ -297,6 +298,7 @@ interface HypothesisCardProps {
   hypothesis: Hypothesis
   diagram: Diagram | null
   summary: DesignSummary | null
+  simulations: Simulation[]
   glossary: GlossaryEntry[]
   problems: Problem[]
   latest: boolean
@@ -308,6 +310,7 @@ export function HypothesisCard({
   hypothesis: h,
   diagram,
   summary,
+  simulations,
   glossary,
   problems,
   latest,
@@ -401,7 +404,11 @@ export function HypothesisCard({
                 <p>
                   <span className="font-semibold">Backend calculation:</span> {c.text}
                 </p>
-                {c.simulation && <SimulationPlot sim={c.simulation} />}
+                {simulations
+                  .filter((s) => s.calc_id === c.id)
+                  .map((s) => (
+                    <SimulationPlot key={s.id} sim={s} />
+                  ))}
               </div>
             </div>
           ))}

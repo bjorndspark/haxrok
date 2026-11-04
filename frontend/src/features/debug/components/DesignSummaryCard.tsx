@@ -15,7 +15,6 @@ import { Card } from "@/shared/ui/card"
 
 import { calculationBadge } from "../present"
 import type { DesignSummary } from "../types"
-import { SimulationPlot } from "./SimulationPlot"
 
 /** What the backend parsed, shown before the model answers so the user
  *  can check the parse and see which ICs have pin data. */
@@ -133,10 +132,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
               <Badge tone={c.flagged ? "red" : "green"} className="shrink-0 self-start font-mono">
                 {calculationBadge(c)}
               </Badge>
-              <div className="min-w-0 flex-1 space-y-2">
-                <p className="leading-relaxed">{c.text}</p>
-                {c.simulation && <SimulationPlot sim={c.simulation} />}
-              </div>
+              <p className="min-w-0 flex-1 leading-relaxed">{c.text}</p>
             </div>
           ))}
           <p className="text-[11px] text-muted-foreground">

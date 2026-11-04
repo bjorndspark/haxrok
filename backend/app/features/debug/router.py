@@ -1,5 +1,6 @@
 """Debug routes. Thin: read the multipart upload, hand it to the service,
-stream the result as SSE (exempt from the envelope, see app.core.responses)."""
+stream the result as SSE (exempt from the envelope, see app.core.responses);
+answer questions about a simulation in the envelope."""
 
 import json
 from typing import Annotated
@@ -12,9 +13,17 @@ from app.core.ai.chat import complete_text
 from app.core.ai.structured import complete_structured
 from app.core.config import settings
 from app.core.errors import BadRequestError
+from app.core.responses import SuccessResponse, ok
 from app.features.debug import service
 from app.features.debug.kicad import KicadCli
-from app.features.debug.schemas import Analysis, Claim, MeasurementInput, Mode
+from app.features.debug.schemas import (
+    Analysis,
+    AskAnswer,
+    AskRequest,
+    Claim,
+    MeasurementInput,
+    Mode,
+)
 from app.features.debug.spice import Ngspice
 
 router = APIRouter(prefix="/debug", tags=["debug"])
@@ -39,6 +48,14 @@ async def _structure(system: str, user: str) -> Analysis[Claim]:
     )
 
 
+async def _answer(system: str, user: str) -> str:
+    return await complete_text(
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        name="debug_ask",
+        timeout_s=settings.DEBUG_AI_TIMEOUT_S,
+    )
+
+
 @router.post("/analyze")
 async def analyze(
     files: Annotated[
@@ -55,8 +72,9 @@ async def analyze(
 
     Upload errors, missing sub-sheets and kicad-cli failures return the
     error envelope. Otherwise the response is an SSE stream:
-    ``design_summary``, ``progress``…, then ``result`` (CheckedAnalysis) or
-    ``error``. File names carry the path inside the dropped folder.
+    ``design_summary``, ``progress`` and ``simulation`` (Simulation, as each
+    ngspice run finishes)…, then ``result`` (CheckedAnalysis) or ``error``.
+    File names carry the path inside the dropped folder.
     """
     try:
         parsed = _measurements.validate_python(json.loads(measurements))
@@ -76,7 +94,15 @@ async def analyze(
             )
         raw.append((f.filename or "", data))
 
-    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), mode, Ngspice())
+    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), mode)
     return EventSourceResponse(
-        service.stream(prepared, service.Model(diagnose=_diagnose, structure=_structure))
+        service.stream(prepared, service.Model(diagnose=_diagnose, structure=_structure), Ngspice())
     )
+
+
+@router.post("/ask")
+async def ask(req: AskRequest) -> SuccessResponse[AskAnswer]:
+    """Answer a question about one simulation from an analysis stream. The
+    browser sends the simulation and the conversation so far each time;
+    nothing is stored."""
+    return ok(AskAnswer(answer=await service.ask(req, _answer)))

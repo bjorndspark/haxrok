@@ -236,6 +236,13 @@ export function toMarkdown(run: Run, summary: DesignSummary, result: CheckedAnal
     for (const r of h.fix.rework) lines.push(`- Rework: ${r.text}`)
     for (const s of h.fix.schematic) lines.push(`- Next revision: ${s}`)
   }
+  if (run.simulations.length > 0) {
+    lines.push("", "## Simulations")
+    for (const sim of run.simulations) {
+      lines.push("", `### ${sim.title}`, "", sim.text, "", "```spice", sim.deck.trim(), "```")
+      for (const t of run.chats[sim.id] ?? []) lines.push("", `**Q:** ${t.question}`, "", t.answer)
+    }
+  }
   if (result.open_questions.length > 0) {
     lines.push("", "## Open questions")
     for (const q of result.open_questions)

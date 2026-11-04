@@ -1,13 +1,16 @@
-import { API_V1_PREFIX, apiUrl, type ErrorResponse } from "@/shared/api/client"
+import { API_V1_PREFIX, apiPost, apiUrl, type ErrorResponse } from "@/shared/api/client"
 
 import type {
   AnalysisEvent,
+  AskAnswer,
+  AskRequest,
   CheckedAnalysis,
   DesignSummary,
   MeasurementInput,
   Mode,
   ProgressEvent,
   ProjectFile,
+  Simulation,
 } from "./types"
 
 /** Parse SSE frames (sse-starlette, CRLF-separated) off a fetch body. */
@@ -77,9 +80,16 @@ export async function* streamAnalysis(
       yield { type: "design_summary", summary: JSON.parse(data) as DesignSummary }
     else if (event === "progress")
       yield { type: "progress", progress: JSON.parse(data) as ProgressEvent }
+    else if (event === "simulation")
+      yield { type: "simulation", simulation: JSON.parse(data) as Simulation }
     else if (event === "result")
       yield { type: "result", result: JSON.parse(data) as CheckedAnalysis }
     else if (event === "error")
       yield { type: "error", message: (JSON.parse(data) as { message: string }).message }
   }
+}
+
+/** Ask about one simulation; the conversation so far goes with it. */
+export async function askSimulation(req: AskRequest): Promise<string> {
+  return (await apiPost<AskAnswer>("/debug/ask", req)).answer
 }

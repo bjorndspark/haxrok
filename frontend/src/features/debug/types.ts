@@ -169,10 +169,6 @@ export interface ReferenceNote {
   text: string
 }
 
-/** A value the backend computed from the netlist with a datasheet formula
- *  (cf1, …). `flagged`: it contradicts the design's intent. */
-/** An ngspice transient of a flagged I²C line released from low: pull-up,
- *  estimated bus capacitance, ideal rail. Drawn on the card only. */
 /** A horizontal reference line on a simulation plot. */
 export interface SimLevel {
   v: number
@@ -181,7 +177,17 @@ export interface SimLevel {
   danger: boolean
 }
 
+/** An ngspice transient of an RC node rising from 0 V: a flagged I²C line,
+ *  or an enable/reset pin's RC delay. Streamed while the model works; the
+ *  user can ask about it. */
 export interface Simulation {
+  /** sim1, sim2, … */
+  id: string
+  /** The Calculation it simulates. */
+  calc_id: string
+  title: string
+  /** The ngspice netlist that was run. */
+  deck: string
   /** Sample times, in t_unit. */
   t: number[]
   t_unit: "ns" | "µs" | "ms"
@@ -190,6 +196,8 @@ export interface Simulation {
   text: string
 }
 
+/** A value the backend computed from the netlist with a datasheet formula
+ *  (cf1, …). `flagged`: it contradicts the design's intent. */
 export interface Calculation {
   id: string
   kind:
@@ -213,8 +221,6 @@ export interface Calculation {
   expected: number | null
   flagged: boolean
   text: string
-  /** Only on a flagged I²C line with a pull-up, and only if ngspice ran. */
-  simulation: Simulation | null
 }
 
 export interface Symptom {
@@ -262,6 +268,7 @@ export interface ProgressEvent {
 export type AnalysisEvent =
   | { type: "design_summary"; summary: DesignSummary }
   | { type: "progress"; progress: ProgressEvent }
+  | { type: "simulation"; simulation: Simulation }
   | { type: "result"; result: CheckedAnalysis }
   | { type: "error"; message: string }
 
@@ -281,4 +288,24 @@ export interface Run {
   stage: ProgressStage | null
   result: CheckedAnalysis | null
   error: string | null
+  /** In the order they finished. */
+  simulations: Simulation[]
+  /** Questions asked about each simulation, by simulation id. */
+  chats: Record<string, AskTurn[]>
+}
+
+/** A question about a simulation and the model's answer. */
+export interface AskTurn {
+  question: string
+  answer: string
+}
+
+export interface AskRequest {
+  simulation: Simulation
+  question: string
+  history: AskTurn[]
+}
+
+export interface AskAnswer {
+  answer: string
 }

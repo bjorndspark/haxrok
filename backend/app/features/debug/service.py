@@ -7,13 +7,16 @@ Two phases, so failures land where the UI can show them:
    server's KiCad can't open is an ordinary error response.
 2. ``stream`` (the SSE body): design summary at once, then our own stage
    updates while the model thinks (it streams nothing for ~90 s per call),
-   then the checked result or an error event.
+   and, in parallel, each ngspice simulation as it finishes; then the
+   checked result or an error event.
 
 The model is called twice (see ``prompt``): a free-text diagnosis, then a
-conversion of it into the structured answer. The kicad runner and both
+conversion of it into the structured answer. ``ask`` answers a question
+about one simulation afterwards. The kicad and ngspice runners and the
 model calls are passed in, so tests fake them.
 """
 
+import asyncio
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
@@ -34,6 +37,7 @@ from app.features.debug.kicad import KicadRunner
 from app.features.debug.project import load_project
 from app.features.debug.schemas import (
     Analysis,
+    AskRequest,
     Calculation,
     Claim,
     DesignSummary,
@@ -54,6 +58,9 @@ Diagnoser = Callable[[str, str], Awaitable[str]]
 
 Structurer = Callable[[str, str], Awaitable[Analysis[Claim]]]
 """(system prompt, user message) -> the model's structured analysis."""
+
+Answerer = Callable[[str, str], Awaitable[str]]
+"""(system prompt, user message) -> the model's answer to a question."""
 
 
 @dataclass(frozen=True)
@@ -88,13 +95,10 @@ async def prepare(
     measurements: list[MeasurementInput],
     kicad: KicadRunner,
     mode: Mode = "debug",
-    ngspice: spice.SpiceRunner | None = None,
 ) -> Prepared:
     """Validate the upload, run kicad-cli and parse its output. Raises
     ``AppError`` subclasses with messages the user can act on. In review
-    mode the symptoms are optional notes on what the board is for. With
-    ``ngspice``, flagged I²C lines and RC delays get a simulated waveform for
-    the UI."""
+    mode the symptoms are optional notes on what the board is for."""
     symptoms = prompt.number_symptoms(symptoms_text)
     if mode == "debug" and not symptoms:
         raise BadRequestError("Describe what you see on the bench first.", field="symptoms")
@@ -108,8 +112,6 @@ async def prepare(
     lookup = pins.lookup(design, erc, parse_labels(project.files))
     notes = reference.lookup(design)
     calcs = calc.lookup(design)
-    if ngspice is not None:
-        calcs = await spice.attach(calcs, design, ngspice)
     numbered = [
         Measurement(id=f"m{i}", step_id=m.step_id, context=m.context, value=m.value)
         for i, m in enumerate(measurements, start=1)
@@ -132,9 +134,72 @@ async def prepare(
     return Prepared(mode, summary, design, erc, lookup, notes, calcs, symptoms, numbered)
 
 
-async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
-    """The SSE body for one analysis run."""
+async def stream(
+    prepared: Prepared, model: Model, ngspice: spice.SpiceRunner | None = None
+) -> AsyncIterator[SseEvent]:
+    """The SSE body for one analysis run: the review, and with ``ngspice``
+    the simulations ``spice.plan`` picks, run alongside it. The terminal
+    event (result or error) waits for the simulations, so it stays last."""
     yield _event("design_summary", prepared.summary.model_dump_json())
+    sources = [_review(prepared, model)]
+    jobs = spice.plan(prepared.calculations, prepared.design) if ngspice else []
+    if ngspice and jobs:
+        sources.append(_simulations(jobs, ngspice))
+    terminal: SseEvent | None = None
+    async for ev in _merge(sources):
+        if ev["event"] in ("result", "error"):
+            terminal = ev
+        else:
+            yield ev
+    if terminal is not None:
+        yield terminal
+
+
+async def _simulations(
+    jobs: list[spice.Job], ngspice: spice.SpiceRunner
+) -> AsyncIterator[SseEvent]:
+    start = time.monotonic()
+    n = 0
+    async for sim in spice.simulate(jobs, ngspice):
+        n += 1
+        yield _event("simulation", sim.model_dump_json())
+    logger.info("ngspice: %d of %d simulations in %.2fs", n, len(jobs), time.monotonic() - start)
+
+
+_DONE: SseEvent = {}
+
+
+async def _merge(sources: list[AsyncIterator[SseEvent]]) -> AsyncIterator[SseEvent]:
+    """Events from all ``sources`` as they come. Each source runs in its
+    own task; closing the merge (the client went away) cancels them all,
+    and an exception in a source is raised here once the others are done."""
+    queue: asyncio.Queue[SseEvent] = asyncio.Queue()
+
+    async def pump(source: AsyncIterator[SseEvent]) -> None:
+        try:
+            async for ev in source:
+                await queue.put(ev)
+        finally:
+            await queue.put(_DONE)
+
+    tasks = [asyncio.create_task(pump(s)) for s in sources]
+    try:
+        left = len(tasks)
+        while left:
+            ev = await queue.get()
+            if ev is _DONE:
+                left -= 1
+            else:
+                yield ev
+        for t in tasks:
+            t.result()
+    finally:
+        for t in tasks:
+            t.cancel()
+
+
+async def _review(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
+    """The model's part of the stream: progress, then result or error."""
     with_data = sum(1 for ic in prepared.summary.ics if ic.pin_data)
     conflicts = len(prepared.pin_lookup.findings)
     plural = "s" if conflicts > 1 else ""
@@ -225,6 +290,23 @@ async def stream(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         if (d := diagram.build(h, prepared.design, prepared.pin_lookup.findings))
     }
     yield _event("result", checked.model_dump_json())
+
+
+async def ask(req: AskRequest, answer: Answerer) -> str:
+    """The model's answer to a question about one simulation, from the
+    deck, the caption and the samples the browser sent back."""
+    start = time.monotonic()
+    text = await answer(
+        prompt.ASK_SIMULATION, prompt.build_ask_message(req.simulation, req.history, req.question)
+    )
+    logger.info(
+        "ask about %s (%s) in %.1fs: %r",
+        req.simulation.id,
+        req.simulation.title,
+        time.monotonic() - start,
+        req.question,
+    )
+    return text.strip()
 
 
 def _progress(stage: str, message: str) -> SseEvent:

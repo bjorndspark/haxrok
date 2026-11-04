@@ -311,14 +311,19 @@ class SimLevel(BaseModel):
 class Simulation(BaseModel):
     """An ngspice transient of an RC node rising from 0 V (``spice.py``): a
     flagged I²C line through its pull-up and estimated bus capacitance, or
-    an enable/reset pin through its RC delay. For the UI to draw; the model
-    never sees it."""
+    an enable/reset pin through its RC delay. Streamed as its own
+    ``simulation`` event while the model works; the review never sees it,
+    but the user can ask about it (``AskRequest``)."""
 
-    t: list[float] = Field(description="Sample times, in t_unit.")
+    id: str = Field(max_length=20, description="sim1, sim2, … in plan order.")
+    calc_id: str = Field(max_length=20, description="The Calculation it simulates.")
+    title: str = Field(max_length=200)
+    deck: str = Field(max_length=4000, description="The ngspice netlist that was run.")
+    t: list[float] = Field(max_length=500, description="Sample times, in t_unit.")
     t_unit: TimeUnit
-    v: list[float]
-    levels: list[SimLevel]
-    text: str
+    v: list[float] = Field(max_length=500)
+    levels: list[SimLevel] = Field(max_length=10)
+    text: str = Field(max_length=2000)
 
 
 class Calculation(BaseModel):
@@ -354,7 +359,6 @@ class Calculation(BaseModel):
     expected: float | None = Field(description="The value the net name promises, if any.")
     flagged: bool
     text: str
-    simulation: Simulation | None = None
 
 
 class Symptom(BaseModel):
@@ -414,9 +418,11 @@ class MeasurementInput(BaseModel):
 
 # --- SSE events -------------------------------------------------------------------
 #
-# Order: design_summary, then any number of progress, then exactly one terminal
-# event, result or error. Parsing and ERC run before the stream opens, so their
-# failures come back as an ordinary error response instead.
+# Order: design_summary, then any number of progress and simulation events
+# (simulations run in parallel with the model), then exactly one terminal event,
+# result or error, sent once the simulations are done. Parsing and ERC run
+# before the stream opens, so their failures come back as an ordinary error
+# response instead.
 
 ProgressStage = Literal["pin_lookup", "reasoning", "structuring", "checking"]
 
@@ -428,3 +434,26 @@ class ProgressEvent(BaseModel):
 
 class ErrorEvent(BaseModel):
     message: str
+
+
+# --- ask --------------------------------------------------------------------------------
+
+
+class AskTurn(BaseModel):
+    """An earlier question about the same simulation and its answer."""
+
+    question: str = Field(max_length=1000)
+    answer: str = Field(max_length=8000)
+
+
+class AskRequest(BaseModel):
+    """A question about one simulation. Runs live in the browser, so the
+    simulation and the conversation so far come with every question."""
+
+    simulation: Simulation
+    question: str = Field(min_length=1, max_length=1000)
+    history: list[AskTurn] = Field(default_factory=list, max_length=10)
+
+
+class AskAnswer(BaseModel):
+    answer: str

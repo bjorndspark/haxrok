@@ -4,12 +4,14 @@ table, the service's event stream and the /debug/analyze route.
 kicad-cli and the model are faked.
 """
 
+import dataclasses
 import json
 
 import pytest
 
 from app.core.errors import BadRequestError, UpstreamError
 from app.features.debug import diagram, pins, prompt, router, service
+from app.features.debug.calc import lookup as calc_lookup
 from app.features.debug.design import Design, Label, Node, Part, parse_labels, parse_netlist
 from app.features.debug.evidence import EvidenceContext
 from app.features.debug.kicad import KicadOutput
@@ -478,69 +480,105 @@ def _vbus_i2c() -> Design:
     )
 
 
-async def test_a_flagged_i2c_line_gets_a_simulated_rise():
+async def _simulated(design: Design, fake: FakeSpice) -> tuple[list[Calculation], list]:
     from app.features.debug import calc, spice
 
+    calcs = calc.lookup(design)
+    return calcs, [s async for s in spice.simulate(spice.plan(calcs, design), fake)]
+
+
+async def test_a_flagged_i2c_line_gets_a_simulated_rise():
     design = _vbus_i2c()
     fake = FakeSpice()
-    calcs = await spice.attach(calc.lookup(design), design, fake)
+    calcs, sims = await _simulated(design, fake)
     sda = next(c for c in calcs if "SDA" in c.text)
     scl = next(c for c in calcs if "SCL" in c.text)
     assert sda.flagged and not scl.flagged
-    assert scl.simulation is None and len(fake.decks) == 1  # only the flagged line runs
+    assert len(fake.decks) == 1  # only the flagged line runs
 
     deck = fake.decks[0]
     assert "Vpull rail 0 DC 5" in deck and "Rpull rail sda 4700" in deck
     assert "Cbus sda 0 3e-11 IC=0" in deck  # 2 IC pins x 10 pF + 10 pF trace
     assert "tran " in deck and " uic" in deck and "wrdata out.txt v(sda)" in deck
 
-    sim = sda.simulation
-    assert sim is not None and sim.t_unit == "ns"
+    (sim,) = sims
+    assert (sim.id, sim.calc_id, sim.deck) == ("sim1", sda.id, deck)
+    assert sim.title == "I²C SDA rising after release" and sim.t_unit == "ns"
     assert [(lv.v, lv.danger) for lv in sim.levels] == [(5.0, False), (3.6, True)]
     assert len(sim.t) == len(sim.v) <= 202 and sim.v[0] == 0
     # 30→70 % of an RC is ln(7/3)·RC = 0.847 × 141 ns.
     assert "Rise time 30→70% is 119 ns" in sim.text
     assert "3.3 V supply + 0.3 V" in sim.text
-    # The model's text is unchanged: the simulation is for the UI only.
-    assert calc.format_calculations(calcs) == calc.format_calculations(calc.lookup(design))
 
 
-async def test_an_rc_delay_gets_a_simulated_rise_in_milliseconds():
-    from app.features.debug import calc, spice
-
-    design = _design(
+def _rc_design() -> Design:
+    return _design(
         {"U1": ("ESP32-C3-MINI-1", "x:y"), "R1": ("10k", "Device:R"), "C1": ("1u", "Device:C")},
         {"+3V3": ["R1.1", "U1.1(VDD)"], "EN": ["R1.2", "C1.1", "U1.8(EN)"], "GND": ["C1.2"]},
     )
+
+
+async def test_an_rc_delay_gets_a_simulated_rise_in_milliseconds():
     fake = FakeSpice()
-    calcs = await spice.attach(calc.lookup(design), design, fake)
+    calcs, (sim,) = await _simulated(_rc_design(), fake)
     rc = next(c for c in calcs if c.kind == "rc_delay")
     (deck,) = fake.decks
     assert "Rpull rail pin 10000" in deck and "Cbus pin 0 1e-06 IC=0" in deck
 
-    sim = rc.simulation
-    assert sim is not None and sim.t_unit == "ms" and sim.t[-1] == pytest.approx(50)
+    assert sim.calc_id == rc.id and sim.title == "EN rising through its RC delay"
+    assert sim.t_unit == "ms" and sim.t[-1] == pytest.approx(50)
     assert [lv.label for lv in sim.levels] == ["rail 3.3 V", "63% 2.09 V"]
     assert not any(lv.danger for lv in sim.levels)
     assert "after 10 ms" in sim.text and "R×C = 10 ms" in sim.text
 
 
 async def test_no_simulation_when_ngspice_fails_or_answers_garbage():
-    from app.features.debug import calc, spice
-
-    design = _vbus_i2c()
     for reply in (None, "", "No. of Data Rows : 0"):
-        calcs = await spice.attach(calc.lookup(design), design, FakeSpice(reply))
-        assert all(c.simulation is None for c in calcs)
+        _, sims = await _simulated(_vbus_i2c(), FakeSpice(reply))
+        assert sims == []
 
 
 async def test_no_simulation_without_a_pullup_to_size():
-    from app.features.debug import calc, spice
-
     design = _design({"U1": ("MCU", "x:y")}, {"+3V3": ["U1.1(VDD)"], "SDA": ["U1.2(SDA)"]})
     fake = FakeSpice()
-    (c,) = await spice.attach(calc.lookup(design), design, fake)
-    assert c.flagged and c.simulation is None and fake.decks == []
+    (c,), sims = await _simulated(design, fake)
+    assert c.flagged and sims == [] and fake.decks == []
+
+
+class SlowSpice(FakeSpice):
+    """Counts how many runs overlap."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.running = self.peak = 0
+
+    async def run(self, netlist: str) -> str | None:
+        import asyncio
+
+        self.running += 1
+        self.peak = max(self.peak, self.running)
+        await asyncio.sleep(0.01)
+        self.running -= 1
+        return await super().run(netlist)
+
+
+async def test_simulations_run_in_parallel_up_to_the_limit():
+    from app.features.debug import spice
+
+    # Six EN pins, each with its own RC: six jobs.
+    parts = {"U1": ("MCU", "x:y")}
+    nets: dict[str, list[str]] = {"+3V3": ["U1.1(VDD)"], "GND": []}
+    for i in range(6):
+        parts |= {f"U{i + 2}": ("LDO", "x:y")}
+        parts |= {f"R{i}": ("10k", "Device:R"), f"C{i}": ("1u", "Device:C")}
+        nets["+3V3"].append(f"R{i}.1")
+        nets["GND"].append(f"C{i}.2")
+        nets[f"EN{i}"] = [f"R{i}.2", f"C{i}.1", f"U{i + 2}.3(EN)"]
+    design = _design(parts, nets)
+    fake = SlowSpice()
+    _, sims = await _simulated(design, fake)
+    assert len(sims) == 6 and len({s.id for s in sims}) == 6
+    assert fake.peak == spice._PARALLEL
 
 
 def _script(tmp_path, body: str) -> str:
@@ -636,6 +674,78 @@ async def test_model_failure_ends_the_stream_with_an_error_event():
     )
 
 
+async def test_simulations_stream_alongside_the_model_and_the_result_comes_last():
+    import asyncio
+
+    prepared = await service.prepare(_files(), "Dead", [], FakeKicad())
+    prepared = dataclasses.replace(prepared, design=_rc_design())
+    prepared = dataclasses.replace(prepared, calculations=calc_lookup(prepared.design))
+
+    async def slow_diagnose(system: str, user: str) -> str:
+        await asyncio.sleep(0.05)  # the simulation finishes while the model thinks
+        return "1. L2 tied to VOUT."
+
+    events = [
+        (e["event"], json.loads(e["data"]))
+        async for e in service.stream(
+            prepared, service.Model(slow_diagnose, _structure), FakeSpice()
+        )
+    ]
+    names = [n for n, _ in events]
+    assert names.count("simulation") == 1 and names[-1] == "result"
+    assert names.index("simulation") < names.index("result")
+    # Sent before the model's write-up: it didn't wait for the model.
+    structuring = next(
+        i for i, (n, d) in enumerate(events) if n == "progress" and d["stage"] == "structuring"
+    )
+    assert names.index("simulation") < structuring
+    sim = events[names.index("simulation")][1]
+    assert sim["id"] == "sim1" and "Rpull rail pin 10000" in sim["deck"]
+
+
+async def test_a_failed_model_still_ends_with_the_error_after_simulations():
+    prepared = await service.prepare(_files(), "Dead", [], FakeKicad())
+    prepared = dataclasses.replace(prepared, design=_rc_design())
+    prepared = dataclasses.replace(prepared, calculations=calc_lookup(prepared.design))
+
+    async def failing(system: str, user: str) -> str:
+        raise UpstreamError("The model call failed: 503")
+
+    events = [
+        e["event"]
+        async for e in service.stream(prepared, service.Model(failing, _structure), FakeSpice())
+    ]
+    assert "simulation" in events and events[-1] == "error"
+
+
+async def _one_simulation():
+    _, (sim,) = await _simulated(_rc_design(), FakeSpice())
+    return sim
+
+
+async def test_ask_sends_the_deck_samples_and_conversation():
+    from app.features.debug.schemas import AskRequest, AskTurn
+
+    sim = await _one_simulation()
+    seen: list[tuple[str, str]] = []
+
+    async def answer(system: str, user: str) -> str:
+        seen.append((system, user))
+        return "  It crosses 2.09 V at about 10 ms.\n"
+
+    req = AskRequest(
+        simulation=sim,
+        question="When does EN pass 63%?",
+        history=[AskTurn(question="What is this?", answer="EN rising through R1 and C1.")],
+    )
+    assert await service.ask(req, answer) == "It crosses 2.09 V at about 10 ms."
+    system, user = seen[0]
+    assert system == prompt.ASK_SIMULATION
+    assert "Rpull rail pin 10000" in user and "63% 2.09 V" in user
+    assert "50 ms\t3.278 V" in user  # the last sample is always in the table
+    assert user.index("Q: What is this?") < user.index("## Question\nWhen does EN pass 63%?")
+
+
 async def test_blank_symptoms_are_refused_before_kicad_runs():
     kicad = FakeKicad()
     with pytest.raises(BadRequestError, match="bench"):
@@ -702,6 +812,21 @@ async def test_analyze_rejects_malformed_measurements(client, fake_backends):
     )
     assert res.status_code == 400
     assert res.json()["error"]["field"] == "measurements"
+
+
+async def test_ask_answers_in_the_envelope(client, monkeypatch):
+    async def answer(system: str, user: str) -> str:
+        return "About 10 ms."
+
+    monkeypatch.setattr(router, "_answer", answer)
+    sim = await _one_simulation()
+    body = {"simulation": sim.model_dump(), "question": "When?", "history": []}
+    res = await client.post("/api/v1/debug/ask", json=body)
+    assert res.status_code == 200
+    assert res.json() == {"success": True, "data": {"answer": "About 10 ms."}}
+
+    res = await client.post("/api/v1/debug/ask", json=body | {"question": ""})
+    assert res.status_code == 422 and res.json()["success"] is False
 
 
 # --- reference designs ------------------------------------------------------------------------

@@ -10,9 +10,10 @@
 Both are worded for hobbyists with a multimeter (plan 001, "Who it's for").
 Review mode (``REVIEW_DIAGNOSE``, ``REVIEW_STRUCTURE``) is the same pair
 before the board is built: no symptoms, look for design mistakes.
+``ASK_SIMULATION`` answers a question about one ngspice simulation.
 """
 
-from app.features.debug.schemas import Measurement, Mode, Symptom
+from app.features.debug.schemas import AskTurn, Measurement, Mode, Simulation, Symptom
 
 _INPUT = """\
 Input: numbered symptoms (s1, s2, ...), the compact netlist (one line per \
@@ -323,3 +324,50 @@ def build_structure_message(*, diagnosis: str, user: str) -> str:
     """The second call's user turn: the diagnosis, then the same input the
     first call saw, so citations can be checked against it."""
     return f"## Diagnosis\n{diagnosis.strip()}\n\n# Input\n\n{user}"
+
+
+ASK_SIMULATION = """\
+You answer a hardware engineer's question about one ngspice simulation of a \
+node on their schematic. You get the netlist that was run, the caption, the \
+reference lines and a table of samples.
+
+- Answer from those numbers. Quote times and voltages from the table or the \
+caption, with units, and say which you used. Interpolate between samples when \
+you need to, and say that you did.
+- The simulation is an ideal model: an ideal rail switched on at t = 0, one \
+resistor, one capacitor. When the answer depends on something it leaves out \
+(an IC's threshold or leakage, the real rail's ramp, trace capacitance), say \
+so, name the datasheet value to look up, and don't make one up.
+- When asked what a different part value would do, work it out from R×C and \
+say it's a calculation, not a re-run.
+- Short and plain: a few sentences, or a short list. No headings."""
+
+
+def _samples(sim: Simulation, rows: int = 25) -> str:
+    step = max(1, len(sim.t) // rows)
+    picked = list(range(0, len(sim.t), step))
+    if picked[-1] != len(sim.t) - 1:
+        picked.append(len(sim.t) - 1)
+    return "\n".join(f"{sim.t[i]:g} {sim.t_unit}\t{sim.v[i]:.3f} V" for i in picked)
+
+
+def build_ask_message(sim: Simulation, history: list[AskTurn], question: str) -> str:
+    """The user turn for a question about ``sim``: the deck, the caption,
+    the reference lines, a sample table, the conversation so far, then the
+    question."""
+    levels = "\n".join(
+        f"- {lv.label}" + (" (a limit the waveform shouldn't cross)" if lv.danger else "")
+        for lv in sim.levels
+    )
+    parts = [
+        f"## Simulation: {sim.title}",
+        "## Netlist that was run\n" + sim.deck.strip(),
+        "## Caption\n" + sim.text,
+        "## Reference lines\n" + (levels or "(none)"),
+        f"## Samples (time, voltage)\n{_samples(sim)}",
+    ]
+    if history:
+        turns = "\n\n".join(f"Q: {h.question}\nA: {h.answer}" for h in history)
+        parts.append("## Conversation so far\n" + turns)
+    parts.append("## Question\n" + question.strip())
+    return "\n\n".join(parts)

@@ -7,6 +7,7 @@ import { Card } from "@/shared/ui/card"
 import type { ProgressStage, Run } from "../types"
 import { formatElapsed, useElapsed } from "../useDebug"
 import { DesignSummaryCard } from "./DesignSummaryCard"
+import { SimulationsCard } from "./SimulationsCard"
 
 const STEPS: { key: "upload" | ProgressStage; label: string; detail: string }[] = [
   { key: "upload", label: "Parse + ERC", detail: "kicad-cli netlist export and ERC" },
@@ -84,6 +85,7 @@ export function AnalyzingPanel({ run, onCancel }: { run: Run; onCancel: () => vo
         </div>
       </Card>
 
+      <SimulationsCard run={run} />
       {run.summary && <DesignSummaryCard summary={run.summary} />}
     </div>
   )

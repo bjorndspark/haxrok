@@ -1,12 +1,17 @@
-"""Simulates RC nodes with ``ngspice -b``, for the UI to draw: a flagged I²C
-line, and the RC delay on an enable or reset pin.
+"""Simulates RC nodes with ``ngspice -b``: a flagged I²C line, and the RC
+delay on an enable or reset pin.
 
-Demo polish, not detection: it only re-draws what ``calc.py`` already
-found. Each circuit is a resistor from an ideal rail and a capacitor to
-ground, rising from 0 V at t=0: for I²C the pull-up and the estimated bus
+``plan`` picks the circuits worth simulating from the calculations;
+``simulate`` runs them in parallel and yields each ``Simulation`` as it
+finishes, so ``service.stream`` can send them while the model is still
+working. The review doesn't see them; the user can ask about each one
+(``service.ask``).
+
+Each circuit is a resistor from an ideal rail and a capacitor to ground,
+rising from 0 V at t=0: for I²C the pull-up and the estimated bus
 capacitance, for an RC delay the pull-up and the pin's capacitor.
 Any failure (ngspice missing, a non-zero exit, a timeout, unreadable output)
-leaves the Calculation without a simulation; it never fails the request.
+drops that simulation; it never fails the request.
 
 This is the feature's I/O edge for ngspice. The service takes a
 ``SpiceRunner`` so tests can fake it; ``Ngspice`` is the real one.
@@ -14,6 +19,8 @@ This is the feature's I/O edge for ngspice. The service takes a
 
 import asyncio
 import tempfile
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -35,6 +42,7 @@ logger = get_logger(__name__)
 _TAUS = 5  # simulate to 5 RC: the line is within 1% of the rail
 _STEPS = 200
 _POINTS = 120  # what the UI draws
+_PARALLEL = 4  # ngspice processes at once, per request
 
 
 class SpiceRunner(Protocol):
@@ -74,6 +82,10 @@ class Ngspice:
                 await proc.wait()
                 logger.warning("ngspice took longer than %.0f s", self.timeout_s)
                 return None
+            except asyncio.CancelledError:
+                # The client went away mid-run: don't leave ngspice behind.
+                proc.kill()
+                raise
             data = work / "out.txt"
             if proc.returncode != 0 or not data.exists():
                 text = out.decode("utf-8", errors="replace").strip()
@@ -154,7 +166,18 @@ def _times(rows: list[tuple[float, float]], scale: float) -> list[float]:
     return [round(t * scale, 3) for t, _ in rows]
 
 
-def simulation(line: I2cLine, rows: list[tuple[float, float]]) -> Simulation:
+@dataclass(frozen=True)
+class Job:
+    """One circuit to simulate: the deck and what it came from."""
+
+    id: str
+    calc_id: str
+    title: str
+    deck: str
+    line: I2cLine | RcLine
+
+
+def simulation(job: Job, line: I2cLine, rows: list[tuple[float, float]]) -> Simulation:
     """The I²C waveform and the caption the UI shows under it."""
     rows = _thin(rows)
     unit, scale = _unit(rows[-1][0])
@@ -173,6 +196,10 @@ def simulation(line: I2cLine, rows: list[tuple[float, float]]) -> Simulation:
         )
     limit = round(line.v_supply + 0.3, 1)
     return Simulation(
+        id=job.id,
+        calc_id=job.calc_id,
+        title=job.title,
+        deck=job.deck,
         t=_times(rows, scale),
         t_unit=unit,
         v=[round(v, 4) for _, v in rows],
@@ -184,7 +211,7 @@ def simulation(line: I2cLine, rows: list[tuple[float, float]]) -> Simulation:
     )
 
 
-def rc_simulation(line: RcLine, rows: list[tuple[float, float]]) -> Simulation:
+def rc_simulation(job: Job, line: RcLine, rows: list[tuple[float, float]]) -> Simulation:
     """The enable/reset pin's rise, with the 63% point at one time constant."""
     rows = _thin(rows)
     unit, scale = _unit(rows[-1][0])
@@ -201,6 +228,10 @@ def rc_simulation(line: RcLine, rows: list[tuple[float, float]]) -> Simulation:
             f"(R×C = {tau * scale:.3g} {unit}). The IC's enable threshold is in its datasheet."
         )
     return Simulation(
+        id=job.id,
+        calc_id=job.calc_id,
+        title=job.title,
+        deck=job.deck,
         t=_times(rows, scale),
         t_unit=unit,
         v=[round(v, 4) for _, v in rows],
@@ -222,19 +253,42 @@ async def _run(runner: SpiceRunner, deck: str, net: str) -> list[tuple[float, fl
         return None
 
 
-async def attach(
-    calcs: list[Calculation], design: Design, runner: SpiceRunner
-) -> list[Calculation]:
-    """``calcs`` with a simulation on each flagged I²C line that has a
-    pull-up and each RC delay on a named rail; the others unchanged."""
-    out = []
+def plan(calcs: list[Calculation], design: Design) -> list[Job]:
+    """The circuits worth simulating: each flagged I²C line with a pull-up,
+    and each RC delay on a named rail. Pure; nothing runs yet."""
+    jobs: list[Job] = []
     for c in calcs:
-        sim = None
-        if (i2c := i2c_line(design, c)) is not None:
-            rows = await _run(runner, netlist(i2c), i2c.net)
-            sim = simulation(i2c, rows) if rows else None
-        elif (rc := rc_line(design, c)) is not None:
-            rows = await _run(runner, rc_netlist(rc), rc.net)
-            sim = rc_simulation(rc, rows) if rows else None
-        out.append(c.model_copy(update={"simulation": sim}) if sim else c)
-    return out
+        line: I2cLine | RcLine | None
+        if (line := i2c_line(design, c)) is not None:
+            title, deck = f"I²C {line.net} rising after release", netlist(line)
+        elif (line := rc_line(design, c)) is not None:
+            title, deck = f"{line.net} rising through its RC delay", rc_netlist(line)
+        else:
+            continue
+        jobs.append(Job(f"sim{len(jobs) + 1}", c.id, title, deck, line))
+    return jobs
+
+
+async def _one(runner: SpiceRunner, job: Job, gate: asyncio.Semaphore) -> Simulation | None:
+    async with gate:
+        rows = await _run(runner, job.deck, job.line.net)
+    if not rows:
+        return None
+    if isinstance(job.line, I2cLine):
+        return simulation(job, job.line, rows)
+    return rc_simulation(job, job.line, rows)
+
+
+async def simulate(jobs: list[Job], runner: SpiceRunner) -> AsyncIterator[Simulation]:
+    """Run ``jobs`` in parallel (at most ``_PARALLEL`` at once) and yield
+    each simulation as it finishes; failed ones are skipped. Closing the
+    iterator early cancels the runs still going."""
+    gate = asyncio.Semaphore(_PARALLEL)
+    tasks = [asyncio.create_task(_one(runner, job, gate)) for job in jobs]
+    try:
+        for done in asyncio.as_completed(tasks):
+            if (sim := await done) is not None:
+                yield sim
+    finally:
+        for t in tasks:
+            t.cancel()

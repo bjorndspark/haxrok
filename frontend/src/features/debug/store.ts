@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-import type { MeasurementInput, Mode, ProjectFile, Run } from "./types"
+import type { AskTurn, MeasurementInput, Mode, ProjectFile, Run } from "./types"
 
 /**
  * Debug UI state. There is no server-side history (plan 001: no accounts),
@@ -27,6 +27,8 @@ interface DebugState {
   addMeasurement: (m: MeasurementInput) => void
   startRun: (trigger: string, controller: AbortController) => number
   updateRun: (number: number, patch: (run: Run) => Partial<Run>) => void
+  /** Record an answered question about simulation `simId` of run `number`. */
+  addAskTurn: (number: number, simId: string, turn: AskTurn) => void
   editInput: () => void
   showSession: () => void
   reset: () => void
@@ -57,12 +59,19 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       stage: null,
       result: null,
       error: null,
+      simulations: [],
+      chats: {},
     }
     set((s) => ({ view: "session", runs: [run, ...s.runs], controller, inputError: null }))
     return number
   },
   updateRun: (number, patch) =>
     set((s) => ({ runs: s.runs.map((r) => (r.number === number ? { ...r, ...patch(r) } : r)) })),
+  addAskTurn: (number, simId, turn) => {
+    get().updateRun(number, (r) => ({
+      chats: { ...r.chats, [simId]: [...(r.chats[simId] ?? []), turn] },
+    }))
+  },
   editInput: () => set({ view: "input" }),
   showSession: () => set({ view: "session" }),
   reset: () => {

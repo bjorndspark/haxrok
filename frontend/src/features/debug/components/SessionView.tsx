@@ -21,6 +21,7 @@ import { AnalyzingPanel } from "./AnalyzingPanel"
 import { DesignSummaryCard } from "./DesignSummaryCard"
 import { GlossaryText } from "./GlossaryText"
 import { HypothesisCard } from "./HypothesisCard"
+import { SimulationsCard } from "./SimulationsCard"
 
 function RunHeader({ run, total }: { run: Run; total: number }) {
   const latest = run.number === total
@@ -86,6 +87,7 @@ function RunBody({
             </div>
           )}
         </Card>
+        <SimulationsCard run={run} />
         {run.summary && latest && <DesignSummaryCard summary={run.summary} />}
       </div>
     )
@@ -116,6 +118,7 @@ function RunBody({
           hypothesis={h}
           diagram={result.diagrams[h.id] ?? null}
           summary={run.summary}
+          simulations={run.simulations}
           glossary={result.glossary}
           problems={result.problems}
           latest={latest}
@@ -123,6 +126,8 @@ function RunBody({
           onRerun={(step, value) => void actions.rerunWithMeasurement(step, value)}
         />
       ))}
+
+      <SimulationsCard run={run} />
 
       {loose.length > 0 && (
         <Card className="space-y-1 p-4 text-xs text-amber-800 dark:text-amber-300">

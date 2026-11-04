@@ -8,9 +8,18 @@ import {
   nearestPoint,
   simulationLayout,
   splitGlossary,
+  toMarkdown,
 } from "./present"
 import { fragmentLines, symptomHints, symptomLines } from "./symptoms"
-import type { Calculation, CheckedClaim, DesignSummary, Hypothesis, Simulation } from "./types"
+import type {
+  Calculation,
+  CheckedAnalysis,
+  CheckedClaim,
+  DesignSummary,
+  Hypothesis,
+  Run,
+  Simulation,
+} from "./types"
 
 describe("symptoms", () => {
   it("numbers non-empty lines the way the backend does", () => {
@@ -128,7 +137,6 @@ describe("assess", () => {
       expected: 3.3,
       flagged: true,
       text: "",
-      simulation: null,
     }
     const review = {
       ...summary,
@@ -225,6 +233,10 @@ describe("diagramLayout box", () => {
 
 describe("simulationLayout", () => {
   const sim: Simulation = {
+    id: "sim1",
+    calc_id: "cf1",
+    title: "I²C SDA rising after release",
+    deck: "",
     t: [0, 100, 200, 400, 700],
     t_unit: "ns",
     v: [0, 2.5, 3.8, 4.7, 4.97],
@@ -276,7 +288,6 @@ describe("calculationBadge", () => {
     expected: 5100,
     flagged: true,
     text: "",
-    simulation: null,
     ...over,
   })
 
@@ -292,5 +303,51 @@ describe("calculationBadge", () => {
     expect(calculationBadge(calc({ kind: "i2c_pullup", value: null, expected: null }))).toBe(
       "missing",
     )
+  })
+})
+
+describe("toMarkdown", () => {
+  it("writes each simulation with its netlist and the questions asked", () => {
+    const sim: Simulation = {
+      id: "sim1",
+      calc_id: "cf2",
+      title: "EN rising through its RC delay",
+      deck: "RC on EN\nRpull rail pin 10000\n",
+      t: [0, 50],
+      t_unit: "ms",
+      v: [0, 3.28],
+      levels: [],
+      text: "ngspice: 10 kΩ from 3.3 V into 1 µF.",
+    }
+    const run: Run = {
+      number: 1,
+      trigger: "Review before ordering",
+      startedAt: 0,
+      finishedAt: 1,
+      summary: null,
+      stage: null,
+      result: null,
+      error: null,
+      simulations: [sim],
+      chats: { sim1: [{ question: "When does it pass 63%?", answer: "At 10 ms." }] },
+    }
+    const summary = {
+      mode: "review",
+      project: "board",
+      parts: 3,
+      nets: 2,
+      erc: [],
+      symptoms: [],
+      measurements: [],
+    } as unknown as DesignSummary
+    const result = {
+      hypotheses: [],
+      open_questions: [],
+      glossary: [],
+    } as unknown as CheckedAnalysis
+    const md = toMarkdown(run, summary, result)
+    expect(md).toContain("## Simulations\n\n### EN rising through its RC delay")
+    expect(md).toContain("```spice\nRC on EN\nRpull rail pin 10000\n```")
+    expect(md).toContain("**Q:** When does it pass 63%?\n\nAt 10 ms.")
   })
 })
