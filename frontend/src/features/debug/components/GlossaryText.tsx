@@ -10,7 +10,7 @@ export function GlossaryText({ text, glossary }: { text: string; glossary: Gloss
           <abbr
             key={i}
             title={part.term.definition}
-            className="cursor-help underline decoration-blue-400/70 decoration-dotted underline-offset-2"
+            className="cursor-help underline decoration-info decoration-dotted underline-offset-2"
           >
             {part.text}
           </abbr>

@@ -1,17 +1,8 @@
-import {
-  BookOpen,
-  ChevronDown,
-  ChevronUp,
-  CircleHelp,
-  Download,
-  ShieldCheck,
-  TriangleAlert,
-} from "lucide-react"
 import { useState } from "react"
 
-import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Card } from "@/shared/ui/card"
+import { Title } from "@/shared/ui/title"
 
 import { isReview } from "../present"
 import { useDebugStore } from "../store"
@@ -30,26 +21,16 @@ function RunHeader({ run, total }: { run: Run; total: number }) {
       ? formatElapsed(Math.floor((run.finishedAt - run.startedAt) / 1000))
       : null
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <div className="flex items-center gap-2.5">
-        <span
-          className={
-            latest
-              ? "flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
-              : "flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground"
-          }
-        >
-          {run.number}
-        </span>
-        <span className="font-mono text-sm font-bold sm:text-base">Run #{run.number}</span>
-        <span className="text-xs text-muted-foreground">
-          · {new Date(run.startedAt).toLocaleTimeString()}
-          {took && ` · took ${took}`}
-        </span>
-      </div>
-      <span className="rounded-md border bg-card px-2.5 py-1 font-mono text-xs text-muted-foreground">
-        {run.trigger}
+    <div className="mb-4 flex items-center gap-[1ch] text-sm">
+      <span className={latest ? "font-bold" : "font-bold text-muted-foreground"}>
+        Run #{run.number}
       </span>
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {new Date(run.startedAt).toLocaleTimeString()}
+        {took && ` · took ${took}`}
+      </span>
+      <span className="min-w-[2ch] flex-1 border-t" aria-hidden />
+      <span className="truncate text-xs text-muted-foreground">{run.trigger}</span>
     </div>
   )
 }
@@ -70,10 +51,10 @@ function RunBody({
   if (run.error !== null || run.result === null) {
     return (
       <div className="space-y-6">
-        <Card className="space-y-3 border-rose-200 p-6 dark:border-rose-900">
-          <p className="flex items-center gap-2 font-semibold text-rose-800 dark:text-rose-300">
-            <TriangleAlert className="h-4 w-4" />
-            This run didn&apos;t finish
+        <Card className="space-y-3 border-bad p-4 sm:p-5">
+          <p>
+            <span className="bg-bad px-[1ch] font-bold text-on-state">FAILED</span> This run
+            didn&apos;t finish
           </p>
           <p className="text-sm">{run.error ?? "No result arrived."}</p>
           {latest && (
@@ -99,18 +80,17 @@ function RunBody({
     <div className="space-y-5">
       {result.hypotheses.length === 0 &&
         (isReview(run.summary) ? (
-          <Card className="space-y-2 border-emerald-200 p-6 dark:border-emerald-900">
-            <p className="flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300">
-              <ShieldCheck className="h-4 w-4" />
-              No schematic issues found
-            </p>
-            <p className="text-sm text-muted-foreground">
+          <Card className="space-y-2 border-ok p-4 sm:p-5">
+            <p className="font-bold text-ok">✓ No schematic issues found</p>
+            <p className="text-muted-foreground">
               The review traced each block and found nothing to change. It only reads the schematic:
               layout, footprints and assembly aren&apos;t checked.
             </p>
           </Card>
         ) : (
-          <Card className="p-6 text-sm">The model returned no hypotheses for this input.</Card>
+          <Card className="p-4 text-sm sm:p-5">
+            The model returned no hypotheses for this input.
+          </Card>
         ))}
       {result.hypotheses.map((h) => (
         <HypothesisCard
@@ -130,7 +110,7 @@ function RunBody({
       <SimulationsCard run={run} />
 
       {loose.length > 0 && (
-        <Card className="space-y-1 p-4 text-xs text-amber-800 dark:text-amber-300">
+        <Card className="space-y-1 border-warn p-4 text-xs text-warn">
           {loose.map((p, i) => (
             <p key={i}>
               {p.where}: {p.message}
@@ -140,21 +120,17 @@ function RunBody({
       )}
 
       {result.open_questions.length > 0 && (
-        <Card className="space-y-4 p-6 sm:p-7">
-          <h3 className="flex items-center gap-2 text-base font-bold sm:text-lg">
-            <CircleHelp className="h-5 w-5 text-blue-600 dark:text-sky-400" />
-            Open questions
-          </h3>
-          <p className="text-xs text-muted-foreground">What your input can&apos;t answer yet.</p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Card className="space-y-3 p-4 sm:p-5">
+          <Title as="h3">Open questions</Title>
+          <div className="divide-y">
             {result.open_questions.map((q, i) => (
-              <div key={i} className="space-y-1.5 rounded-lg border bg-background p-3.5 text-xs">
-                <p className="font-semibold">
+              <div key={i} className="space-y-1 py-2.5 text-xs">
+                <p className="font-bold">
                   <GlossaryText text={q.text} glossary={result.glossary} />
                 </p>
                 {q.suggested_check && (
-                  <p className="leading-relaxed text-muted-foreground">
-                    Check: {q.suggested_check}
+                  <p className="leading-relaxed">
+                    <span className="text-info">check:</span> {q.suggested_check}
                   </p>
                 )}
               </div>
@@ -164,18 +140,13 @@ function RunBody({
       )}
 
       {result.glossary.length > 0 && (
-        <Card className="space-y-4 p-6 sm:p-7">
-          <h3 className="flex items-center gap-2 text-base font-bold sm:text-lg">
-            <BookOpen className="h-5 w-5 text-muted-foreground" />
-            Glossary
-          </h3>
-          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+        <Card className="space-y-3 p-4 sm:p-5">
+          <Title as="h3">Glossary</Title>
+          <dl className="grid grid-cols-1 gap-x-[3ch] gap-y-2.5 sm:grid-cols-2">
             {result.glossary.map((g) => (
-              <div key={g.term} className="space-y-1 rounded-lg border bg-background p-3 text-xs">
-                <dt className="font-mono font-bold text-blue-700 dark:text-sky-400">{g.term}</dt>
-                <dd className="text-[11px] leading-relaxed text-muted-foreground">
-                  {g.definition}
-                </dd>
+              <div key={g.term} className="space-y-0.5 text-xs">
+                <dt className="font-bold text-info">{g.term}</dt>
+                <dd className="leading-relaxed text-muted-foreground">{g.definition}</dd>
               </div>
             ))}
           </dl>
@@ -189,28 +160,27 @@ function OlderRun({ run, total, actions }: { run: Run; total: number; actions: D
   const [open, setOpen] = useState(false)
   const top = run.result?.hypotheses[0]
   return (
-    <div className="rounded-2xl border bg-muted/40 p-5 sm:p-6">
+    <div>
       <RunHeader run={run} total={total} />
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between rounded-lg border bg-card px-4 py-2.5 text-left text-sm"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-[1ch] border px-[1ch] py-1.5 text-left text-sm hover:bg-accent"
       >
         <span className="truncate">
           {top ? (
             <>
-              <span className="font-mono text-xs text-muted-foreground">#1 </span>
+              <span className="text-muted-foreground">#1 </span>
               {top.title}
             </>
           ) : (
             (run.error ?? "No result")
           )}
         </span>
-        {open ? (
-          <ChevronUp className="h-4 w-4 shrink-0" />
-        ) : (
-          <ChevronDown className="h-4 w-4 shrink-0" />
-        )}
+        <span className="shrink-0" aria-hidden>
+          {open ? "▾" : "▸"}
+        </span>
       </button>
       {open && (
         <div className="mt-4">
@@ -233,24 +203,20 @@ export function SessionView({ actions }: { actions: DebugActions }) {
 
   return (
     <div className="animate-fade-in space-y-8">
-      <div className="flex flex-col justify-between gap-4 border-b pb-2 sm:flex-row sm:items-center">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <div className="flex items-center gap-2">
-            <Badge tone="blue" className="font-bold tracking-wider uppercase">
-              {busy ? "Analyzing" : review ? "Review ready" : "Diagnosis ready"}
-            </Badge>
-            <span className="font-mono text-xs text-muted-foreground">
-              {runs.length} {runs.length === 1 ? "run" : "runs, newest first"}
+          <p className="text-xs text-muted-foreground">
+            <span className={busy ? "font-bold text-warn" : "font-bold text-ok"}>
+              {busy ? "analyzing" : review ? "review ready" : "diagnosis ready"}
             </span>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-            {review ? "Design review" : "Ranked hypotheses"}
-          </h1>
+            {" · "}
+            {runs.length} {runs.length === 1 ? "run" : "runs, newest first"}
+          </p>
+          <h1 className="mt-1 font-bold">{review ? "Design review" : "Ranked hypotheses"}</h1>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-[1ch]">
           {reportable && (
             <Button variant="outline" size="sm" onClick={() => actions.downloadReport(reportable)}>
-              <Download />
               Download report
             </Button>
           )}

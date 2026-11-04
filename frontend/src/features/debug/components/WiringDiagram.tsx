@@ -4,14 +4,15 @@ import { diagramLayout } from "../present"
 import type { Diagram } from "../types"
 
 /** The hypothesis's cited IC pins wired to their nets, drawn from the
- *  netlist by the backend. A pin the wiring check flagged is red. */
+ *  netlist by the backend: the IC in cyan, its value yellow, nets magenta. A
+ *  pin the wiring check flagged is red. */
 export function WiringDiagram({ diagram }: { diagram: Diagram }) {
   const layout = diagramLayout(diagram)
   return (
     <figure className="space-y-1.5">
       <svg
         viewBox={`0 0 ${String(layout.width)} ${String(layout.height)}`}
-        className="w-full max-w-xl font-mono text-[11px]"
+        className="w-full max-w-2xl font-mono text-xs"
         role="img"
         aria-label={`${diagram.ic} pins and the nets they are on`}
       >
@@ -20,17 +21,12 @@ export function WiringDiagram({ diagram }: { diagram: Diagram }) {
           y={layout.box.y}
           width={layout.box.width}
           height={layout.box.height}
-          rx={4}
-          className="fill-background stroke-slate-400 dark:stroke-slate-500"
+          className="fill-background stroke-foreground"
         />
-        <text
-          x={layout.box.x + 8}
-          y={layout.box.y + 15}
-          className="fill-foreground text-[12px] font-bold"
-        >
+        <text x={layout.box.x + 8} y={layout.box.y + 17} className="fill-info text-sm font-bold">
           {diagram.ic}
         </text>
-        <text x={layout.box.x + 8} y={layout.box.y + 28} className="fill-muted-foreground">
+        <text x={layout.box.x + 8} y={layout.box.y + 33} className="fill-value">
           {diagram.value}
         </text>
         {layout.pins.map((p) => (
@@ -38,8 +34,8 @@ export function WiringDiagram({ diagram }: { diagram: Diagram }) {
             key={p.pin}
             className={cn(
               p.flagged
-                ? "fill-rose-700 stroke-rose-600 dark:fill-rose-300 dark:stroke-rose-400"
-                : "fill-foreground stroke-slate-500 dark:stroke-slate-400",
+                ? "fill-bad stroke-bad font-bold"
+                : "fill-foreground stroke-muted-foreground",
             )}
           >
             <text
@@ -68,24 +64,21 @@ export function WiringDiagram({ diagram }: { diagram: Diagram }) {
               x2={layout.busX}
               y2={n.bottom}
               strokeWidth={2}
-              className={
-                n.flagged
-                  ? "stroke-rose-600 dark:stroke-rose-400"
-                  : "stroke-slate-500 dark:stroke-slate-400"
-              }
+              className={n.flagged ? "stroke-bad" : "stroke-muted-foreground"}
             />
-            <text x={layout.busX + 10} y={n.top + 4} className="fill-foreground font-bold">
+            <text
+              x={layout.busX + 10}
+              y={n.top + 4}
+              className={cn("font-bold", n.flagged ? "fill-bad" : "fill-net")}
+            >
               {n.label}
             </text>
-            <text x={layout.busX + 10} y={n.top + 18} className="fill-muted-foreground">
+            <text x={layout.busX + 10} y={n.top + 20} className="fill-muted-foreground">
               {n.members}
             </text>
           </g>
         ))}
       </svg>
-      <figcaption className="text-[11px] text-muted-foreground">
-        Drawn from your netlist. Red: a pin wired against its datasheet function.
-      </figcaption>
     </figure>
   )
 }

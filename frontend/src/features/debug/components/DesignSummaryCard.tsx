@@ -1,20 +1,21 @@
-import {
-  BookCheck,
-  Calculator,
-  ChevronDown,
-  ChevronUp,
-  Cpu,
-  ShieldAlert,
-  TriangleAlert,
-  Zap,
-} from "lucide-react"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 
 import { Badge } from "@/shared/ui/badge"
 import { Card } from "@/shared/ui/card"
+import { Title } from "@/shared/ui/title"
 
 import { calculationBadge } from "../present"
 import type { DesignSummary } from "../types"
+
+/** A sub-heading as a named rule: `LABEL ─────`, like aitop's machine rows. */
+function Rule({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="flex items-center gap-[1ch] text-xs font-bold tracking-wider uppercase">
+      <span className="shrink-0">{children}</span>
+      <span className="min-w-[2ch] flex-1 border-t" aria-hidden />
+    </h3>
+  )
+}
 
 /** What the backend parsed, shown before the model answers so the user
  *  can check the parse and see which ICs have pin data. */
@@ -24,55 +25,43 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
   const [showRefs, setShowRefs] = useState(false)
   const refParts = new Set(summary.references.map((n) => n.part))
   return (
-    <Card className="space-y-6 p-6 sm:p-7">
-      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+    <Card className="space-y-5 p-4 sm:p-5">
+      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
         <div>
-          <h2 className="text-lg font-bold">Design summary</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Parsed from <code className="font-mono text-foreground">{summary.project}</code> by
-            kicad-cli
-          </p>
+          <Title>Design summary</Title>
+          <span className="ml-[1ch] font-bold text-info">{summary.project}</span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge>{summary.sheets} sheets</Badge>
-          <Badge>{summary.parts} parts</Badge>
-          <Badge>{summary.nets} nets</Badge>
-          <Badge>{summary.ics.length} ICs</Badge>
-          <Badge tone={summary.erc.length > 0 ? "amber" : "green"}>
-            {summary.erc.length} ERC findings
-          </Badge>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          {summary.sheets} sheets · {summary.parts} parts · {summary.nets} nets ·{" "}
+          {summary.ics.length} ICs ·{" "}
+          <span className={summary.erc.length > 0 ? "text-warn" : "text-ok"}>
+            {summary.erc.length} ERC
+          </span>
+        </p>
       </div>
 
-      <div className="space-y-2.5">
-        <h3 className="font-mono text-xs font-bold tracking-wider text-muted-foreground uppercase">
-          ICs and pin data
-        </h3>
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <div className="space-y-2">
+        <Rule>ICs and pin data</Rule>
+        <div className="grid grid-cols-1 gap-x-[3ch] gap-y-2 sm:grid-cols-2">
           {summary.ics.map((ic) => (
-            <div key={ic.ref} className="rounded-lg border bg-background p-3 text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5 font-mono font-bold text-blue-700 dark:text-sky-400">
-                  <Cpu className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    {ic.ref} · {ic.value}
-                  </span>
+            <div key={ic.ref} className="min-w-0 text-xs">
+              <div className="flex items-center justify-between gap-[1ch]">
+                <span className="truncate font-bold text-info">
+                  {ic.ref} · {ic.value}
                 </span>
-                <span className="flex shrink-0 gap-1">
-                  {refParts.has(ic.value) && <Badge tone="green">Reference</Badge>}
-                  <Badge tone={ic.pin_data ? "green" : "neutral"}>
-                    {ic.pin_data ? "Pin table" : "No pin data"}
+                <span className="flex shrink-0 gap-[1ch]">
+                  {refParts.has(ic.value) && <Badge tone="ok">ref design</Badge>}
+                  <Badge tone={ic.pin_data ? "ok" : "neutral"}>
+                    {ic.pin_data ? "pin table" : "no pin data"}
                   </Badge>
                 </span>
               </div>
-              <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
-                {ic.footprint || "no footprint"}
-              </p>
+              <p className="truncate text-muted-foreground">{ic.footprint || "no footprint"}</p>
             </div>
           ))}
         </div>
         {summary.ics.some((ic) => !ic.pin_data) && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             ICs without pin data are still analyzed; facts about their pins come from the
             model&apos;s memory and are marked unverified.
           </p>
@@ -80,98 +69,77 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
       </div>
 
       {summary.wiring.length > 0 && (
-        <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50/60 p-3.5 text-xs dark:border-rose-900 dark:bg-rose-950/30">
-          <span className="flex items-center gap-2 font-semibold text-rose-900 dark:text-rose-200">
-            <Zap className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-            Wired against the datasheet ({summary.wiring.length})
+        <div className="space-y-2 border-l-2 border-bad pl-[1ch] text-xs">
+          <span className="font-bold text-bad">
+            ! Wired against the datasheet ({summary.wiring.length})
           </span>
           {summary.wiring.map((f) => (
             <p key={f.id} className="leading-relaxed">
               {f.text}
             </p>
           ))}
-          <p className="text-[11px] text-muted-foreground">
-            Found by checking your netlist against the pin table, before the model runs.
-          </p>
         </div>
       )}
 
       {summary.pin_warnings.length > 0 && (
-        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 text-xs dark:border-amber-900 dark:bg-amber-950/30">
-          <span className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
-            <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            Pin order to check ({summary.pin_warnings.length})
+        <div className="space-y-2 border-l-2 border-warn pl-[1ch] text-xs">
+          <span className="font-bold text-warn">
+            ! Pin order to check against the package&apos;s usual pinout (
+            {summary.pin_warnings.length})
           </span>
           {summary.pin_warnings.map((w) => (
             <p key={w.id} className="leading-relaxed">
               {w.text}
             </p>
           ))}
-          <p className="text-[11px] text-muted-foreground">
-            Compared with the pinout most parts in this package use, not with this part&apos;s
-            datasheet.
-          </p>
         </div>
       )}
 
       {summary.calculations.length > 0 && (
-        <div className="space-y-2 rounded-lg border bg-background p-3.5 text-xs">
-          <span className="flex items-center gap-2 font-semibold">
-            <Calculator className="h-4 w-4 text-blue-600 dark:text-sky-400" />
-            Calculated from your netlist ({summary.calculations.length})
-          </span>
+        <div className="space-y-2 text-xs">
+          <Rule>Calculated from your netlist ({summary.calculations.length})</Rule>
           {summary.calculations.map((c) => (
             <div
               key={c.id}
               className={
                 c.flagged
-                  ? "flex flex-col gap-1.5 rounded-md border border-rose-200 bg-rose-50/60 p-2.5 sm:flex-row sm:items-start dark:border-rose-900 dark:bg-rose-950/30"
-                  : "flex flex-col gap-1.5 rounded-md border p-2.5 sm:flex-row sm:items-start"
+                  ? "flex flex-col gap-1 border-l-2 border-bad pl-[1ch] sm:flex-row sm:items-start sm:gap-[1ch]"
+                  : "flex flex-col gap-1 border-l-2 border-transparent pl-[1ch] sm:flex-row sm:items-start sm:gap-[1ch]"
               }
             >
-              <Badge tone={c.flagged ? "red" : "green"} className="shrink-0 self-start font-mono">
+              <Badge tone={c.flagged ? "alert" : "ok"} className="shrink-0 self-start">
                 {calculationBadge(c)}
               </Badge>
               <p className="min-w-0 flex-1 leading-relaxed">{c.text}</p>
             </div>
           ))}
-          <p className="text-[11px] text-muted-foreground">
-            Exact arithmetic on your part values (regulator outputs, charge and LED currents, I²C
-            pull-ups, RC delays, dividers) and wiring checks (USB-C CC, decoupling, UART TX/RX),
-            before the model runs.
-          </p>
         </div>
       )}
 
       {summary.references.length > 0 && (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="border">
           <button
             type="button"
             onClick={() => setShowRefs(!showRefs)}
-            className="flex w-full items-center justify-between bg-background p-3.5 text-left hover:bg-accent"
+            aria-expanded={showRefs}
+            className="flex w-full items-center justify-between gap-[1ch] px-[1ch] py-2 text-left hover:bg-accent"
           >
-            <span className="flex items-center gap-2 text-xs font-semibold">
-              <BookCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              Reference designs ({summary.references.length} notes for {[...refParts].join(", ")})
+            <span className="text-xs font-bold">
+              <span className="mr-[1ch]">{showRefs ? "▾" : "▸"}</span>
+              Reference designs ({summary.references.length} notes for{" "}
+              <span className="text-info">{[...refParts].join(", ")}</span>)
             </span>
-            {showRefs ? (
-              <ChevronUp className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5" />
-            )}
           </button>
           {showRefs && (
-            <ul className="space-y-2 border-t p-4 text-xs">
+            <ul className="space-y-2 border-t p-[1ch] text-xs">
               {summary.references.map((n) => (
                 <li key={n.id} className="space-y-0.5">
                   <p className="leading-relaxed">
-                    <span className="mr-1.5 font-mono font-semibold text-muted-foreground">
-                      {n.id}
-                    </span>
+                    <span className="mr-[1ch] font-bold text-muted-foreground">{n.id}</span>
                     {n.text}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {n.part} · {n.source}
+                  <p className="text-muted-foreground">
+                    <span className="text-info">{n.part}</span> · {n.source}
                   </p>
                 </li>
               ))}
@@ -180,41 +148,28 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
         </div>
       )}
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 text-xs dark:border-amber-900 dark:bg-amber-950/30">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
-            <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            KiCad ERC findings ({summary.erc.length})
-          </span>
+      <div className="border-l-2 border-warn pl-[1ch] text-xs">
+        <div className="flex items-center justify-between gap-[1ch]">
+          <span className="font-bold text-warn">KiCad ERC findings ({summary.erc.length})</span>
           {summary.erc.length > 0 && (
             <button
               type="button"
               onClick={() => setShowErc(!showErc)}
-              className="flex items-center gap-1 font-medium text-amber-800 dark:text-amber-300"
+              aria-expanded={showErc}
+              className="text-warn hover:underline"
             >
-              {showErc ? "Hide" : "Inspect"}
-              {showErc ? (
-                <ChevronUp className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" />
-              )}
+              {showErc ? "▾ hide" : "▸ inspect"}
             </button>
           )}
         </div>
-        <p className="mt-1 text-[11px] text-amber-800/80 dark:text-amber-300/80">
-          Warnings only about missing symbol libraries are dropped; the schematics embed their
-          symbols.
-        </p>
         {showErc && (
-          <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto border-t border-amber-200 pt-2 text-amber-950 dark:border-amber-900 dark:text-amber-100">
+          <ul className="mt-2 max-h-72 space-y-1.5 overflow-y-auto border-t pt-2">
             {summary.erc.map((e) => (
-              <li key={e.id} className="flex items-start gap-2">
-                <span className="shrink-0 font-mono font-bold text-amber-700 dark:text-amber-400">
-                  {e.id}
-                </span>
+              <li key={e.id} className="flex items-start gap-[1ch]">
+                <span className="shrink-0 font-bold text-info">{e.id}</span>
                 <span>
-                  <span className="font-mono text-[11px]">[{e.rule}]</span> {e.message}{" "}
-                  <span className="text-amber-700/80 dark:text-amber-300/70">({e.sheet})</span>
+                  <span className="text-muted-foreground">{e.rule}</span> {e.message}{" "}
+                  <span className="text-muted-foreground">({e.sheet})</span>
                 </span>
               </li>
             ))}
@@ -223,39 +178,32 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
       </div>
 
       {(summary.symptoms.length > 0 || summary.measurements.length > 0) && (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="border">
           <button
             type="button"
             onClick={() => setShowSymptoms(!showSymptoms)}
-            className="flex w-full items-center justify-between bg-background p-3.5 text-left hover:bg-accent"
+            aria-expanded={showSymptoms}
+            className="flex w-full items-center justify-between gap-[1ch] px-[1ch] py-2 text-left hover:bg-accent"
           >
             <span className="text-xs font-bold tracking-wider uppercase">
+              <span className="mr-[1ch]">{showSymptoms ? "▾" : "▸"}</span>
               {summary.mode === "review" ? "Notes on the board" : "Symptoms"}
               {summary.measurements.length > 0 ? " and measurements" : ""}
             </span>
-            {showSymptoms ? (
-              <ChevronUp className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5" />
-            )}
           </button>
           {showSymptoms && (
-            <ol className="space-y-1 border-t p-4 text-xs">
+            <ol className="space-y-1 border-t p-[1ch] text-xs">
               {summary.symptoms.map((s) => (
-                <li key={s.id} className="flex gap-2">
-                  <span className="w-7 shrink-0 font-mono font-semibold text-muted-foreground">
-                    {s.id}
-                  </span>
+                <li key={s.id} className="flex gap-[1ch]">
+                  <span className="w-[4ch] shrink-0 font-bold text-muted-foreground">{s.id}</span>
                   <span>{s.text}</span>
                 </li>
               ))}
               {summary.measurements.map((m) => (
-                <li key={m.id} className="flex gap-2">
-                  <span className="w-7 shrink-0 font-mono font-semibold text-emerald-700 dark:text-emerald-400">
-                    {m.id}
-                  </span>
+                <li key={m.id} className="flex gap-[1ch]">
+                  <span className="w-[4ch] shrink-0 font-bold text-muted-foreground">{m.id}</span>
                   <span>
-                    {m.value}
+                    <span className="text-value">{m.value}</span>
                     {m.step_id && (
                       <span className="text-muted-foreground"> (step {m.step_id})</span>
                     )}

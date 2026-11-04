@@ -1,8 +1,9 @@
-import { Activity, LoaderCircle, Send } from "lucide-react"
 import { useState } from "react"
 
 import { Button } from "@/shared/ui/button"
 import { Card } from "@/shared/ui/card"
+import { Prompt } from "@/shared/ui/prompt"
+import { Title } from "@/shared/ui/title"
 
 import type { Run, Simulation } from "../types"
 import { useSimulationChat } from "../useDebug"
@@ -22,28 +23,33 @@ function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation
     <div className="space-y-2 border-t pt-3 text-xs">
       {chat.turns.map((t, i) => (
         <div key={i} className="space-y-1">
-          <p className="font-semibold">{t.question}</p>
-          <p className="leading-relaxed whitespace-pre-line text-foreground/90">{t.answer}</p>
+          <p className="font-bold">
+            <span className="text-muted-foreground">&gt; </span>
+            {t.question}
+          </p>
+          <p className="leading-relaxed whitespace-pre-line">{t.answer}</p>
         </div>
       ))}
       {chat.pending !== null && (
         <div className="space-y-1">
-          <p className="font-semibold">{chat.pending}</p>
-          <p className="flex items-center gap-1.5 text-muted-foreground">
-            <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-            Reading the waveform…
+          <p className="font-bold">
+            <span className="text-muted-foreground">&gt; </span>
+            {chat.pending}
+          </p>
+          <p className="text-muted-foreground">
+            <span className="animate-pulse">●</span> reading the waveform…
           </p>
         </div>
       )}
-      {chat.error && <p className="text-rose-700 dark:text-rose-400">{chat.error}</p>}
+      {chat.error && <p className="text-bad">{chat.error}</p>}
       {chat.turns.length === 0 && !busy && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-x-[2ch] gap-y-1">
           {SUGGESTIONS.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => send(s)}
-              className="rounded-full border bg-background px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+              className="text-info underline decoration-dotted underline-offset-2 hover:no-underline"
             >
               {s}
             </button>
@@ -51,23 +57,23 @@ function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation
         </div>
       )}
       <form
-        className="flex gap-2"
+        className="flex"
         onSubmit={(e) => {
           e.preventDefault()
           send(question)
         }}
       >
-        <input
+        <Prompt
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask about this simulation"
           maxLength={1000}
-          className="min-w-0 flex-1 rounded-md border bg-card px-3 py-1.5 text-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-        />
-        <Button type="submit" size="sm" disabled={busy || !question.trim()}>
-          <Send />
-          Ask
-        </Button>
+          aria-label="Ask about this simulation"
+        >
+          <Button type="submit" size="sm" disabled={busy || !question.trim()}>
+            Ask
+          </Button>
+        </Prompt>
       </form>
     </div>
   )
@@ -78,27 +84,16 @@ function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation
 export function SimulationsCard({ run }: { run: Run }) {
   if (run.simulations.length === 0) return null
   return (
-    <Card className="space-y-4 p-6 sm:p-7">
-      <div>
-        <h3 className="flex items-center gap-2 text-base font-bold sm:text-lg">
-          <Activity className="h-5 w-5 text-blue-600 dark:text-sky-400" />
-          Simulations ({run.simulations.length})
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          ngspice runs on circuits from your netlist, in parallel with the review. Ask about any of
-          them.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <Card className="space-y-4 p-4 sm:p-5">
+      <Title as="h3">Simulations ({run.simulations.length})</Title>
+      <div className="space-y-4">
         {run.simulations.map((sim) => (
-          <div key={sim.id} className="min-w-0 space-y-3 rounded-lg border bg-background p-4">
-            <p className="text-sm font-semibold">{sim.title}</p>
+          <div key={sim.id} className="min-w-0 space-y-3 border p-3">
+            <p className="text-sm font-bold">{sim.title}</p>
             <SimulationPlot sim={sim} />
-            <details className="text-[11px] text-muted-foreground">
-              <summary className="cursor-pointer">Netlist</summary>
-              <pre className="mt-1.5 overflow-x-auto rounded-md border bg-muted/40 p-2 font-mono">
-                {sim.deck}
-              </pre>
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer">ngspice netlist</summary>
+              <pre className="mt-1.5 overflow-x-auto border-l-2 pl-[1ch]">{sim.deck}</pre>
             </details>
             <SimulationChat runNumber={run.number} sim={sim} />
           </div>

@@ -1,5 +1,3 @@
-import { CircleCheck, Clock, LoaderCircle } from "lucide-react"
-
 import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/ui/button"
 import { Card } from "@/shared/ui/card"
@@ -25,64 +23,54 @@ function stepState(run: Run, index: number): "done" | "active" | "pending" {
   return index === current ? "active" : "pending"
 }
 
+const STATE_LABEL = { done: "done", active: "running", pending: "waiting" } as const
+const STATE_GLYPH = { done: "✓", active: "●", pending: "·" } as const
+
 export function AnalyzingPanel({ run, onCancel }: { run: Run; onCancel: () => void }) {
   const elapsed = useElapsed(run.startedAt, run.finishedAt)
   return (
     <div className="animate-fade-in space-y-6">
-      <Card className="p-6 sm:p-7">
-        <div className="flex flex-col items-start justify-between gap-4 border-b pb-6 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-400">
-              <LoaderCircle className="h-5 w-5 animate-spin" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Analyzing…</h2>
-                <span className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-base font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-sky-400">
-                  <Clock className="h-4 w-4" />
-                  {formatElapsed(elapsed)}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Usually four to five minutes: the model says nothing until each step is done.
-              </p>
-            </div>
-          </div>
-          <Button variant="outline" size="sm" onClick={onCancel}>
+      <Card className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-[1.5ch]">
+          <span className="bg-warn px-[1ch] font-bold text-on-state">ANALYZING</span>
+          <span className="font-bold tabular-nums">{formatElapsed(elapsed)}</span>
+          <span className="text-xs text-muted-foreground">usually 4–5 min</span>
+          <Button variant="outline" size="sm" className="ml-auto" onClick={onCancel}>
             Cancel
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-6 sm:grid-cols-3 lg:grid-cols-5">
+        <ol className="mt-4 border-t pt-3">
           {STEPS.map((step, i) => {
             const state = stepState(run, i)
             return (
-              <div
+              <li
                 key={step.key}
                 className={cn(
-                  "rounded-lg border p-3 transition-all",
-                  state === "done" &&
-                    "border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200",
-                  state === "active" &&
-                    "border-blue-300 bg-blue-50/80 text-blue-900 ring-2 ring-blue-200 dark:border-blue-800 dark:bg-blue-950/40 dark:text-sky-300 dark:ring-blue-900/60",
-                  state === "pending" && "bg-background text-muted-foreground",
+                  "grid grid-cols-[9ch_minmax(0,14ch)_minmax(0,1fr)] gap-x-[1.5ch] py-0.5 text-sm",
+                  state === "pending" && "text-muted-foreground",
                 )}
               >
-                <div className="flex items-center gap-2">
-                  {state === "done" && <CircleCheck className="h-4 w-4 shrink-0" />}
-                  {state === "active" && <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" />}
-                  {state === "pending" && (
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full border font-mono text-[10px]">
-                      {i + 1}
-                    </span>
+                <span
+                  className={cn(
+                    "flex items-center gap-[0.5ch]",
+                    state === "done" && "text-ok",
+                    state === "active" && "font-bold text-warn",
                   )}
-                  <span className="text-xs font-bold tracking-wider uppercase">{step.label}</span>
-                </div>
-                <p className="mt-1.5 text-[11px] opacity-80">{step.detail}</p>
-              </div>
+                >
+                  <span className={cn("w-[1ch]", state === "active" && "animate-pulse")}>
+                    {STATE_GLYPH[state]}
+                  </span>
+                  {STATE_LABEL[state]}
+                </span>
+                <span className={cn("truncate", state !== "pending" && "font-bold")}>
+                  {step.label}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">{step.detail}</span>
+              </li>
             )
           })}
-        </div>
+        </ol>
       </Card>
 
       <SimulationsCard run={run} />

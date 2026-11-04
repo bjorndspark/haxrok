@@ -270,14 +270,15 @@ export interface DiagramLayout {
   }[]
 }
 
-const ROW = 26
+const ROW = 28
 const GROUP_GAP = 14
-const HEADER = 50
-// Characters of member text that fit right of the bus at 11px mono.
-const MEMBER_CHARS = 44
-// Width of one 11px mono character, and the narrowest the IC box gets.
-const CHAR_W = 6.7
-const MIN_BOX = 150
+const HEADER = 54
+// Characters of member text that fit right of the bus at 13px mono, leaving
+// room for the " · +NN more" that may follow them.
+const MEMBER_CHARS = 34
+// Width of one 13px mono character, and the narrowest the IC box gets.
+const CHAR_W = 7.9
+const MIN_BOX = 170
 
 /** Where everything in a wiring diagram goes: the IC's pins down the right
  *  edge of its box, grouped by net, each group joined by a bus with the
@@ -322,7 +323,7 @@ export function diagramLayout(d: Diagram): DiagramLayout {
   const boxWidth = Math.max(MIN_BOX, Math.ceil(longest * CHAR_W) + 20)
   const busX = boxWidth + 70
   return {
-    width: busX + 340,
+    width: busX + 380,
     height: boxHeight + 8,
     box: { x: 4, y: 4, width: boxWidth, height: boxHeight - 4 },
     busX,
@@ -331,7 +332,7 @@ export function diagramLayout(d: Diagram): DiagramLayout {
   }
 }
 
-const PLOT = { width: 440, height: 180, left: 40, right: 96, top: 22, bottom: 28 }
+const PLOT = { width: 520, height: 200, left: 44, right: 128, top: 24, bottom: 36 }
 
 export interface SimulationLayout {
   width: number

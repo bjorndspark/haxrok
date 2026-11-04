@@ -14,7 +14,7 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
     <figure className="space-y-1.5">
       <svg
         viewBox={`0 0 ${String(layout.width)} ${String(layout.height)}`}
-        className="w-full max-w-md font-mono text-[10px]"
+        className="w-full max-w-lg font-mono text-xs"
         role="img"
         aria-label={sim.text}
         onMouseMove={(e) => {
@@ -28,14 +28,8 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
       >
         {layout.yTicks.map((t) => (
           <g key={t.label}>
-            <line
-              x1={plot.x0}
-              x2={plot.x1}
-              y1={t.y}
-              y2={t.y}
-              className="stroke-slate-200 dark:stroke-slate-800"
-            />
-            <text x={plot.x0 - 6} y={t.y + 3} textAnchor="end" className="fill-muted-foreground">
+            <line x1={plot.x0} x2={plot.x1} y1={t.y} y2={t.y} className="stroke-border" />
+            <text x={plot.x0 - 6} y={t.y + 4} textAnchor="end" className="fill-muted-foreground">
               {t.label}
             </text>
           </g>
@@ -44,17 +38,17 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
           <text
             key={t.label}
             x={t.x}
-            y={plot.y0 + 13}
+            y={plot.y0 + 16}
             textAnchor="middle"
             className="fill-muted-foreground"
           >
             {t.label}
           </text>
         ))}
-        <text x={plot.x1} y={plot.y0 + 25} textAnchor="end" className="fill-muted-foreground">
+        <text x={plot.x1} y={plot.y0 + 31} textAnchor="end" className="fill-muted-foreground">
           {sim.t_unit}
         </text>
-        <text x={plot.x0 - 6} y={plot.y1 - 12} textAnchor="end" className="fill-muted-foreground">
+        <text x={plot.x0 - 6} y={plot.y1 - 10} textAnchor="end" className="fill-muted-foreground">
           V
         </text>
         {layout.levels.map((l) => (
@@ -65,13 +59,9 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
               y1={l.y}
               y2={l.y}
               strokeDasharray="4 3"
-              className={
-                l.danger
-                  ? "stroke-rose-500 dark:stroke-rose-400"
-                  : "stroke-slate-400 dark:stroke-slate-500"
-              }
+              className={l.danger ? "stroke-bad" : "stroke-muted-foreground"}
             />
-            <text x={plot.x1 + 4} y={l.y + 3} className="fill-foreground">
+            <text x={plot.x1 + 4} y={l.y + 4} className={l.danger ? "fill-bad" : "fill-value"}>
               {l.label}
             </text>
           </g>
@@ -81,7 +71,7 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
           fill="none"
           strokeWidth={2}
           strokeLinejoin="round"
-          className="stroke-blue-600 dark:stroke-sky-400"
+          className="stroke-info"
         />
         {hover && (
           <g>
@@ -90,29 +80,27 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
               x2={hover.x}
               y1={plot.y1}
               y2={plot.y0}
-              className="stroke-slate-400 dark:stroke-slate-500"
+              className="stroke-muted-foreground"
             />
             <circle
               cx={hover.x}
               cy={hover.y}
               r={4}
               strokeWidth={2}
-              className="fill-blue-600 stroke-background dark:fill-sky-400"
+              className="fill-info stroke-background"
             />
             <text
               x={hover.x > (plot.x0 + plot.x1) / 2 ? hover.x - 6 : hover.x + 6}
               y={plot.y1 - 10}
               textAnchor={hover.x > (plot.x0 + plot.x1) / 2 ? "end" : "start"}
-              className="fill-foreground font-semibold"
+              className="fill-value font-bold"
             >
               {`${hover.v.toFixed(2)} V @ ${String(Number(hover.t.toPrecision(3)))} ${sim.t_unit}`}
             </text>
           </g>
         )}
       </svg>
-      <figcaption className="text-[11px] leading-relaxed text-muted-foreground">
-        {sim.text}
-      </figcaption>
+      <figcaption className="text-xs leading-relaxed text-muted-foreground">{sim.text}</figcaption>
     </figure>
   )
 }

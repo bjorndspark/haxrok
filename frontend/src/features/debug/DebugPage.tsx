@@ -16,14 +16,6 @@ export function DebugPage() {
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
         {view === "input" ? <InputView actions={actions} /> : <SessionView actions={actions} />}
       </main>
-      <footer className="mt-auto border-t bg-card py-4 text-xs text-muted-foreground">
-        <div className="mx-auto flex max-w-4xl flex-col items-center justify-between gap-2 px-4 sm:flex-row sm:px-6">
-          <span>Pre-fab review and bench debugging, for KiCad projects.</span>
-          <span>
-            Every claim is labelled with what it rests on. Check it before you rework or order.
-          </span>
-        </div>
-      </footer>
     </div>
   )
 }

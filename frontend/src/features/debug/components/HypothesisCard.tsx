@@ -1,19 +1,9 @@
-import {
-  CircleAlert,
-  CircleCheck,
-  CircleHelp,
-  FileCode,
-  Gauge,
-  Hand,
-  RotateCcw,
-  ShieldCheck,
-  Wrench,
-} from "lucide-react"
 import { useState, type ReactNode } from "react"
 
 import { cn } from "@/shared/lib/utils"
 import { Badge, type BadgeProps } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
+import { Prompt } from "@/shared/ui/prompt"
 
 import {
   assess,
@@ -42,69 +32,64 @@ import { SimulationPlot } from "./SimulationPlot"
 import { WiringDiagram } from "./WiringDiagram"
 
 const EVIDENCE_TONE: Record<Evidence, BadgeProps["tone"]> = {
-  schematic: "blue",
-  erc: "amber",
-  datasheet: "green",
-  reference: "green",
-  measurement: "green",
+  schematic: "info",
+  erc: "warn",
+  datasheet: "ok",
+  reference: "ok",
+  measurement: "ok",
   none: "neutral",
 }
 
 const CONFIDENCE_TONE: Record<Confidence, BadgeProps["tone"]> = {
-  verified: "green",
-  fits: "blue",
+  verified: "ok",
+  fits: "info",
   speculative: "neutral",
 }
 
 const SEVERITY_TONE: Record<Severity, BadgeProps["tone"]> = {
-  will_fail: "red",
-  may_fail: "amber",
+  will_fail: "alert",
+  may_fail: "warn",
   improve: "neutral",
 }
 
-const CONFIDENCE_ICON: Record<Confidence, typeof ShieldCheck> = {
-  verified: ShieldCheck,
-  fits: CircleCheck,
-  speculative: CircleHelp,
+const CONFIDENCE_GLYPH: Record<Confidence, string> = {
+  verified: "✓",
+  fits: "●",
+  speculative: "?",
 }
 
-/** "N of M" as text plus a thin bar. Counts, never a percentage. */
+const METER_CELLS = 10
+
+/** "N of M" as text plus an htop-style bar, `[|||||     ]`. Counts, never a
+ *  percentage. */
 function Meter({ label, value, of }: { label: string; value: number; of: number }) {
   const share = of > 0 ? Math.min(value / of, 1) : 0
+  const filled = Math.round(share * METER_CELLS)
   return (
-    <div className="min-w-0 flex-1 space-y-1">
-      <p className="text-[11px] text-muted-foreground">
-        {label}{" "}
-        <span className="font-semibold text-foreground tabular-nums">
-          {value} of {of}
-        </span>
-      </p>
-      <div
-        className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
-        role="meter"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={of}
-        aria-valuenow={value}
-      >
-        <div
-          className="h-full rounded-full bg-slate-600 dark:bg-slate-300"
-          style={{ width: `${String(share * 100)}%` }}
-        />
-      </div>
-    </div>
+    <p
+      className="text-xs whitespace-pre text-muted-foreground"
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={of}
+      aria-valuenow={value}
+    >
+      {label} [<span className="text-foreground">{"|".repeat(filled)}</span>
+      {" ".repeat(METER_CELLS - filled)}]{" "}
+      <span className="font-bold text-foreground tabular-nums">
+        {value}/{of}
+      </span>
+    </p>
   )
 }
 
 function ConfidenceLine({ assessment: a, review }: { assessment: Assessment; review: boolean }) {
-  const Icon = CONFIDENCE_ICON[a.confidence]
   return (
-    <div className="mt-3.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
-      <Badge tone={CONFIDENCE_TONE[a.confidence]} className="self-start text-xs" title={a.reason}>
-        <Icon />
-        {confidenceLabel(a.confidence, review)}
+    <div className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-[3ch]">
+      <Badge tone={CONFIDENCE_TONE[a.confidence]} className="self-start font-bold" title={a.reason}>
+        {CONFIDENCE_GLYPH[a.confidence]} {confidenceLabel(a.confidence, review)}
       </Badge>
-      <div className="flex flex-1 gap-5">
+      <div className="flex flex-wrap gap-x-[3ch] gap-y-1">
         {!review && <Meter label="Explains" value={a.explained} of={a.symptoms} />}
         <Meter label="Claims backed" value={a.backed} of={a.claims} />
       </div>
@@ -132,44 +117,36 @@ function Disclosure({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className={cn(
-          "flex w-full items-center justify-between px-5 py-3 text-left transition-colors sm:px-6",
-          accent
-            ? "bg-blue-50/40 hover:bg-blue-50/80 dark:bg-blue-950/20 dark:hover:bg-blue-950/40"
-            : "bg-background/60 hover:bg-accent",
-        )}
+        className="flex w-full items-center justify-between gap-[1ch] px-4 py-2 text-left hover:bg-accent sm:px-5"
       >
         <span
           className={cn(
-            "flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase",
-            accent && "text-blue-900 dark:text-sky-300",
+            "flex items-center gap-[1ch] text-xs font-bold tracking-wider uppercase",
+            accent && "text-info",
           )}
         >
           <span>{open ? "▾" : "▸"}</span>
           {title}
         </span>
-        {aside && <span className="text-xs font-medium text-muted-foreground">{aside}</span>}
+        {aside && <span className="text-right text-xs text-muted-foreground">{aside}</span>}
       </button>
-      {open && <div className="space-y-3 p-5 text-xs sm:p-6">{children}</div>}
+      {open && <div className="space-y-3 px-4 pt-1 pb-4 text-xs sm:px-5">{children}</div>}
     </div>
   )
 }
 
 function ClaimRow({ claim }: { claim: CheckedClaim }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-background p-3 sm:flex-row sm:items-start sm:gap-3">
-      <Badge tone={EVIDENCE_TONE[claim.evidence]} className="self-start">
+    <div className="flex flex-col gap-1 border-l-2 pl-[1ch] sm:flex-row sm:items-start sm:gap-[1ch]">
+      <Badge tone={EVIDENCE_TONE[claim.evidence]} bracket className="self-start">
         {EVIDENCE_LABEL[claim.evidence]}
       </Badge>
       <div className="space-y-1">
         <p className="leading-relaxed">{claim.text}</p>
         {claim.downgraded && claim.claimed_evidence && (
-          <p className="flex items-start gap-1 text-[11px] text-amber-700 dark:text-amber-300">
-            <CircleAlert className="mt-px h-3 w-3 shrink-0" />
-            <span>
-              Labelled &ldquo;{EVIDENCE_LABEL[claim.claimed_evidence]}&rdquo; by the model, but the
-              check failed: {claim.reason}
-            </span>
+          <p className="text-warn">
+            ! Labelled &ldquo;{EVIDENCE_LABEL[claim.claimed_evidence]}&rdquo; by the model, but the
+            check failed: {claim.reason}
           </p>
         )}
       </div>
@@ -191,66 +168,65 @@ function StepView({
 }) {
   const [value, setValue] = useState("")
   return (
-    <div className="space-y-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-center gap-1.5">
+    <div className="space-y-3 border p-3">
+      <div className="flex flex-wrap items-center gap-[1ch]">
         <Badge tone="solid">{step.id}</Badge>
-        <Badge tone={step.power === "off" ? "neutral" : "red"}>Power {step.power}</Badge>
-        <Badge>{step.tool === "look" ? "Look" : step.tool}</Badge>
-        <Badge tone={step.purpose === "test_cause" ? "blue" : "neutral"}>
+        <Badge tone={step.power === "off" ? "neutral" : "bad"}>power {step.power}</Badge>
+        <Badge>· {step.tool === "look" ? "look" : step.tool}</Badge>
+        <Badge tone={step.purpose === "test_cause" ? "info" : "neutral"}>
+          ·{" "}
           {step.purpose === "test_cause"
-            ? "Tests the cause"
-            : "Checks the board matches the schematic"}
+            ? "tests the cause"
+            : "checks the board matches the schematic"}
         </Badge>
-        {!step.practical && (
-          <Badge tone="amber">
-            <Hand />
-            Hard by hand
-          </Badge>
-        )}
+        {!step.practical && <Badge tone="warn">! hard by hand</Badge>}
       </div>
       <p className="text-sm leading-relaxed">{step.instruction}</p>
-      {step.practical_note && (
-        <p className="text-[11px] text-muted-foreground italic">{step.practical_note}</p>
-      )}
+      {step.practical_note && <p className="text-xs text-warn">{step.practical_note}</p>}
       {step.setup.length > 0 && (
         <div>
-          <p className="mb-1 font-mono text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+          <p className="mb-1 text-xs font-bold tracking-wider text-muted-foreground uppercase">
             Rewire before power
           </p>
-          <ul className="space-y-0.5 font-mono text-[11px]">
+          <ul className="space-y-0.5 text-xs">
             {step.setup.map((c, i) => (
               <li key={i}>
-                {c.action === "disconnect"
-                  ? `✂ ${c.pin} from ${c.net ?? "?"}`
-                  : `↔ ${c.pin} to ${c.to_pin ?? c.net ?? "?"}`}
+                {c.action === "disconnect" ? "✂ " : "↔ "}
+                <span className="text-info">{c.pin}</span>
+                {c.action === "disconnect" ? " from " : " to "}
+                {c.action === "connect" && c.to_pin ? (
+                  <span className="text-info">{c.to_pin}</span>
+                ) : (
+                  <span className="text-net">{c.net ?? "?"}</span>
+                )}
               </li>
             ))}
           </ul>
         </div>
       )}
       {step.readings.length > 0 && (
-        <table className="w-full border-separate border-spacing-0 overflow-hidden rounded-md border text-left">
-          <thead className="bg-background text-[11px] text-muted-foreground uppercase">
+        <table className="w-full border-collapse text-left">
+          <thead className="bg-foreground text-xs text-background uppercase">
             <tr>
-              <th className="px-3 py-1.5 font-semibold">If you see</th>
-              <th className="px-3 py-1.5 font-semibold">It means</th>
+              <th className="px-[1ch] py-0.5 font-bold">If you see</th>
+              <th className="px-[1ch] py-0.5 font-bold">It means</th>
             </tr>
           </thead>
           <tbody>
             {step.readings.map((r, i) => (
               <tr key={i} className="align-top">
-                <td className="border-t px-3 py-2 font-mono">{r.reading}</td>
-                <td className="border-t px-3 py-2">
+                <td className="border-b px-[1ch] py-1.5 font-bold text-value">{r.reading}</td>
+                <td className="border-b px-[1ch] py-1.5">
                   {r.establishes}
                   {(r.supports.length > 0 || r.rules_out.length > 0) && (
-                    <span className="mt-1 flex flex-wrap gap-1">
+                    <span className="mt-1 flex flex-wrap gap-[1ch]">
                       {r.supports.map((id) => (
-                        <Badge key={`s-${id}`} tone="green">
+                        <Badge key={`s-${id}`} tone="ok">
                           supports {id}
                         </Badge>
                       ))}
                       {r.rules_out.map((id) => (
-                        <Badge key={`r-${id}`} tone="red">
+                        <Badge key={`r-${id}`} tone="bad">
                           rules out {id}
                         </Badge>
                       ))}
@@ -264,7 +240,6 @@ function StepView({
       )}
       {!review && (
         <form
-          className="flex flex-col gap-2 rounded-lg border bg-background p-3 sm:flex-row sm:items-end"
           onSubmit={(e) => {
             e.preventDefault()
             if (!value.trim()) return
@@ -272,22 +247,22 @@ function StepView({
             setValue("")
           }}
         >
-          <label className="flex-1">
-            <span className="mb-1 block text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+          <label className="block">
+            <span className="block text-xs font-bold tracking-wider text-muted-foreground uppercase">
               Your reading
             </span>
-            <input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="e.g. 3.28 V at TP11"
-              maxLength={500}
-              className="w-full rounded-md border bg-card px-3 py-1.5 font-mono text-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-            />
+            <span className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Prompt
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="e.g. 3.28 V at TP11"
+                maxLength={500}
+              />
+              <Button type="submit" size="sm" disabled={busy || !value.trim()}>
+                Re-run with this reading
+              </Button>
+            </span>
           </label>
-          <Button type="submit" size="sm" disabled={busy || !value.trim()}>
-            <RotateCcw />
-            Re-run with this reading
-          </Button>
         </form>
       )}
     </div>
@@ -323,31 +298,25 @@ export function HypothesisCard({
   const assessment = assess(h, summary)
   const review = isReview(summary)
   return (
-    <div
-      className={cn(
-        "rounded-xl border bg-card elevation-1",
-        primary &&
-          "border-blue-400 ring-1 ring-blue-200 dark:border-blue-500 dark:ring-blue-900/60",
-      )}
-    >
-      <div className="p-5 sm:p-6">
-        <div className="flex items-start gap-2.5">
-          <Badge tone={primary ? "solid" : "neutral"} className="mt-0.5 text-xs">
+    <div className={cn("border bg-card", primary && "border-foreground")}>
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start gap-[1ch]">
+          <Badge tone={primary ? "solid" : "neutral"} className="mt-0.5 font-bold">
             #{h.rank}
           </Badge>
           {h.severity && (
-            <Badge tone={SEVERITY_TONE[h.severity]} className="mt-0.5 shrink-0 text-xs">
+            <Badge tone={SEVERITY_TONE[h.severity]} className="mt-0.5 shrink-0 font-bold">
               {SEVERITY_LABEL[h.severity]}
             </Badge>
           )}
-          <h3 className="text-base font-bold tracking-tight sm:text-lg">{h.title}</h3>
+          <h3 className="text-sm font-bold">{h.title}</h3>
         </div>
-        <p className="pt-2 text-sm leading-relaxed text-foreground/90">
+        <p className="pt-2 text-sm leading-relaxed">
           <GlossaryText text={h.summary} glossary={glossary} />
         </p>
         <ConfidenceLine assessment={assessment} review={review} />
         {diagram && (
-          <div className="mt-4 rounded-lg border bg-background p-3">
+          <div className="mt-4 border p-3">
             <WiringDiagram diagram={diagram} />
           </div>
         )}
@@ -361,16 +330,16 @@ export function HypothesisCard({
           >
             <ul className="space-y-1.5 leading-relaxed">
               {h.explains.map((id) => (
-                <li key={id} className="flex gap-2" title={id}>
-                  <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <li key={id} className="flex gap-[1ch]" title={id}>
+                  <span className="shrink-0 text-ok">✓</span>
                   <span>{symptomText(summary, id)}</span>
                 </li>
               ))}
               {h.does_not_explain.map((id) => (
-                <li key={id} className="flex gap-2" title={id}>
-                  <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                <li key={id} className="flex gap-[1ch]" title={id}>
+                  <span className="shrink-0 font-bold text-bad">!</span>
                   <span>
-                    <span className="font-semibold">Doesn&apos;t explain:</span>{" "}
+                    <span className="font-bold">Doesn&apos;t explain:</span>{" "}
                     {symptomText(summary, id)}
                   </span>
                 </li>
@@ -386,23 +355,23 @@ export function HypothesisCard({
           {assessment.findings.map((f) => (
             <div
               key={f.id}
-              className="flex gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 leading-relaxed dark:border-emerald-900 dark:bg-emerald-950/30"
+              className="flex gap-[1ch] border-l-2 border-ok pl-[1ch] leading-relaxed"
             >
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
+              <span className="shrink-0 text-ok">✓</span>
               <span>
-                <span className="font-semibold">Backend wiring check:</span> {f.text}
+                <span className="font-bold text-ok">Backend wiring check:</span> {f.text}
               </span>
             </div>
           ))}
           {assessment.calculations.map((c) => (
             <div
               key={c.id}
-              className="flex gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 leading-relaxed dark:border-emerald-900 dark:bg-emerald-950/30"
+              className="flex gap-[1ch] border-l-2 border-ok pl-[1ch] leading-relaxed"
             >
-              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />
+              <span className="shrink-0 text-ok">✓</span>
               <div className="min-w-0 flex-1 space-y-2">
                 <p>
-                  <span className="font-semibold">Backend calculation:</span> {c.text}
+                  <span className="font-bold text-ok">Backend calculation:</span> {c.text}
                 </p>
                 {simulations
                   .filter((s) => s.calc_id === c.id)
@@ -415,10 +384,6 @@ export function HypothesisCard({
           {h.claims.map((c, i) => (
             <ClaimRow key={i} claim={c} />
           ))}
-          <p className="text-[11px] text-muted-foreground">
-            A label means the cited pins, nets, ERC entries or readings exist in your input. It
-            doesn&apos;t mean the conclusion was verified.
-          </p>
         </Disclosure>
 
         {h.confirm.length > 0 && (
@@ -438,7 +403,7 @@ export function HypothesisCard({
               />
             ))}
             {!latest && !review && (
-              <p className="text-[11px] text-muted-foreground">Enter readings on the latest run.</p>
+              <p className="text-muted-foreground">Enter readings on the latest run.</p>
             )}
           </Disclosure>
         )}
@@ -451,19 +416,14 @@ export function HypothesisCard({
           }
         >
           {h.fix.rework.length > 0 && (
-            <div className="space-y-1.5 border-l-2 border-amber-400 pl-3">
-              <span className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
-                <Wrench className="h-3.5 w-3.5" />
-                Rework on this board
-              </span>
+            <div className="space-y-1.5 border-l-2 border-warn pl-[1ch]">
+              <span className="font-bold text-warn">Rework on this board</span>
               <ol className="list-decimal space-y-1 pl-4 leading-relaxed">
                 {h.fix.rework.map((r, i) => (
                   <li key={i}>
                     {r.text}
                     {!r.practical && r.practical_note && (
-                      <span className="block text-[11px] text-amber-700 dark:text-amber-300">
-                        Hard by hand: {r.practical_note}
-                      </span>
+                      <span className="block text-warn">! Hard by hand: {r.practical_note}</span>
                     )}
                   </li>
                 ))}
@@ -471,9 +431,8 @@ export function HypothesisCard({
             </div>
           )}
           {h.fix.schematic.length > 0 && (
-            <div className="space-y-1.5 border-l-2 border-blue-400 pl-3">
-              <span className="flex items-center gap-1.5 font-bold text-blue-800 dark:text-sky-300">
-                <FileCode className="h-3.5 w-3.5" />
+            <div className="space-y-1.5 border-l-2 border-info pl-[1ch]">
+              <span className="font-bold text-info">
                 {review ? "Schematic change" : "Next schematic revision"}
               </span>
               <ul className="list-disc space-y-1 pl-4 leading-relaxed">
@@ -483,8 +442,7 @@ export function HypothesisCard({
               </ul>
             </div>
           )}
-          <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Gauge className="h-3 w-3" />
+          <p className="text-muted-foreground">
             {review
               ? "Unverified: settle the issue with the checks above before changing the design."
               : "Rework is unverified: confirm the cause with the steps above first."}
@@ -493,7 +451,7 @@ export function HypothesisCard({
       </div>
 
       {ownProblems.length > 0 && (
-        <div className="border-t bg-amber-50/50 px-5 py-3 text-[11px] text-amber-800 sm:px-6 dark:bg-amber-950/20 dark:text-amber-300">
+        <div className="border-t px-4 py-2.5 text-xs text-warn sm:px-5">
           {ownProblems.map((p, i) => (
             <p key={i}>
               {p.where}: {p.message}
