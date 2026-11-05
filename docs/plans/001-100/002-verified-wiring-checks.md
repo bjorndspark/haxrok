@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-04 | 2026-11-04 | Done, except BOOT0 (blocked on RM0360) | — | `001-mvp-scope.md`, `evals/README.md` |
+| 2026-11-04 | 2026-11-05 | Done | — | `001-mvp-scope.md`, `evals/README.md` |
 
 The model already ranks three planted faults #1 (`orbit-uart-swapped`,
 `orbit-boot0-high`, `rp-micro-ldo-en`), but only as "Reasoned: check it".
@@ -51,7 +51,7 @@ transmit output.
 - Planted: `orbit-uart-swapped` flagged. Must stay quiet: `orbit-boot0-high`
   (the same board wired correctly), `rust-board-*`, `rp-micro-*`.
 
-## 2. Enable and boot pins that can't reach their working level (`enable_pin`): EN done, BOOT0 blocked
+## 2. Enable and boot pins that can't reach their working level (`enable_pin`): done
 
 Two cases. Both are wiring facts, so no thresholds are needed:
 
@@ -60,15 +60,21 @@ Two cases. Both are wiring facts, so no thresholds are needed:
   it never starts. Planted: `rp-micro-ldo-en`. Must stay quiet: EN tied to
   VIN (`rp-micro-no-fault`'s RT9013 on RAW, ORBIT's TPS63802 on +BATT).
 - **STM32 BOOT0 that can't be low.** Walk out from the `BOOT0` net
-  through resistors and switch throws, and collect the rails it can
-  reach. Flag it when no path leads to ground. A switch counts as joining
-  its common pin to each throw, from the symbol's pins. RM0360 (the
-  STM32F030 reference manual) gives the boot mode table. Planted:
+  through resistors, switches and jumpers, and collect the rails it can
+  reach. Flag it when no path leads to ground. The netlist doesn't name a
+  switch's common pin, so a switch counts as joining all its pins: that
+  can only hide a stuck pin, never invent one. Anything else on the way
+  (an IC, a transistor, a header) may drive the pin, so the check stays
+  quiet. RM0360 2.5, Table 3 gives the boot modes (BOOT0 = 0 boots main
+  flash). On the STM32F030xC and F070x6, option bytes (nSWBOOT0) can
+  override the pin, so there it's a hint, not a flag. Planted:
   `orbit-boot0-high`. Must stay quiet: `orbit-uart-swapped`, whose BOOT0
   switch selects +3.3V or R2 to GND.
-- BOOT0 is blocked: st.com doesn't serve RM0360 or the datasheet to this
-  machine, and the boot mode table isn't in ST's GitHub data. It waits for
-  a copy of the document.
+- Sources: st.com doesn't serve RM0360 to this machine. Table 3 was read in
+  a section-by-section copy of RM0360 (docs.dirba.io) and matches the
+  STM32F030 datasheet (DS9773 Rev 5, 3.3 Boot modes: the boot pin and an
+  option bit select flash, system memory or SRAM), fetched from a
+  distributor (hestore.hu).
 - A floating EN (nothing on the net but the IC pin) is left out: whether
   that's a fault depends on each part's internal pull-up.
 

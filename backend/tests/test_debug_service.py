@@ -1229,6 +1229,50 @@ def test_a_regulator_enabled_from_its_own_output_is_flagged():
     assert "enable_pin" not in kinds(_ldo("+3V3", en_pin="~{EN}"))  # active-low
 
 
+def _boot0(
+    nets: dict[str, list[str]], mcu: str = "STM32F030C8Tx", boot_net: str = "BOOT0"
+) -> Design:
+    """An STM32 U1 with BOOT0 on pin 44 (on ``boot_net``), a slide switch SW1,
+    a resistor R1 and a MOSFET Q1. ``nets`` adds the other nodes."""
+    parts = {
+        "U1": (mcu, "MCU_ST_STM32F0:STM32F030C8Tx"),
+        "SW1": ("BOOT0_SW", "Switch:SW_SPDT"),
+        "R1": ("10k", "Device:R"),
+        "Q1": ("2N7002", "Transistor_FET:2N7002"),
+    }
+    nets = {name: list(nodes) for name, nodes in nets.items()}
+    nets[boot_net] = ["U1.44(BOOT0)", *nets.get(boot_net, [])]
+    return _design(parts, nets)
+
+
+def test_a_boot0_that_never_reaches_ground_is_flagged():
+    from app.features.debug import calc
+
+    def boot(d: Design) -> list[Calculation]:
+        return [c for c in calc.lookup(d) if c.kind == "enable_pin"]
+
+    # The switch picks +3V3 or R1, but R1 also goes to +3V3 (orbit-boot0-high).
+    stuck = {"BOOT0": ["SW1.2"], "+3V3": ["SW1.3", "R1.1"], "Net-(SW1-1)": ["SW1.1", "R1.2"]}
+    (c,) = boot(_boot0(stuck))
+    assert c.flagged and c.pins == ["U1.44"]
+    assert "R1 (10k)" in c.text and "SW1 (BOOT0_SW)" in c.text and "Table 3" in c.text
+    # Tied straight to the rail.
+    (c,) = boot(_boot0({"+3V3": ["C1.1"]}, boot_net="+3V3"))
+    assert c.flagged and "through" not in c.text
+    # F030xC: option bytes can override the pin, so it's a hint.
+    (c,) = boot(_boot0(stuck, mcu="STM32F030CCT6"))
+    assert not c.flagged and "nSWBOOT0" in c.text
+
+    # The working switch: R1 is a pull-down (orbit-uart-swapped).
+    ok = {"BOOT0": ["SW1.2"], "+3V3": ["SW1.3"], "GND": ["R1.1"], "Net-(SW1-1)": ["SW1.1", "R1.2"]}
+    assert boot(_boot0(ok)) == []
+    # Floating, or driven by a transistor: the netlist can't tell the level.
+    assert boot(_boot0({})) == []
+    assert boot(_boot0({"BOOT0": ["R1.1", "Q1.3"], "+3V3": ["R1.2"]})) == []
+    # A family RM0360 doesn't cover.
+    assert boot(_boot0(stuck, mcu="STM32G030K8Tx")) == []
+
+
 def _usb_c(cc1: list[str], cc2: list[str], resistors: dict[str, str]) -> Design:
     """A USB-C receptacle J1 whose CC1/CC2 nets hold the given extra nodes."""
     parts = {"J1": ("USB_C_Receptacle_USB2.0", "Connector:USB_C_Receptacle_USB2.0")}

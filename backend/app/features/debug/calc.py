@@ -31,8 +31,11 @@ every such circuit needs:
   has its own check) to a named rail more than 0.3 V above the IC's I/O
   supply. Flagged, except on STM32 parts, whose 5 V tolerant (FT) pins the
   netlist can't tell apart: there it's a hint.
-- **enable_pin**: always flagged. A regulator whose active-high enable is
-  on its own output net, so it can never start.
+- **enable_pin**: a pin that can't reach its working level. A regulator
+  whose active-high enable is on its own output net, so it can never start;
+  or an STM32F030/F070 BOOT0 that reaches a positive rail and never ground,
+  so it boots the ROM bootloader (RM0360 Table 3). Flagged, except BOOT0 on
+  an F030xC or F070x6, whose option bytes can override the pin: a hint there.
 - **uart**: always flagged. A net joining two IC transmit outputs, or IC
   receive inputs and nothing that transmits; both lines of one link wrong
   is reported once, as swapped. Direction comes from the pin's name or,
@@ -988,6 +991,105 @@ def _enable_loop(design: Design, ref: str) -> Calculation | None:
     return None
 
 
+# STM32 parts whose boot area BOOT0 selects, from RM0360 (STM32F030x4/x6/x8/xC,
+# STM32F070x6/xB) 2.5 Boot configuration, Table 3: BOOT0 = 0 boots main flash;
+# BOOT0 = 1 boots system memory (the ROM bootloader), or SRAM if nBOOT1 = 0.
+_BOOT_PARTS = re.compile(r"^STM32F0[37]0", re.IGNORECASE)
+# STM32F030xC and STM32F070x6 only: option bytes (nSWBOOT0 = 0, nBOOT0 = 1)
+# can make the chip ignore the pin, so a stuck pin is a hint there, not a fault.
+_BOOT_OPTION = re.compile(r"^STM32F0(30[A-Z]C|70[A-Z]6)", re.IGNORECASE)
+_BOOT_PIN = re.compile(r"(^|/)BOOT0$", re.IGNORECASE)
+_BOOT_SOURCE = "RM0360 2.5 Boot configuration, Table 3"
+# Parts that join their pins at DC in some position: resistors, switches,
+# jumpers. A switch is taken as joining all its pins (the netlist doesn't name
+# the common pin), which can only hide a stuck pin, never invent one.
+_SWITCH_LIB = re.compile(r"SW|SPDT|SPST|JUMPER", re.IGNORECASE)
+
+
+def _passes_dc(design: Design, ref: str) -> bool:
+    part = design.parts.get(ref)
+    return _head(ref) in {"R", "SW", "JP"} or (
+        part is not None and _SWITCH_LIB.search(part.lib_part) is not None
+    )
+
+
+def _reach(design: Design, start: str, pin_ref: str) -> tuple[set[str], list[str]] | None:
+    """The rails ``start`` reaches through resistors, switches and jumpers,
+    and the parts on the way. None when anything else is on the way (an IC, a
+    transistor, a header, a rail without a voltage in its name): the pin may
+    be driven, so its level can't be read from the netlist. Capacitors are
+    ignored; they don't set a DC level."""
+    rails: set[str] = set()
+    via: list[str] = []
+    seen, todo = {start}, [start]
+    while todo:
+        net = todo.pop()
+        if is_ground(net) or (named_voltage(net) or 0) > 0:
+            rails.add(net)
+            continue
+        for node in design.nets.get(net, []):
+            if node.pin_ref == pin_ref or _head(node.ref) == "C":
+                continue
+            if not _passes_dc(design, node.ref):
+                return None
+            if node.ref in via:
+                continue
+            via.append(node.ref)
+            for other in design.nets:
+                if other not in seen and any(n.ref == node.ref for n in design.nets[other]):
+                    seen.add(other)
+                    todo.append(other)
+    return rails, via
+
+
+def _boot_pin(design: Design, ref: str) -> Calculation | None:
+    """An STM32 BOOT0 that can never be low: every path from it leads to a
+    positive rail and none to ground, so the chip boots its ROM bootloader at
+    every reset. Logic, not a threshold."""
+    value = design.parts[ref].value
+    if not _BOOT_PARTS.match(value):
+        return None
+    pins = [n for nodes in design.nets.values() for n in nodes if n.ref == ref]
+    boot = next((n for n in pins if _BOOT_PIN.search(n.function)), None)
+    net = design.net_of(boot.pin_ref) if boot else None
+    if boot is None or net is None or (found := _reach(design, net, boot.pin_ref)) is None:
+        return None
+    rails, via = found
+    if not rails or any(is_ground(r) for r in rails):
+        return None
+    option = _BOOT_OPTION.match(value) is not None
+    path = (
+        f" through {', '.join(f'{r} ({design.parts[r].value})' for r in sorted(via))}"
+        if via
+        else ""
+    )
+    caveat = (
+        " On this part option bytes (nSWBOOT0 = 0, nBOOT0 = 1) can make it ignore the pin; "
+        "check them before calling this a fault."
+        if option
+        else ""
+    )
+    return Calculation(
+        id="",
+        kind="enable_pin",
+        ic=ref,
+        pins=[boot.pin_ref],
+        value=None,
+        unit="",
+        expected=None,
+        flagged=not option,
+        text=(
+            f"{ref} ({value}): BOOT0 {boot.pin_ref} reaches only {', '.join(sorted(rails))}"
+            f"{path}, never ground, so it is high at every reset and the chip boots system "
+            "memory (the ROM bootloader) instead of main flash. BOOT0 = 0 selects main "
+            "flash; BOOT0 = 1 selects system memory, or SRAM if nBOOT1 = 0 "
+            f"({_BOOT_SOURCE}). Flashing over SWD still verifies, and a debug session that "
+            "sets the PC still runs main(), which hides it. Fix: give BOOT0 a path to GND, "
+            f"such as a 10 kΩ pull-down.{caveat}"
+        ),
+    )
+
+
 @dataclass(frozen=True)
 class UartPins:
     """The UART direction of MCU pins named only by port (PA9, GPIO0), for
@@ -1210,6 +1312,8 @@ def lookup(design: Design) -> list[Calculation]:
             calcs.append(c)
         if _head(part.ref) in {"U", "IC"} and (c := _enable_loop(design, part.ref)):
             calcs.append(c)
+        if _head(part.ref) in {"U", "IC"} and (c := _boot_pin(design, part.ref)):
+            calcs.append(c)
     for net in sorted(design.nets):
         if net in fb_nets:
             continue
@@ -1231,7 +1335,7 @@ def format_calculations(calcs: list[Calculation]) -> str:
     if not calcs:
         return (
             "(none: no regulator divider or headroom, charger, LED, I²C, RC, divider, "
-            "decoupling, USB-C CC, over-voltage pull-up, enable loop or miswired UART "
-            "circuit recognised)\n"
+            "decoupling, USB-C CC, over-voltage pull-up, enable loop, stuck BOOT0 or "
+            "miswired UART circuit recognised)\n"
         )
     return "\n".join(f"{c.id}{' FLAGGED' if c.flagged else ''}: {c.text}" for c in calcs) + "\n"

@@ -338,12 +338,13 @@ class Calculation(BaseModel):
     """A value or wiring check the backend computed from the netlist
     (``calc.py``): a regulator's output or headroom, a charge current, an LED
     current, an I²C pull-up, an RC delay, a divider, USB-C CC pull-downs,
-    supply decoupling, a UART's TX/RX wiring, a regulator's enable, a pull-up
-    above an IC's supply. Verified,
-    not the model's. ``flagged`` means the netlist as drawn contradicts
-    itself or misses what every such circuit needs (+3V3 set to 0.73 V, an
-    I²C line with no pull-up, CC1 and CC2 sharing one resistor, a supply rail
-    with no capacitor, TX wired to TX, an enable pin on its own output)."""
+    supply decoupling, a UART's TX/RX wiring, a regulator's enable or an
+    STM32's BOOT0, a pull-up above an IC's supply. Verified, not the model's.
+    ``flagged`` means the netlist as drawn contradicts itself or misses what
+    every such circuit needs (+3V3 set to 0.73 V, an I²C line with no
+    pull-up, CC1 and CC2 sharing one resistor, a supply rail with no
+    capacitor, TX wired to TX, an enable pin on its own output, a BOOT0 with
+    no path to ground)."""
 
     id: str
     kind: Literal[

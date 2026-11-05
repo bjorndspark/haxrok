@@ -42,8 +42,8 @@ Scope, the go/no-go result and the ideas weighed against this one are in
 - [x] Wiring checks in code: USB-C CC pull-downs, missing decoupling,
       SOT-23 transistor pinouts, and from
       `docs/plans/001-100/002-verified-wiring-checks.md` UART wired TX to
-      TX, a regulator enabled from its own output, and pull-ups above an
-      IC's supply. The STM32 BOOT0 check waits for ST's reference manual
+      TX, a regulator enabled from its own output, an STM32 BOOT0 that
+      can never be low, and pull-ups above an IC's supply
 - [x] ngspice simulations of I²C lines and enable/reset RC delays, run in
       parallel with the review and drawn as waveforms. You can ask the model
       about each one (`docs/plans/001-100/003-simulate-and-ask.md`)
