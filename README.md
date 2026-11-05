@@ -2,7 +2,7 @@
 
 *Hunt down the fault before the magic smoke escapes.*
 
-Häxrök (Swedish for "witch smoke") is a schematic debugger. You give it your
+Häxrök is a schematic debugger. You give it your
 KiCad netlist and describe the symptom you see on the bench. It ranks root-cause
 hypotheses and labels every claim with what it rests on: your netlist, KiCad's
 ERC, the part's datasheet pins, the manufacturer's reference design, a value
