@@ -50,10 +50,10 @@ Then write `symptom.md` from bench notes only, and `expected.md`.
   the tool will always have ERC.
 
 ```sh
-# gateway from AI_BASE_URL / AI_API_KEY (default localhost:8080); load .env first:
+# endpoint from AI_BASE_URL / AI_API_KEY (default Meta's API); load .env first:
 #   set -a; . ./.env; set +a
-python3 -I evals/gonogo.py                              # meta/muse-spark-1.3-contributor
-python3 -I evals/gonogo.py --model meta/muse-spark-1.3
+python3 -I evals/gonogo.py                              # muse-spark-1.3-contributor
+python3 -I evals/gonogo.py --model muse-spark-1.3
 python3 -I evals/gonogo.py --case rust-board-fb-swapped
 ```
 

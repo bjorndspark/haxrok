@@ -15,8 +15,8 @@ the shared Redis infra (a no-op if already running), and starts backend +
 frontend with hot reload. Open the printed frontend port (default http://localhost:5173).
 
 - Swagger UI: `http://localhost:$BACKEND_HOST_PORT/docs`
-- Debug runs won't work until `.env` points at an OpenAI-compatible gateway —
-  set `AI_BASE_URL` + `AI_API_KEY` (Bifrost recommended; see README).
+- Debug runs won't work until `.env` has a model API key — set `AI_API_KEY`
+  to a Meta API key (`AI_BASE_URL` defaults to Meta's API; see README).
 
 ## Daily
 

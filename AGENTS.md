@@ -89,10 +89,11 @@ frontend/src/
 - **Backend**: FastAPI + Pydantic v2, Python 3.12, `uv`
 - **Frontend**: React 19 + Vite + TypeScript + Tailwind 4 + shadcn/ui, `pnpm`
 - **Cache**: Redis — shared infra per machine (`docker-compose.infra.yml`,
-  `name: infra`), caching gateway answers. Client: `app/core/redis.py`
+  `name: infra`), caching model answers. Client: `app/core/redis.py`
   (`get_redis()`, async, `REDIS_URL`). No database.
-- **AI**: external OpenAI-compatible gateway via `AI_BASE_URL` (Bifrost
-  recommended). Model names are env vars, not code.
+- **AI**: any OpenAI-compatible endpoint via `AI_BASE_URL` — Meta's API
+  directly by default; a gateway works the same. Model names are env vars,
+  not code.
 
 ## Commands
 

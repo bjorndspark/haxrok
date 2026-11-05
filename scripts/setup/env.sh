@@ -152,5 +152,5 @@ set_env_var "VITE_API_URL"        "http://localhost:$BACKEND_PORT" "$ENV_FILE"
 set_env_var "BACKEND_CORS_ORIGINS" "http://localhost:$FRONTEND_PORT" "$ENV_FILE"
 
 echo "==> Done. Start the app with: make dev"
-echo "    Point AI_BASE_URL at your gateway (e.g. Bifrost) or leave empty"
-echo "    and set AI_API_KEY to hit OpenAI directly."
+echo "    Set AI_API_KEY to your Meta API key (AI_BASE_URL defaults to Meta's API;"
+echo "    point it at any other OpenAI-compatible endpoint to switch)."

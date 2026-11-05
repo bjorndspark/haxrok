@@ -7,9 +7,9 @@
 #     generates with non-conflicting values so several copies can run at once.
 #   - Redis is reached via the shared infra_default network using the compose
 #     service name (redis) as hostname.
-#   - The AI gateway is NOT a service here. The app talks to any
+#   - The model API is NOT a service here. The app talks to any
 #     OpenAI-compatible endpoint via AI_BASE_URL; where that endpoint lives
-#     (Bifrost, a cloud provider, ...) is deployment config, not repo code.
+#     (Meta's API, a gateway, ...) is deployment config, not repo code.
 services:
   backend:
     build: ./backend

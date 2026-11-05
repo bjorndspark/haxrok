@@ -6,8 +6,9 @@ The few trade-offs worth recording. Append at the bottom; don't fork docs.
 
 **Decision:** the app talks to one OpenAI-compatible endpoint (`AI_BASE_URL`
 + `AI_API_KEY`, model names as env vars). All provider concerns — keys,
-routing, fallbacks, budgets, observability — live in the gateway (Bifrost
-recommended). `app/core/ai/` is the entire AI surface: one `AsyncOpenAI` client
+routing, fallbacks, budgets, observability — live behind that endpoint:
+Meta's API directly by default, or a gateway such as Bifrost or LiteLLM when
+routing or fallbacks are wanted. `app/core/ai/` is the entire AI surface: one `AsyncOpenAI` client
 plus thin call helpers (`chat.py`, `structured.py`).
 
 **Alternatives rejected:** an in-repo provider abstraction + model catalog
@@ -22,10 +23,10 @@ field (via `fallbacks_extra_body` in `app/core/ai/client.py`). It's a
 pass-through, not routing logic — unset, the gateway's own VK/routing
 fallbacks apply; set, it overrides them.
 
-Cost protection is the gateway's job too: with no auth (below), a public
+Cost protection is the endpoint's job too: with no auth (below), a public
 deploy lets anyone start debug analyses (two long model calls each), so
-the budget and rate limits on the gateway virtual key (`AI_API_KEY`) are
-the spend ceiling. The app adds no rate limiting of its own — one place to
+the budget and rate limits on the key in `AI_API_KEY` (the Meta API key,
+or a gateway virtual key) are the spend ceiling. The app adds no rate limiting of its own — one place to
 set limits, and it's the place that sees every provider's price. Configure
 them before exposing a deploy.
 

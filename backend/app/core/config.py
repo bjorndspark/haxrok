@@ -30,21 +30,20 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:56379/0"
     BACKEND_CORS_ORIGINS: str = ""
 
-    # Any OpenAI-compatible endpoint: Bifrost, LiteLLM, or empty for
-    # api.openai.com. Provider keys, routing, and budgets live in the
-    # gateway; fallbacks too, unless AI_CHAT_FALLBACKS below overrides
-    # them per request.
+    # Any OpenAI-compatible endpoint: Meta's API (what .env.example sets),
+    # a gateway such as LiteLLM or Bifrost, or empty for api.openai.com.
+    # Provider keys, routing, and budgets live behind that endpoint.
     AI_BASE_URL: str = ""
     AI_API_KEY: str = ""
     AI_CHAT_MODEL: str = "gpt-4o-mini"
-    # Per-operation timeout (connect, each read) for gateway calls.
+    # Per-operation timeout (connect, each read) for model calls.
     AI_TIMEOUT_S: float = 120.0
-    # Optional comma-separated fallback chains (provider/model form),
-    # forwarded to the gateway as Bifrost's `fallbacks` request field.
-    # Setting it overrides the gateway's own VK/routing-rule fallbacks;
-    # empty = gateway decides.
+    # Gateway only: optional comma-separated fallback chains (provider/model
+    # form), sent as the `fallbacks` request field (Bifrost's format).
+    # Setting it overrides the gateway's own fallbacks; leave empty when
+    # calling Meta's API directly.
     AI_CHAT_FALLBACKS: str = ""
-    # Seconds a gateway answer stays cached in Redis, keyed by the whole
+    # Seconds a model answer stays cached in Redis, keyed by the whole
     # request (model, fallbacks, messages, schema); 0 = always call the model.
     AI_CACHE_TTL_S: int = 7 * 24 * 3600
 

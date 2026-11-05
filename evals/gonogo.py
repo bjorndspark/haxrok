@@ -5,9 +5,9 @@ Runs each case under two conditions:
   netlist+erc  also includes the KiCad ERC report (realistic: a tool would have it)
 
 Usage:
-  python3 -I evals/gonogo.py [--model meta/muse-spark-1.3-contributor] [--case rust-board-fb-swapped]
+  python3 -I evals/gonogo.py [--model muse-spark-1.3-contributor] [--case rust-board-fb-swapped]
 
-Env: AI_BASE_URL (default http://localhost:8080/v1), AI_API_KEY (optional).
+Env: AI_BASE_URL (default https://api.meta.ai/v1), AI_API_KEY (optional).
 Writes each answer to evals/results/<case>/<model>/<condition>.md
 """
 
@@ -98,11 +98,11 @@ def verdict(answer, groups):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default="meta/muse-spark-1.3-contributor")
+    ap.add_argument("--model", default="muse-spark-1.3-contributor")
     ap.add_argument("--case", default="rust-board-fb-swapped")
     args = ap.parse_args()
 
-    base_url = os.environ.get("AI_BASE_URL", "http://localhost:8080/v1")
+    base_url = os.environ.get("AI_BASE_URL", "https://api.meta.ai/v1")
     api_key = os.environ.get("AI_API_KEY", "")
     case_dir = ROOT / "cases" / args.case
     out_dir = ROOT / "results" / args.case / args.model.replace("/", "_")
