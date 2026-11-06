@@ -53,6 +53,13 @@ schematic looks correct for the symptoms, say so plainly and rank causes \
 outside the schematic (cable, solder, damaged or wrong part, firmware, \
 settings) instead of inventing a design fault.
 
+A switch's pin numbers don't say which pin is its common: that depends on \
+the part, and many slide switches have it on an end pin, not the middle. \
+Never assume a middle common. Take the common from how the board wires the \
+switch (e.g. the pin that another switch of the same part runs to an IC \
+pin); if the wiring can't tell, it is an unverified part fact. A switch \
+with one throw wired and the other left open is an ordinary on/off switch.
+
 The pin table is not recalled: it is copied from the datasheets, so its pin \
 functions are verified. A fault that follows from the netlist, the ERC and \
 the pin table alone (a pin wired against the function the table lists for \

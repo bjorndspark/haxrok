@@ -203,6 +203,16 @@ GND) stays quiet. Run through the Bifrost gateway.
 |---|---|---|---|---|
 | `orbit-boot0-high` | review | #1 (won't work) | 175 s | "BOOT0 tied high in all switch positions - boots bootloader, not flash". #2 is a false alarm: "PWR switch uses 1 and 3, middle 2 left NC" assumes a centre common, but on this K3-1270L-F1 pin 3 is the common (the BOOT0 switch on the same board shows it) |
 
+After the switch rule (a switch's pin numbers don't say which pin is its
+common; read it from the wiring, never assume the middle). Run through the
+Bifrost gateway.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `orbit-boot0-high` | review | #1 (won't work) | 166 s | The PWR1 false alarm is gone. #2 (may fail) is L1 drawn as 0.47 µH while its part, DFE201612E-2R2M, is 2.2 µH: a real mismatch on the board |
+| `orbit-uart-swapped` | review | #1 (won't work) | 145 s | Only issue |
+| `rp-micro-no-fault` | review | PASS (no issues) | 74 s | |
+
 ## Reading the result
 
 | Outcome | Meaning |
