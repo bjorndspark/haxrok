@@ -159,6 +159,8 @@ Settings for the `/step` workflow (one plan step per session).
   changes the model's prompt or output schema.
 - **Commits:** the Git section's `type(scope): …` style, not
   `Plan NNN step N: …`.
+- **Push:** push the branch the commit is on (`git push origin HEAD`), as
+  the Git section says.
 
 ### Current work
 
