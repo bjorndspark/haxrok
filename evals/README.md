@@ -203,6 +203,14 @@ GND) stays quiet. Run through the Bifrost gateway.
 |---|---|---|---|---|
 | `orbit-boot0-high` | review | #1 (won't work) | 175 s | "BOOT0 tied high in all switch positions - boots bootloader, not flash". #2 is a false alarm: "PWR switch uses 1 and 3, middle 2 left NC" assumes a centre common, but on this K3-1270L-F1 pin 3 is the common (the BOOT0 switch on the same board shows it) |
 
+After the switch-common rule in the debug prompt (a switch's common comes
+from how the board wires it, never from a middle pin; one throw wired is an
+on/off switch). Run through the Bifrost gateway; the time wasn't recorded.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `orbit-boot0-high` | review | #1 (won't work) | — | The PWR1 false alarm is gone: the diagnosis infers pin 3 as the common from PWR1's own wiring and calls it an ordinary on/off switch. #2 (may fail) is real: L1's value says 0.47 µH but its part number `DFE201612E-2R2M` is 2.2 µH, labelled unverified |
+
 ## Reading the result
 
 | Outcome | Meaning |

@@ -164,7 +164,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. SPDT common-pin false alarm: orbit `PWR1` (K3-1270L-F1, common = pin 3)
-   is called miswired. Small fix.
-2. `003-simulate-and-ask.md` steps 3–4 (what-if re-runs, circuits a
+1. `003-simulate-and-ask.md` steps 3–4 (what-if re-runs, circuits a
    formula can't answer): ask first.
