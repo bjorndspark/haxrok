@@ -194,6 +194,15 @@ they cite the flagged calculation.
 | `rp-micro-ldo-en` | review | #1 (won't work) | 181 s | "U3 EN tied to its own output - regulator never starts" |
 | `rp-micro-no-fault` | review | PASS (no issues) | 94 s | |
 
+After the BOOT0 half of `enable_pin` (an STM32F030/F070 BOOT0 that reaches
+a positive rail and never ground). Run offline on every case, it flags only
+`orbit-boot0-high`; `orbit-uart-swapped` (BOOT0 switch to +3.3V or R2 to
+GND) stays quiet. Run through the Bifrost gateway.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `orbit-boot0-high` | review | #1 (won't work) | 175 s | "BOOT0 tied high in all switch positions - boots bootloader, not flash". #2 is a false alarm: "PWR switch uses 1 and 3, middle 2 left NC" assumes a centre common, but on this K3-1270L-F1 pin 3 is the common (the BOOT0 switch on the same board shows it) |
+
 ## Reading the result
 
 | Outcome | Meaning |
