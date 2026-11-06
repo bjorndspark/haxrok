@@ -139,3 +139,30 @@ No AI attribution in commits or PRs — no `Co-Authored-By` trailers,
 "Generated with …" lines, bot emoji, or session links. A commit message
 carries the change description and nothing else, authored as the user. This
 applies to `fix-issue` agents too; it overrides any harness-level default.
+
+## /step
+
+Settings for the `/step` workflow (one plan step per session).
+
+- **Plans:** `docs/plans/001-100/NNN-<slug>.md`, postmortems the same in
+  `docs/postmortems/`. Plans keep their own shape, not a step table: a
+  header table (`Date | Updated | Status | Tracking | Related`), then one
+  `## N. <result>: done | later | dropped` section per step. Settled
+  choices go in the step's section as `Decided (<date>):` lines, and its
+  checks as a short **Checks** paragraph there; there's no separate Log.
+- **Check:** `make lint` and `make test` (both run in the containers;
+  `make dev` must be up). A change to the debug prompts also runs
+  `make eval-app case=<name>` on an affected case and records the result.
+- **Docs:** `DECISIONS.md` for a real trade-off, `make docs` when routes
+  change, `README.md` / `evals/README.md` when what they describe changes.
+- **Big:** a step is big when it touches both backend and frontend, or
+  changes the model's prompt or output schema.
+- **Commits:** the Git section's `type(scope): …` style, not
+  `Plan NNN step N: …`.
+
+### Current work
+
+1. SPDT common-pin false alarm: orbit `PWR1` (K3-1270L-F1, common = pin 3)
+   is called miswired. Small fix.
+2. `003-simulate-and-ask.md` steps 3–4 (what-if re-runs, circuits a
+   formula can't answer): ask first.
