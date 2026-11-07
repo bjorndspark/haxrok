@@ -13,6 +13,8 @@ dependencies = [
     "sse-starlette>=3.5.0",
     "httpx>=0.27",
     "redis>=8.1.0",
+    "pdfplumber>=0.11.10",
+    "pypdfium2>=5.15.0",
 ]
 
 [project.optional-dependencies]

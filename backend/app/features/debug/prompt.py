@@ -30,12 +30,13 @@ from app.features.debug.schemas import (
 _INPUT = """\
 Input: numbered symptoms (s1, s2, ...), the compact netlist (one line per \
 part, then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
-(erc-1, ...), a pin table copied from datasheets for some ICs, verified \
-findings (wf1, ...) the backend computed from the netlist and pin table, \
-reference notes (rd1, ...) copied from manufacturers' reference designs and \
-datasheets, values the backend calculated from the netlist with datasheet \
-formulas (cf1, ...), and sometimes bench measurements the user entered \
-(m1, ...)."""
+(erc-1, ...), a pin table copied from datasheets for some ICs, facts read \
+from the ICs' datasheets (ds1, ...: limits and typical application parts, \
+each with its page), verified findings (wf1, ...) the backend computed from \
+the netlist and pin table, reference notes (rd1, ...) copied from \
+manufacturers' reference designs and datasheets, values the backend \
+calculated from the netlist with datasheet formulas (cf1, ...), and \
+sometimes bench measurements the user entered (m1, ...)."""
 
 # The unverified-facts rule: the model recalls part specs from memory, and in
 # the no-fault eval it called a correct part an error and told the user to
@@ -64,7 +65,9 @@ The pin table is not recalled: it is copied from the datasheets, so its pin \
 functions are verified. A fault that follows from the netlist, the ERC and \
 the pin table alone (a pin wired against the function the table lists for \
 it) is a verified design error. Rank it on how well it explains the \
-symptoms; don't demote it for want of a datasheet check.
+symptoms; don't demote it for want of a datasheet check. The datasheet \
+facts (ds1, ...) are read from the datasheets too, so they are verified \
+the same way: use them instead of recalling the part.
 
 The verified findings are such faults, found by a deterministic check of the \
 netlist against the pin table (e.g. an inductor pin that shares a net with \
@@ -104,8 +107,8 @@ Give your top 3 root-cause hypotheses, ranked. For each: the exact nets and \
 pins involved, the mechanism that produces the observed symptoms (which \
 symptoms it explains and which it can't), how to confirm it on the bench \
 (say power off or on and where to put the probes), and the fix. Mark each \
-claim as CONFIRMED (follows directly from the netlist, ERC, pin table or a \
-measurement) or INFERRED.
+claim as CONFIRMED (follows directly from the netlist, ERC, pin table, \
+datasheet facts or a measurement) or INFERRED.
 
 {_UNVERIFIED}
 """
@@ -120,9 +123,12 @@ claim if any fails, so cite exactly.
 and its net, exactly as written) or pin_name (the pin's name as the netlist \
 gives it, and use that same name in the text).
 - erc: a fact from an ERC entry. Cite its id.
-- datasheet: a pin function from the pin table. Cite pin_function with the \
-pin. Only pins listed in the pin table can be cited. State only what the pin \
-does; put which net it is on in a separate schematic claim.
+- datasheet: a pin function from the pin table, cited as pin_function with \
+the pin; or a datasheet fact (a limit or typical application part), cited \
+as kind datasheet with its id (ds...). Only pins listed in the pin table \
+and ids listed under the datasheet facts can be cited. State only what the \
+pin does or what the fact says; put which net it is on in a separate \
+schematic claim.
 - reference: a fact from a reference note (rd...) or a calculated value \
 (cf...). Cite kind reference with its id. Use it for "this matches the \
 manufacturer's design" and for calculated voltages and currents.
@@ -207,11 +213,12 @@ _REVIEW_INPUT = """\
 Input: optional notes from the designer on what the board is for (s1, s2, \
 ...; supplies, loads, environment), the compact netlist (one line per part, \
 then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
-(erc-1, ...), a pin table copied from datasheets for some ICs, verified \
-findings (wf1, ...) the backend computed from the netlist and pin table, \
-reference notes (rd1, ...) copied from manufacturers' reference designs and \
-datasheets, and values the backend calculated from the netlist with \
-datasheet formulas (cf1, ...)."""
+(erc-1, ...), a pin table copied from datasheets for some ICs, facts read \
+from the ICs' datasheets (ds1, ...: limits and typical application parts, \
+each with its page), verified findings (wf1, ...) the backend computed from \
+the netlist and pin table, reference notes (rd1, ...) copied from \
+manufacturers' reference designs and datasheets, and values the backend \
+calculated from the netlist with datasheet formulas (cf1, ...)."""
 
 REVIEW_DIAGNOSE = f"""\
 You are an expert hardware engineer reviewing a hobbyist's KiCad schematic \
@@ -232,8 +239,8 @@ a severity (WILL FAIL: won't work as drawn; MAY FAIL: fails under some \
 supply, load or tolerance; IMPROVE: works, but a cheap change makes it more \
 robust), how to settle it before ordering (which datasheet section to read, \
 or what to check on the first assembled board), and the schematic fix. Mark \
-each claim as CONFIRMED (follows directly from the netlist, ERC or pin table) \
-or INFERRED.
+each claim as CONFIRMED (follows directly from the netlist, ERC, pin table \
+or datasheet facts) or INFERRED.
 
 A design that looks correct is a valid and useful answer: say which blocks \
 you checked and that you found no issues. Never pad the list. Style, part \
@@ -326,9 +333,11 @@ def build_user_message(
     warnings: str = "",
     references: str = "",
     calculations: str = "",
+    datasheet_facts: str = "",
 ) -> str:
     """The user turn: symptoms (review: the designer's notes), measurements,
-    netlist, ERC, pin table, verified findings, unverified pin warnings."""
+    netlist, ERC, pin table, datasheet facts, verified findings, unverified
+    pin warnings, reference notes, calculated values."""
     parts = []
     if mode == "debug":
         parts.append("## Symptoms\n" + "\n".join(f"{s.id}: {s.text}" for s in symptoms))
@@ -345,6 +354,13 @@ def build_user_message(
         "## Netlist\n" + netlist,
         "## ERC report\n" + erc,
         "## Pin table (from datasheets)\n" + pin_table,
+    ]
+    if datasheet_facts:
+        parts.append(
+            "## Datasheet facts (read from each IC's datasheet; p.N is the PDF's page)\n"
+            + datasheet_facts
+        )
+    parts += [
         "## Verified findings (netlist checked against the pin table)\n" + findings,
     ]
     if warnings:
@@ -484,3 +500,52 @@ def build_result_ask_message(
             "## Open questions\n" + "\n".join(f"- {q.text}" for q in result.open_questions)
         )
     return _with_question(parts, history, question)
+
+
+# --- datasheet facts -------------------------------------------------------------
+# One call per IC's datasheet (``facts``), before the review, so the review
+# can cite what a datasheet says instead of recalling it.
+
+DATASHEET_FACTS = """\
+You read one IC's datasheet and copy out the facts a schematic review needs. \
+You get the part as the board uses it (its value, footprint, and the board's \
+pin numbers with the names the schematic gives them), then the datasheet's \
+text page by page under '=== Page N ===' headers. Tables are rows with ' | ' \
+between cells. Some pages may be left out.
+
+Copy, don't recall: every fact must be printed on the page you give for it. \
+If the text doesn't say, leave the fact out.
+
+- pins: every board pin the datasheet describes, for the package that \
+matches the footprint and pin count. pin is the board's pin number as \
+listed; name is the datasheet's name for it; function says what the pin \
+does in one short sentence, with the level or connection it needs (e.g. \
+"Boot mode select: low boots from main flash, high from system memory"). A \
+pin table covering several packages has one column per package: read the \
+board's.
+- limits: the thresholds and limits a schematic depends on: absolute \
+maximum supply and pin voltages, the recommended operating supply range, \
+input logic thresholds, enable and undervoltage thresholds, reference or \
+feedback voltage, current limits, reset pulse width and start-up times, \
+internal pull-up and pull-down resistance. At most 30. Numbers and units as \
+printed; null where the table gives no min, typ or max.
+- application: the parts of the typical application circuit (the \
+datasheet's reference schematic, or its component-selection text): each \
+external resistor, capacitor, inductor, diode or crystal, its value, and \
+which of the IC's pins (board numbering) it connects to. [] if there is \
+none.
+- page: the N of the '=== Page N ===' header the fact is under."""
+
+
+def build_datasheet_message(
+    *, value: str, footprint: str, pins: list[tuple[str, str]], pages: list[tuple[int, str]]
+) -> str:
+    """The user turn for ``DATASHEET_FACTS``: the part, its board pins as
+    (number, schematic name), and the datasheet's pages as (number, text)."""
+    pin_lines = "\n".join(f"{number}: {name or '(unnamed)'}" for number, name in pins)
+    page_text = "\n\n".join(f"=== Page {number} ===\n{text}" for number, text in pages)
+    return (
+        f"Part: {value}\nFootprint: {footprint}\n"
+        f"Board pins (number: name in the schematic):\n{pin_lines}\n\n"
+        f"# Datasheet\n\n{page_text}"
+    )

@@ -251,8 +251,11 @@ see "Reference designs and calculations are verified evidence".
 
 **Partly reversed (2026-11-07):** the app now downloads each IC's
 datasheet; see "Datasheets come from the schematic's URL, then LCSC".
-Until the facts are read from those PDFs (plan 004 step 2), the model
-still recalls them, and the unverified-facts rule above still applies.
+The model reads each PDF once (plan 004 step 2; see "Datasheets are read
+whole, or cut to a page budget") and the review cites those facts by page
+as `datasheet` evidence. For an IC whose datasheet wasn't found or
+couldn't be read, and for any fact the reading didn't cover, the model
+still recalls, and the unverified-facts rule above still applies.
 
 ## Datasheets come from the schematic's URL, then LCSC
 
@@ -285,6 +288,33 @@ runs read the kept files. On the orbit, rp-micro and rust-board
 schematics, 11 of 15 ICs got a PDF: 5 of 6, 3 of 3 and 3 of 6. Two were
 skipped as generic, and two missed (an LCSC number LCSC doesn't know, and
 an IC with only a manufacturer).
+
+## Datasheets are read whole, or cut to a page budget
+
+**Decision:** before the review, one model call per datasheet copies out
+its pins (in the board's package), limits and typical application
+circuit, each with its PDF page. A datasheet up to 120k characters
+(~30k tokens) is sent whole; a longer one is cut to that budget by page,
+ranked by headings (pin descriptions, limits, electrical
+characteristics, typical application, boot, reset, and their
+"continued" pages first; package, ordering and revision pages never).
+The answer is checked (a fact on a page that wasn't sent, or about a pin
+the board's part doesn't have, is dropped) and cached in Redis per part
+and per prompt, schema, board pins and model.
+
+**Alternatives rejected:** search over chunks (embeddings, a vector
+store): another service, and for one part at a time the headings already
+say where the pins and limits are. Sending a whole 600-page reference
+manual: too slow and too costly per part, and most of it is registers.
+PyMuPDF for the text: AGPL. pdfplumber reads the chosen pages' tables;
+pypdfium2, which it already depends on, reads every page's plain text
+fast enough to choose them.
+
+**Consequence:** a board's first review waits for its datasheet reads
+(in parallel, four at a time); later runs hit the cache. A fact on a page
+cut by the budget is missed, and the model falls back to memory, marked
+unverified, for it. PDFium isn't thread-safe, so PDF parsing is one at a
+time per process; only the model calls run in parallel.
 
 ## Debug analysis is two model calls: diagnose, then structure
 

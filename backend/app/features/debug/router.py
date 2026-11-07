@@ -17,12 +17,14 @@ from app.core.errors import BadRequestError
 from app.core.responses import SuccessResponse, ok
 from app.features.debug import service
 from app.features.debug.datasheet import Datasheets, DatasheetStore, HttpFetcher
+from app.features.debug.facts import FactReader, RedisFactsCache
 from app.features.debug.kicad import KicadCli
 from app.features.debug.schemas import (
     Analysis,
     AskAnswer,
     AskRequest,
     Claim,
+    DatasheetFacts,
     Language,
     MeasurementInput,
     Mode,
@@ -48,6 +50,15 @@ async def _structure(system: str, user: str) -> Analysis[Claim]:
         Analysis[Claim],
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
         name="debug_analysis",
+        timeout_s=settings.DEBUG_AI_TIMEOUT_S,
+    )
+
+
+async def _extract(system: str, user: str) -> DatasheetFacts:
+    return await complete_structured(
+        DatasheetFacts,
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        name="datasheet_facts",
         timeout_s=settings.DEBUG_AI_TIMEOUT_S,
     )
 
@@ -104,7 +115,12 @@ async def analyze(
     datasheets = Datasheets(HttpFetcher(), DatasheetStore(Path(settings.DATASHEET_DIR)))
     prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), datasheets, mode, language)
     return EventSourceResponse(
-        service.stream(prepared, service.Model(diagnose=_diagnose, structure=_structure), Ngspice())
+        service.stream(
+            prepared,
+            service.Model(diagnose=_diagnose, structure=_structure),
+            Ngspice(),
+            FactReader(_extract, RedisFactsCache()),
+        )
     )
 
 

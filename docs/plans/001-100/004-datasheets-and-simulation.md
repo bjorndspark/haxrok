@@ -80,7 +80,7 @@ backend 133 passed, frontend 29 passed. Self-review caught that
 `/ask-result` would have rejected a summary saved before this change
 (`datasheets` was required); it now defaults to empty, with a test.
 
-## 2. Datasheet facts are extracted and cited by page: proposed
+## 2. Datasheet facts are extracted and cited by page: done
 
 - The PDF's text and tables are extracted per page in the backend.
 - One model call per datasheet (through `app/core/ai/`) turns them into
@@ -96,10 +96,79 @@ tables). PyMuPDF is AGPL, so not that.
 Decided (2026-11-07): extraction finishes before the review, so the model
 can cite datasheet pages. A board's first run is slower (one call per new
 IC, in parallel); later runs hit the cache.
+Decided (2026-11-07): a datasheet of up to ~120k characters (~30k tokens)
+is sent whole; a longer one (RP2040's 642 pages, STM32's 93) is cut to
+that budget by page, preferring pages whose headings name pin
+descriptions, limits, electrical characteristics, typical application,
+boot or reset (and their "continued" pages), and skipping package,
+ordering and revision pages. pypdfium2 (pdfplumber's own dependency) reads
+every page's text for that choice in under a second; pdfplumber then reads
+the chosen pages' tables. Pages are cited by their PDF page number, so
+`<url>#page=N` opens them.
+Decided (2026-11-07): the model is given the IC's value, footprint and the
+board's pin numbers and names, so pin facts use the board's package. A fact
+whose page wasn't sent, or whose pin isn't on the board, is dropped.
+Decided (2026-11-07): pin facts replace the hand-written table's lines for
+that IC and are cited as `pin_function`; limits and application parts get
+ids (`ds1`, `ds2`, …) and are cited as a new `datasheet` cite kind. Either
+backs `datasheet` evidence. The wiring checks stay on the hand-written
+table until step 3.
+Decided (2026-11-07): extracted facts are cached in Redis under the part's
+key and a hash of the prompt, schema, board pins and model, for
+`AI_CACHE_TTL_S`. A failed extraction (no text, scanned PDF, model error)
+leaves that IC on the hand-written table and the review goes on.
 
 **Checks:** golden tests on 3–4 real datasheets (STM32F030, TPS63802,
 RP2040, an LDO): extracted pins and thresholds match by hand; the review on
 `orbit-boot0-high` cites `datasheet` evidence for BOOT0.
+20 tests in `test_debug_facts.py` cover the following:
+- page choice: the whole sheet when it fits, ranked headings, "continued"
+  pages, register tables whose columns say "reset";
+- reading: page numbers, a scan, 8 threads reading at once;
+- the reader: dropped pages and pins, one read per shared part, a cache hit,
+  a corrupt cache entry, failures, a broken PDF, sheets not found;
+- pin and prompt merging, and the `datasheet` cite check.
+
+One service test checks that a stream reads the found datasheets and that a
+`ds` cite backs a claim.
+
+Live run on 2026-11-07, real model, from the backend container. Neither
+board had a failed sheet, and every value below matches the PDF by hand:
+- orbit (86 s cold): STM32F030 had 4 watched pins (BOOT0 pin 44, p.33;
+  NRST 7, VDD 1, VDDA 9) and 34 facts, including VDD 2.4–3.6 V (p.44),
+  BOOT0 max 5.5 V and the NRST 0.1 µF (p.67). TPS63802 had 35 facts: VI
+  1.3–5.5 V, L 0.47 µH (p.5), and the typical application's 0.47 µH, 10 µF,
+  22 µF and 511k/91k divider (p.17).
+- rp-micro (46 s): RP2040 RUN pin 26 (p.12), TESTEN 19, IOVDD absolute
+  maximum 3.63 V, 12 MHz crystal and 27 Ω USB resistors. The recommended
+  IOVDD range wasn't among its 26 facts. RT9013 had 17 facts: VIN 2.2–5.5 V
+  (p.3) and 1 µF in and out (p.2).
+
+The review on `orbit-boot0-high`, with those facts, ranked "BOOT0 strapped
+high" #1 [will_fail]. It cited `datasheet` evidence for BOOT0 through the
+datasheet-read pin (`pin_function` U16.44). It cited no `ds` id in that run.
+
+`make eval-app case=orbit-boot0-high mode=review`, which runs without
+datasheets, still ranks BOOT0 #1 [will_fail].
+
+`make lint` and `make test` are clean (one existing react-refresh warning).
+Backend 154 passed, frontend 29 passed.
+
+Bugs found:
+- RP2040's register tables (a "Reset" column) outranked its pin pages, so
+  only headings score now.
+- pdfplumber raised on a page with objects outside the box; it reads with
+  `strict=False`.
+- The cache key lacked the footprint, so a package change reused another
+  package's pins.
+- PDFium segfaults on concurrent reads, so `pdf.read` holds a process lock.
+  The thread test failed 4 of 4 runs without it.
+- The "Reading" type is renamed `DatasheetReading`, and a fact count says
+  "1 fact".
+
+Platform issues, not code: Docker's 192.168.0.0/20 pool overlapped the LAN
+gateway, fixed in Docker Desktop's address pools. The gateway also gave a
+transient 503 `pii_mask_error`, and a rerun passed.
 
 ## 3. The board is checked against each datasheet's typical application: proposed
 

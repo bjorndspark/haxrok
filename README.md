@@ -47,6 +47,10 @@ Scope, the go/no-go result and the ideas weighed against this one are in
 - [x] ngspice simulations of I²C lines and enable/reset RC delays, run in
       parallel with the review and drawn as waveforms. You can ask the model
       about each one (`docs/plans/001-100/003-simulate-and-ask.md`)
+- [x] Datasheets: each IC's PDF is fetched from the schematic's URL or
+      LCSC, read once per part by the model, and its pins, limits and
+      typical application are cited by page
+      (`docs/plans/001-100/004-datasheets-and-simulation.md`)
 - [ ] Stretch: agent loop, what-if re-runs ("try C5 = 1 µF")
 
 The app started from a FastAPI, React and Postgres template. Its seed chat,

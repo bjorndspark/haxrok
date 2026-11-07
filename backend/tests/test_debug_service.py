@@ -15,7 +15,9 @@ from app.features.debug import diagram, pins, prompt, router, service
 from app.features.debug.calc import lookup as calc_lookup
 from app.features.debug.design import Design, Label, Node, Part, parse_labels, parse_netlist
 from app.features.debug.evidence import EvidenceContext
+from app.features.debug.facts import FactReader
 from app.features.debug.kicad import KicadOutput
+from app.features.debug.pdf import Page
 from app.features.debug.project import Project, load_project, missing_sheets, normalize_paths
 from app.features.debug.prompt import number_symptoms
 from app.features.debug.schemas import (
@@ -24,11 +26,14 @@ from app.features.debug.schemas import (
     CheckedClaim,
     Cite,
     Claim,
+    DatasheetFacts,
     DatasheetStatus,
     ErcEntry,
     Fix,
     Hypothesis,
+    LimitFact,
     MeasurementInput,
+    PinFact,
 )
 
 ROOT_SCH = b'(kicad_sch (version 20231120)\n (sheet (property "Sheetfile" "power.kicad_sch"))\n)'
@@ -696,6 +701,76 @@ async def test_stream_sends_summary_progress_then_checked_result():
     claims = events[-1][1]["hypotheses"][0]["claims"]
     assert [c["evidence"] for c in claims] == ["schematic", "datasheet", "none"]
     assert claims[2]["downgraded"] and "m2" in claims[2]["reason"]
+
+
+async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
+    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), FakeDatasheets())
+    found = DatasheetStatus(
+        ref="U2",
+        value="TPS63070RNMR",
+        status="found",
+        url="https://example.com/tps63070.pdf",
+        path="/app/data/datasheets/tps63070.pdf",
+    )
+    prepared = dataclasses.replace(prepared, datasheets=[found, prepared.datasheets[1]])
+
+    async def extract(system: str, user: str) -> DatasheetFacts:
+        assert "9: L2" in user and "=== Page 4 ===" in user
+        return DatasheetFacts(
+            pins=[PinFact(pin="9", name="L2", function="Output-side switch node.", page=4)],
+            limits=[
+                LimitFact(
+                    parameter="VIN input voltage",
+                    min=2.0,
+                    typ=None,
+                    max=16.0,
+                    unit="V",
+                    conditions="",
+                    page=5,
+                )
+            ],
+            application=[],
+        )
+
+    class Cache:
+        async def get(self, key: str) -> str | None:
+            return None
+
+        async def put(self, key: str, value: str) -> None:
+            pass
+
+    reader = FactReader(extract, Cache(), lambda path: [Page(4, "pins"), Page(5, "limits")])
+    seen: list[str] = []
+
+    async def diagnose(system: str, user: str) -> str:
+        seen.append(user)
+        return "1. L2 tied to VOUT."
+
+    async def structure(system: str, user: str) -> Analysis[Claim]:
+        analysis = _analysis()
+        analysis.hypotheses[0].claims.append(
+            Claim(
+                text="VIN may be at most 16 V.",
+                evidence="datasheet",
+                cites=[Cite(kind="datasheet", pin=None, net=None, id="ds1")],
+            )
+        )
+        return analysis
+
+    model = service.Model(diagnose=diagnose, structure=structure)
+    events = [
+        (e["event"], json.loads(e["data"]))
+        async for e in service.stream(prepared, model, facts=reader)
+    ]
+    progress = [data["message"] for name, data in events if name == "progress"]
+    assert progress[0] == "Reading 1 datasheet (once per part, then cached)."
+    assert "1 datasheet read, 1 fact." in progress[1]
+
+    assert "U2 (TPS63070RNMR), from its datasheet:" in seen[0]
+    assert "U2.9 L2: Output-side switch node. (p.4)" in seen[0]
+    assert "ds1 p.5 VIN input voltage: min 2, max 16 V" in seen[0]
+    claims = events[-1][1]["hypotheses"][0]["claims"]
+    assert [c["evidence"] for c in claims] == ["schematic", "datasheet", "none", "datasheet"]
 
 
 async def test_model_failure_ends_the_stream_with_an_error_event():

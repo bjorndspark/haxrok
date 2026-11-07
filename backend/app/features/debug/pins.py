@@ -11,12 +11,13 @@ Three-pin discrete parts (``PINOUTS``) are checked the other way round:
 their symbols name pins after the datasheet (D, G, S), so the names the
 netlist carries are compared with the datasheet's numbering.
 
-This is the MVP source of datasheet evidence. Per-part datasheet retrieval
-replaces it (plan 001, "After the hackathon").
+Pins read from an IC's own datasheet (``facts.FactReader``) replace its
+lines here; this table is the fallback where no datasheet was read, and
+``check_wiring`` still runs on it.
 """
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from app.features.debug.design import Design, Label, Part, short_net_name
@@ -263,9 +264,20 @@ def is_ic(ref: str) -> bool:
     return head in {"U", "IC"} and head != ref
 
 
-def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label] = ()) -> PinLookup:
+DatasheetPins = Mapping[str, dict[str, tuple[str, str]]]
+"""ref -> pin number -> (datasheet name, function), read from its datasheet."""
+
+
+def lookup(
+    design: Design,
+    erc: Sequence[ErcEntry] = (),
+    labels: Sequence[Label] = (),
+    datasheet_pins: DatasheetPins | None = None,
+) -> PinLookup:
     """Match every IC on the board against the pin table. ``erc`` and
-    ``labels`` let a wiring finding name the label behind it."""
+    ``labels`` let a wiring finding name the label behind it. An IC in
+    ``datasheet_pins`` is listed from its own datasheet instead of the
+    table (the wiring checks still use the table)."""
     ics: list[IcSummary] = []
     pin_refs: set[str] = set()
     lines: list[str] = []
@@ -284,15 +296,21 @@ def lookup(design: Design, erc: Sequence[ErcEntry] = (), labels: Sequence[Label]
         entry = next(
             (e for e in PIN_TABLE if e.matches(part.value, part.lib_part, part.footprint)), None
         )
+        read = (datasheet_pins or {}).get(part.ref)
         ics.append(
             IcSummary(
-                ref=part.ref, value=part.value, footprint=part.footprint, pin_data=entry is not None
+                ref=part.ref,
+                value=part.value,
+                footprint=part.footprint,
+                pin_data=entry is not None or bool(read),
             )
         )
-        if entry is None:
-            continue
-        findings += check_wiring(design, part.ref, entry, erc, labels)
-        lines += _table_lines(part, entry.source, entry.pins, used_pins, pin_refs)
+        if entry is not None:
+            findings += check_wiring(design, part.ref, entry, erc, labels)
+        if read:
+            lines += _table_lines(part, "its datasheet", read, used_pins, pin_refs)
+        elif entry is not None:
+            lines += _table_lines(part, entry.source, entry.pins, used_pins, pin_refs)
     missing = [ic.ref for ic in ics if not ic.pin_data]
     if missing:
         lines.append(f"No pin table for: {', '.join(missing)}.")
@@ -317,7 +335,7 @@ def _table_lines(
     """The pin table's lines for one part, its connected pins only; adds
     each listed pin to ``pin_refs``, the pins a claim may cite as datasheet."""
     lines = [f"{part.ref} ({part.value}), from {source}:"]
-    for number, (name, function) in sorted(table.items(), key=lambda kv: int(kv[0])):
+    for number, (name, function) in sorted(table.items(), key=lambda kv: pin_order(kv[0])):
         pin_ref = f"{part.ref}.{number}"
         if pin_ref not in used_pins:
             continue
@@ -572,6 +590,12 @@ def is_inductor(design: Design, ref: str) -> bool:
     part = design.parts.get(ref)
     lib_name = part.lib_part.rsplit(":", 1)[-1].upper() if part else ""
     return _ref_head(ref) == "L" or lib_name == "L" or lib_name.startswith("L_")
+
+
+def pin_order(number: str) -> tuple[bool, int, str]:
+    """Sort key for pin numbers: numeric ones in order, then BGA-style
+    names ("A1") alphabetically."""
+    return (not number.isdigit(), int(number) if number.isdigit() else 0, number)
 
 
 def _ref_head(ref: str) -> str:

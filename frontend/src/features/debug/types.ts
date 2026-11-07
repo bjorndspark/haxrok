@@ -10,7 +10,7 @@ export type Severity = "will_fail" | "may_fail" | "improve"
 
 export type Evidence = "schematic" | "erc" | "datasheet" | "reference" | "measurement" | "none"
 export type CiteKind =
-  "pin_on_net" | "pin_name" | "erc" | "pin_function" | "reference" | "measurement"
+  "pin_on_net" | "pin_name" | "erc" | "pin_function" | "datasheet" | "reference" | "measurement"
 
 export interface Cite {
   kind: CiteKind

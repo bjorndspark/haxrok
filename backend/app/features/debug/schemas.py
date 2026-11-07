@@ -23,9 +23,11 @@ from pydantic import BaseModel, ConfigDict, Field
 # --- shared vocabulary ---------------------------------------------------------
 
 Evidence = Literal["schematic", "erc", "datasheet", "reference", "measurement", "none"]
-"""schematic: the netlist. erc: a KiCad ERC entry. datasheet: the hand-written
-pin table. reference: a manufacturer reference note or a value the backend
-calculated with a datasheet formula (``reference.py``). measurement: a value
+"""schematic: the netlist. erc: a KiCad ERC entry. datasheet: a fact read from
+the part's datasheet (a pin, a limit, its typical application), or the
+hand-written pin table where there's none. reference: a manufacturer
+reference note or a value the backend calculated with a datasheet formula
+(``reference.py``). measurement: a value
 the user entered. none: no direct evidence."""
 
 Mode = Literal["debug", "review"]
@@ -42,15 +44,18 @@ Severity = Literal["will_fail", "may_fail", "improve"]
 fails under some conditions (a supply, a load, a tolerance). improve: works,
 but a cheap change makes it more robust."""
 
-CiteKind = Literal["pin_on_net", "pin_name", "erc", "pin_function", "reference", "measurement"]
+CiteKind = Literal[
+    "pin_on_net", "pin_name", "erc", "pin_function", "datasheet", "reference", "measurement"
+]
 
 # Which citation kinds back which evidence label. pin_name is the pin's name
 # as the netlist gives it (U2.9 is "L2"); pin_function is what the pin does,
-# from the hand-written pin table.
+# from the datasheet or the hand-written pin table; datasheet is a limit or
+# typical-application fact read from a datasheet ("ds3").
 EVIDENCE_CITE_KINDS: dict[Evidence, frozenset[CiteKind]] = {
     "schematic": frozenset({"pin_on_net", "pin_name"}),
     "erc": frozenset({"erc"}),
-    "datasheet": frozenset({"pin_function"}),
+    "datasheet": frozenset({"pin_function", "datasheet"}),
     "reference": frozenset({"reference"}),
     "measurement": frozenset({"measurement"}),
     "none": frozenset(),
@@ -74,8 +79,8 @@ class Cite(_Strict):
     kind: CiteKind = Field(
         description="pin_on_net: the pin is on that net in the netlist. pin_name: the pin's "
         "name as the netlist gives it, e.g. U2.9(L2). erc: an ERC entry. pin_function: what "
-        "the pin does, from the pin table. reference: a reference note (rd1) or calculated value "
-        "(cf1). measurement: a value the user entered."
+        "the pin does, from the pin table. datasheet: a datasheet fact (ds1). reference: a "
+        "reference note (rd1) or calculated value (cf1). measurement: a value the user entered."
     )
     pin: str | None = Field(
         description='Pin as REF.PIN, e.g. "U2.9". Required for pin_on_net, pin_name and '
@@ -83,7 +88,8 @@ class Cite(_Strict):
     )
     net: str | None = Field(description="Net name exactly as in the netlist. For pin_on_net.")
     id: str | None = Field(
-        description='ERC entry id ("erc-3"), reference id ("rd2", "cf1") or measurement id ("m1").'
+        description='ERC entry id ("erc-3"), datasheet fact id ("ds4"), reference id ("rd2", '
+        '"cf1") or measurement id ("m1").'
     )
 
 
@@ -180,6 +186,55 @@ class Analysis[C: Claim](_Strict):
     hypotheses: list[Hypothesis[C]]
     open_questions: list[OpenQuestion] = Field(description="What the input can't answer.")
     glossary: list[GlossaryEntry] = Field(description="Jargon used above, defined plainly.")
+
+
+# --- datasheet facts (model output, one call per datasheet) -----------------------
+
+
+class PinFact(_Strict):
+    """What one pin of the board's package does, per the datasheet."""
+
+    pin: str = Field(description="The pin number on the board's package, as listed to you.")
+    name: str = Field(description='The datasheet\'s name for the pin, e.g. "BOOT0".')
+    function: str = Field(description="What the pin does, in one short sentence.")
+    page: int = Field(description="The page the pin is described on (=== Page N ===).")
+
+
+class LimitFact(_Strict):
+    """One threshold or limit a schematic review needs: absolute maximums,
+    operating ranges, thresholds, reset and start-up times."""
+
+    parameter: str = Field(description='What is limited, e.g. "VDD supply voltage".')
+    min: float | None
+    typ: float | None
+    max: float | None
+    unit: str = Field(description='"V", "mA", "ms", "kΩ", …')
+    conditions: str = Field(description='Conditions as printed, e.g. "TA = 25 °C"; "" if none.')
+    page: int
+
+
+AppPartKind = Literal["resistor", "capacitor", "inductor", "diode", "crystal", "other"]
+
+
+class AppPart(_Strict):
+    """One part of the datasheet's typical application circuit."""
+
+    role: str = Field(description='What the part is for, e.g. "input capacitor".')
+    kind: AppPartKind
+    value: str = Field(description='Value as printed, e.g. "10 µF", "100 kΩ"; "" if not given.')
+    pins: list[str] = Field(
+        description="The IC's pin numbers (board package) the part connects to, or [] if "
+        "it connects to none directly."
+    )
+    page: int
+
+
+class DatasheetFacts(_Strict):
+    """Everything one model call reads from one datasheet."""
+
+    pins: list[PinFact]
+    limits: list[LimitFact]
+    application: list[AppPart]
 
 
 # --- checked output ----------------------------------------------------------------

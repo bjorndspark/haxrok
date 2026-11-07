@@ -6,7 +6,8 @@ Two phases, so failures land where the UI can show them:
    kicad-cli, parse the netlist and ERC, find each IC's datasheet PDF. A
    bad folder or a schematic the server's KiCad can't open is an ordinary
    error response; a datasheet that can't be found is only a status.
-2. ``stream`` (the SSE body): design summary at once, then our own stage
+2. ``stream`` (the SSE body): design summary at once, then each found
+   datasheet read for facts (``facts``, cached per part), then our own stage
    updates while the model thinks (it streams nothing for ~90 s per call),
    and, in parallel, each ngspice simulation as it finishes; then the
    checked result or an error event.
@@ -14,8 +15,8 @@ Two phases, so failures land where the UI can show them:
 The model is called twice (see ``prompt``): a free-text diagnosis, then a
 conversion of it into the structured answer. ``ask`` answers a question
 about one simulation afterwards, ``ask_result`` a follow-up about the run.
-The kicad and ngspice runners, the datasheet finder and the model calls
-are passed in, so tests fake them.
+The kicad and ngspice runners, the datasheet finder and reader, and the
+model calls are passed in, so tests fake them.
 """
 
 import asyncio
@@ -36,6 +37,7 @@ from app.features.debug.design import (
     parse_netlist,
 )
 from app.features.debug.evidence import EvidenceContext, check
+from app.features.debug.facts import DatasheetReading, FactReader
 from app.features.debug.kicad import KicadRunner
 from app.features.debug.project import load_project
 from app.features.debug.schemas import (
@@ -150,13 +152,17 @@ async def prepare(
 
 
 async def stream(
-    prepared: Prepared, model: Model, ngspice: spice.SpiceRunner | None = None
+    prepared: Prepared,
+    model: Model,
+    ngspice: spice.SpiceRunner | None = None,
+    facts: FactReader | None = None,
 ) -> AsyncIterator[SseEvent]:
-    """The SSE body for one analysis run: the review, and with ``ngspice``
-    the simulations ``spice.plan`` picks, run alongside it. The terminal
-    event (result or error) waits for the simulations, so it stays last."""
+    """The SSE body for one analysis run: the review (with ``facts``, after
+    reading the found datasheets), and with ``ngspice`` the simulations
+    ``spice.plan`` picks, run alongside it. The terminal event (result or
+    error) waits for the simulations, so it stays last."""
     yield _event("design_summary", prepared.summary.model_dump_json())
-    sources = [_review(prepared, model)]
+    sources = [_review(prepared, model, facts)]
     jobs = spice.plan(prepared.calculations, prepared.design) if ngspice else []
     if ngspice and jobs:
         sources.append(_simulations(jobs, ngspice))
@@ -213,9 +219,27 @@ async def _merge(sources: list[AsyncIterator[SseEvent]]) -> AsyncIterator[SseEve
             t.cancel()
 
 
-async def _review(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
+async def _review(
+    prepared: Prepared, model: Model, facts: FactReader | None = None
+) -> AsyncIterator[SseEvent]:
     """The model's part of the stream: progress, then result or error."""
-    with_data = sum(1 for ic in prepared.summary.ics if ic.pin_data)
+    reading = DatasheetReading()
+    found_sheets = sum(1 for s in prepared.datasheets if s.status == "found")
+    if facts is not None and found_sheets:
+        yield _progress(
+            "pin_lookup",
+            f"Reading {found_sheets} datasheet{'s' if found_sheets > 1 else ''} "
+            "(once per part, then cached).",
+        )
+        reading = await facts.read(prepared.design, prepared.datasheets)
+    # Pins read from a datasheet replace that IC's hand-written table lines;
+    # the wiring findings stay the ones prepare() made from the table.
+    table = (
+        pins.lookup(prepared.design, datasheet_pins=reading.pins)
+        if reading.pins
+        else prepared.pin_lookup
+    )
+    with_data = sum(1 for ic in table.ics if ic.pin_data)
     conflicts = len(prepared.pin_lookup.findings)
     plural = "s" if conflicts > 1 else ""
     found = f" {conflicts} pin{plural} wired against the datasheet." if conflicts else ""
@@ -231,9 +255,15 @@ async def _review(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         else ""
     )
     notes = f" {len(prepared.references)} reference-design notes." if prepared.references else ""
+    read = (
+        f" {len(reading.sources)} datasheet{'s' if len(reading.sources) > 1 else ''} read,"
+        f" {len(reading.facts)} fact{'' if len(reading.facts) == 1 else 's'}."
+        if reading.sources
+        else ""
+    )
     yield _progress(
         "pin_lookup",
-        f"Pin table found for {with_data} of {len(prepared.summary.ics)} ICs.{found}{notes}{calcs}",
+        f"Pin data for {with_data} of {len(table.ics)} ICs.{read}{found}{notes}{calcs}",
     )
     review = prepared.mode == "review"
     yield _progress(
@@ -248,11 +278,12 @@ async def _review(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
         measurements=prepared.measurements,
         netlist=compact(prepared.design),
         erc=format_erc(prepared.erc),
-        pin_table=prepared.pin_lookup.text,
+        pin_table=table.text,
         findings=pins.format_findings(prepared.pin_lookup.findings),
         warnings=pins.format_warnings(prepared.pin_lookup.warnings),
         references=reference.format_notes(prepared.references),
         calculations=calc.format_calculations(prepared.calculations),
+        datasheet_facts=reading.text,
     )
     start = time.monotonic()
     try:
@@ -295,12 +326,13 @@ async def _review(prepared: Prepared, model: Model) -> AsyncIterator[SseEvent]:
     ctx = EvidenceContext(
         design=prepared.design,
         erc={e.id: e for e in prepared.erc},
-        pin_data=prepared.pin_lookup.pin_refs,
+        pin_data=table.pin_refs,
         symptom_ids=frozenset(s.id for s in prepared.symptoms),
         measurement_ids=frozenset(m.id for m in prepared.measurements),
         reference_ids=frozenset(
             [n.id for n in prepared.references] + [c.id for c in prepared.calculations]
         ),
+        datasheet_ids=reading.ids,
     )
     checked = check(analysis, ctx)
     miswired = diagram.miswired_pins(prepared.pin_lookup.findings, prepared.calculations)

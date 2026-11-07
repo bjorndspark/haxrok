@@ -9,7 +9,8 @@ Rules for a claim with evidence other than ``none``:
 
 1. Every citation resolves (pin on that net; pin has that name in the
    netlist, and the text uses it; ERC id exists; pin in the pin table;
-   reference note or calculation id exists; measurement id exists).
+   datasheet fact id exists; reference note or calculation id exists;
+   measurement id exists).
 2. At least one citation is of the kind its label needs (schematic needs a
    pin_on_net or pin_name, and so on).
 3. Every pin and net the text names is cited. This catches a claim that
@@ -42,7 +43,9 @@ from app.features.debug.schemas import (
 class EvidenceContext:
     """Everything a reference can resolve to.
 
-    ``pin_data`` holds the REF.PIN refs the hand-written pin table covers."""
+    ``pin_data`` holds the REF.PIN refs the pin table lists (from each IC's
+    datasheet, else the hand-written table); ``datasheet_ids`` the facts
+    read from datasheets (ds1…)."""
 
     design: Design
     erc: dict[str, ErcEntry]
@@ -50,6 +53,7 @@ class EvidenceContext:
     symptom_ids: frozenset[str]
     measurement_ids: frozenset[str]
     reference_ids: frozenset[str] = frozenset()  # rd1…, cf1… from reference.lookup
+    datasheet_ids: frozenset[str] = frozenset()  # ds1… from facts.FactReader
 
 
 def check(analysis: Analysis[Claim], ctx: EvidenceContext) -> CheckedAnalysis:
@@ -184,6 +188,9 @@ def _cite_failure(cite: Cite, ctx: EvidenceContext) -> str | None:
             pin = normalize_pin(cite.pin)
             if pin not in ctx.pin_data:
                 return f"The pin table has no entry for {pin}."
+        case "datasheet":
+            if not cite.id or cite.id not in ctx.datasheet_ids:
+                return f"No datasheet fact {cite.id} was read."
         case "reference":
             if not cite.id or cite.id not in ctx.reference_ids:
                 return f"There is no reference note or calculation {cite.id}."
