@@ -249,6 +249,43 @@ it as the next feature after the hackathon. Since 2026-11-04 a small
 hand-written reference table covers recommended circuits for six parts;
 see "Reference designs and calculations are verified evidence".
 
+**Partly reversed (2026-11-07):** the app now downloads each IC's
+datasheet; see "Datasheets come from the schematic's URL, then LCSC".
+Until the facts are read from those PDFs (plan 004 step 2), the model
+still recalls them, and the unverified-facts rule above still applies.
+
+## Datasheets come from the schematic's URL, then LCSC
+
+**Decision:** every IC's datasheet PDF is fetched while the run is
+prepared and kept on disk under `data/datasheets/`, keyed by part number,
+until deleted by hand. For each IC, in order: a PDF already kept; the
+schematic's own `Datasheet` URL, when it serves a PDF; LCSC's product
+record for the part's LCSC number, whose `pdfUrl` is the PDF. KiCad
+libraries and JLCPCB-assembled boards fill the LCSC field far more often
+than an MPN. Each IC gets a status (found with its source, not found with
+what was tried, or skipped for a generic value like "~") that goes into
+the design summary. Only ICs are looked up; passives have no datasheet
+worth reading.
+
+**Alternatives rejected:** an MPN search. LCSC's keyword search sits
+behind a bot wall, and getting past it would be circumvention, so a part
+with only an MPN is "not found". Paid part APIs (Octopart/Nexar, Digi-Key,
+Mouser) need keys and accounts the app doesn't have. A database for the
+PDFs: they're files, and the app keeps no database.
+
+**Consequence:** LCSC's endpoint is unofficial and may change or refuse
+us. Anything unexpected there is "not found", never an error, and the
+requests say who they are (the app's name as User-Agent; httpx's default
+agent gets a 403). The URLs come from an uploaded schematic, so the
+fetcher only reaches public addresses, checked on every redirect hop;
+DNS rebinding between the check and the connect isn't caught, which is
+acceptable for a local tool. The first run of a board waits for its
+downloads (at most `DATASHEET_TIMEOUT_S` × 3 per IC, in parallel); later
+runs read the kept files. On the orbit, rp-micro and rust-board
+schematics, 11 of 15 ICs got a PDF: 5 of 6, 3 of 3 and 3 of 6. Two were
+skipped as generic, and two missed (an LCSC number LCSC doesn't know, and
+an IC with only a manufacturer).
+
 ## Debug analysis is two model calls: diagnose, then structure
 
 **Decision:** `features/debug` calls the model twice. `prompt.DIAGNOSE`

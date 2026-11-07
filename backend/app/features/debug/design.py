@@ -31,6 +31,12 @@ class Part:
     lib_part: str
     footprint: str
     sheet: str = ""  # KiCad's sheet path, e.g. "/Power Management/"; "" if unknown
+    # The schematic's datasheet URL; "" when it gives none (KiCad writes "~").
+    datasheet: str = ""
+    # Part numbers from the symbol's fields (see ``_part_numbers``); "" if absent.
+    lcsc: str = ""  # LCSC/JLCPCB part number, "C424093"
+    mpn: str = ""  # manufacturer part number
+    manufacturer: str = ""
 
 
 @dataclass(frozen=True)
@@ -142,8 +148,15 @@ def parse_netlist(text: str) -> Design:
             ref = _field(comp, "ref")
             sheetpath = _children(comp, "sheetpath")
             sheet = _field(sheetpath[0], "names") if sheetpath else ""
+            datasheet = _field(comp, "datasheet")
             parts[ref] = Part(
-                ref, _field(comp, "value"), lib_part, _field(comp, "footprint"), sheet
+                ref,
+                _field(comp, "value"),
+                lib_part,
+                _field(comp, "footprint"),
+                sheet,
+                datasheet if datasheet.startswith(("http://", "https://")) else "",
+                **_part_numbers(comp),
             )
     nets: dict[str, list[Node]] = {}
     for net_block in _children(root, "nets"):
@@ -153,6 +166,49 @@ def parse_netlist(text: str) -> Design:
                 for n in _children(net, "node")
             ]
     return Design(parts, nets)
+
+
+# Symbol field names for part numbers, compared lowercased with everything but
+# letters and digits dropped: libraries spell them "LCSC Part #", "LCSC Part#",
+# "LCSC", "JLCPCB Part #", "MFR. Part #", "MPN", "MP", "MANUFACTURER", "MF"...
+_LCSC_KEYS = ("lcsc", "jlcpcb", "jlc")
+_MPN_KEYS = frozenset(
+    {
+        "mpn",
+        "mp",
+        "mfrpart",
+        "mfrpartnumber",
+        "mfrpn",
+        "mfgpart",
+        "mfgpartnumber",
+        "manufacturerpart",
+        "manufacturerpartnumber",
+        "manfpartnumber",
+        "partnumber",
+    }
+)
+_MANUFACTURER_KEYS = frozenset({"manufacturer", "manufacturername", "mf", "mfr", "mfg"})
+_LCSC_NUMBER = re.compile(r"C\d{2,9}")
+
+
+def _part_numbers(comp: list) -> dict[str, str]:
+    """``lcsc``, ``mpn`` and ``manufacturer`` from a netlist component's
+    symbol fields, whatever the library named them; "" when absent. A
+    JLCPCB part number is an LCSC one (same catalogue)."""
+    found = {"lcsc": "", "mpn": "", "manufacturer": ""}
+    for fields in _children(comp, "fields"):
+        for f in _children(fields, "field"):
+            value = f[2].strip() if len(f) > 2 and isinstance(f[2], str) else ""
+            if not value or value == "~":
+                continue
+            key = re.sub(r"[^a-z0-9]", "", _field(f, "name").lower())
+            if key.startswith(_LCSC_KEYS) and _LCSC_NUMBER.fullmatch(value.upper()):
+                found["lcsc"] = found["lcsc"] or value.upper()
+            elif key in _MPN_KEYS:
+                found["mpn"] = found["mpn"] or value
+            elif key in _MANUFACTURER_KEYS:
+                found["manufacturer"] = found["manufacturer"] or value
+    return found
 
 
 def compact(design: Design) -> str:

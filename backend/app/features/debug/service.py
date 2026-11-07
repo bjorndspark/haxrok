@@ -3,8 +3,9 @@
 Two phases, so failures land where the UI can show them:
 
 1. ``prepare`` (before the response starts): validate the upload, run
-   kicad-cli, parse the netlist and ERC. A bad folder or a schematic the
-   server's KiCad can't open is an ordinary error response.
+   kicad-cli, parse the netlist and ERC, find each IC's datasheet PDF. A
+   bad folder or a schematic the server's KiCad can't open is an ordinary
+   error response; a datasheet that can't be found is only a status.
 2. ``stream`` (the SSE body): design summary at once, then our own stage
    updates while the model thinks (it streams nothing for ~90 s per call),
    and, in parallel, each ngspice simulation as it finishes; then the
@@ -13,8 +14,8 @@ Two phases, so failures land where the UI can show them:
 The model is called twice (see ``prompt``): a free-text diagnosis, then a
 conversion of it into the structured answer. ``ask`` answers a question
 about one simulation afterwards, ``ask_result`` a follow-up about the run.
-The kicad and ngspice runners and the model calls are passed in, so tests
-fake them.
+The kicad and ngspice runners, the datasheet finder and the model calls
+are passed in, so tests fake them.
 """
 
 import asyncio
@@ -25,6 +26,7 @@ from dataclasses import dataclass
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
 from app.features.debug import calc, diagram, pins, prompt, reference, spice
+from app.features.debug.datasheet import DatasheetFinder
 from app.features.debug.design import (
     Design,
     compact,
@@ -41,6 +43,7 @@ from app.features.debug.schemas import (
     AskRequest,
     Calculation,
     Claim,
+    DatasheetStatus,
     DesignSummary,
     ErcEntry,
     ErrorEvent,
@@ -90,6 +93,7 @@ class Prepared:
     calculations: list[Calculation]
     symptoms: list[Symptom]
     measurements: list[Measurement]
+    datasheets: list[DatasheetStatus]
     language: Language = "en"
 
 
@@ -98,6 +102,7 @@ async def prepare(
     symptoms_text: str,
     measurements: list[MeasurementInput],
     kicad: KicadRunner,
+    datasheets: DatasheetFinder,
     mode: Mode = "debug",
     language: Language = "en",
 ) -> Prepared:
@@ -118,6 +123,7 @@ async def prepare(
     lookup = pins.lookup(design, erc, parse_labels(project.files))
     notes = reference.lookup(design)
     calcs = calc.lookup(design)
+    sheets = await datasheets.find([design.parts[ic.ref] for ic in lookup.ics])
     numbered = [
         Measurement(id=f"m{i}", step_id=m.step_id, context=m.context, value=m.value)
         for i, m in enumerate(measurements, start=1)
@@ -129,6 +135,7 @@ async def prepare(
         parts=len(design.parts),
         nets=len(design.nets),
         ics=lookup.ics,
+        datasheets=sheets,
         erc=erc,
         wiring=lookup.findings,
         pin_warnings=lookup.warnings,
@@ -137,7 +144,9 @@ async def prepare(
         symptoms=symptoms,
         measurements=numbered,
     )
-    return Prepared(mode, summary, design, erc, lookup, notes, calcs, symptoms, numbered, language)
+    return Prepared(
+        mode, summary, design, erc, lookup, notes, calcs, symptoms, numbered, sheets, language
+    )
 
 
 async def stream(

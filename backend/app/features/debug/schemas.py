@@ -253,6 +253,24 @@ class IcSummary(BaseModel):
     pin_data: bool
 
 
+class DatasheetStatus(BaseModel):
+    """Whether one IC's datasheet PDF was found (``datasheet.find``). Found
+    PDFs are kept on disk by part number, so a later run reads them from
+    there."""
+
+    ref: str
+    value: str
+    status: Literal["found", "not_found", "skipped"]
+    source: Literal["schematic", "lcsc"] | None = Field(
+        None, description="Where the PDF came from: the schematic's URL or LCSC's listing."
+    )
+    url: str | None = Field(None, description="The PDF's URL; None unless found.")
+    part_number: str | None = Field(None, description="The LCSC number or MPN, if any.")
+    reason: str = Field("", description="Why not found or skipped, in a few words.")
+    # The PDF on the server, for the extraction step. Not sent to the browser.
+    path: str = Field("", exclude=True)
+
+
 class ErcEntry(BaseModel):
     """One KiCad ERC violation. ``id`` is what claims cite."""
 
@@ -395,6 +413,11 @@ class DesignSummary(BaseModel):
     parts: int
     nets: int
     ics: list[IcSummary]
+    # Defaults to empty: /ask-result gets summaries back from the browser,
+    # including runs from before datasheets were looked up.
+    datasheets: list[DatasheetStatus] = Field(
+        default_factory=list, description="One per IC, in the order of ``ics``."
+    )
     erc: list[ErcEntry]
     wiring: list[WiringFinding]
     pin_warnings: list[PinWarning]

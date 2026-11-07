@@ -6,6 +6,7 @@ kicad-cli and the model are faked.
 
 import dataclasses
 import json
+from collections.abc import Sequence
 
 import pytest
 
@@ -23,6 +24,7 @@ from app.features.debug.schemas import (
     CheckedClaim,
     Cite,
     Claim,
+    DatasheetStatus,
     ErcEntry,
     Fix,
     Hypothesis,
@@ -96,6 +98,21 @@ class FakeKicad:
     async def export(self, project: Project) -> KicadOutput:
         self.projects.append(project)
         return KicadOutput(netlist=NETLIST, erc=ERC)
+
+
+class FakeDatasheets:
+    """Finds no datasheet and touches no network; records which parts it
+    was asked about."""
+
+    def __init__(self, *_: object) -> None:
+        self.asked: list[list[str]] = []
+
+    async def find(self, parts: Sequence[Part]) -> list[DatasheetStatus]:
+        self.asked.append([p.ref for p in parts])
+        return [
+            DatasheetStatus(ref=p.ref, value=p.value, status="not_found", reason="faked")
+            for p in parts
+        ]
 
 
 def _files() -> list[tuple[str, bytes]]:
@@ -627,13 +644,17 @@ async def test_ngspice_runner_reads_wrdata_and_falls_back_to_none(tmp_path):
 
 async def test_stream_sends_summary_progress_then_checked_result():
     kicad = FakeKicad()
+    datasheets = FakeDatasheets()
     prepared = await service.prepare(
         _files(),
         "Fails on battery\nWorks on USB",
         [MeasurementInput(step_id="h1-c1", context="Ohms L2 to VOUT", value="0.2 ohm")],
         kicad,
+        datasheets,
     )
     assert kicad.projects[0].root == "board.kicad_sch"
+    assert datasheets.asked == [["U2", "U9"]]
+    assert [d.ref for d in prepared.summary.datasheets] == ["U2", "U9"]
     seen: list[str] = []
     structured: list[str] = []
 
@@ -678,7 +699,7 @@ async def test_stream_sends_summary_progress_then_checked_result():
 
 
 async def test_model_failure_ends_the_stream_with_an_error_event():
-    prepared = await service.prepare(_files(), "Dead board", [], FakeKicad())
+    prepared = await service.prepare(_files(), "Dead board", [], FakeKicad(), FakeDatasheets())
 
     async def failing_diagnose(system: str, user: str) -> str:
         raise UpstreamError("The model call failed: 503")
@@ -699,7 +720,7 @@ async def test_model_failure_ends_the_stream_with_an_error_event():
 async def test_simulations_stream_alongside_the_model_and_the_result_comes_last():
     import asyncio
 
-    prepared = await service.prepare(_files(), "Dead", [], FakeKicad())
+    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), FakeDatasheets())
     prepared = dataclasses.replace(prepared, design=_rc_design())
     prepared = dataclasses.replace(prepared, calculations=calc_lookup(prepared.design))
 
@@ -726,7 +747,7 @@ async def test_simulations_stream_alongside_the_model_and_the_result_comes_last(
 
 
 async def test_a_failed_model_still_ends_with_the_error_after_simulations():
-    prepared = await service.prepare(_files(), "Dead", [], FakeKicad())
+    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), FakeDatasheets())
     prepared = dataclasses.replace(prepared, design=_rc_design())
     prepared = dataclasses.replace(prepared, calculations=calc_lookup(prepared.design))
 
@@ -774,7 +795,7 @@ async def test_ask_sends_the_deck_samples_and_conversation():
 
 async def _finished_run() -> tuple[dict, dict]:
     """The design summary and checked result of a faked run, as the browser holds them."""
-    prepared = await service.prepare(_files(), "Dead", [], FakeKicad())
+    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), FakeDatasheets())
     events = await _collect(prepared, service.Model(diagnose=_diagnose, structure=_structure))
     assert events[0][0] == "design_summary" and events[-1][0] == "result"
     return events[0][1], events[-1][1]
@@ -815,12 +836,12 @@ async def test_ask_result_sends_the_checks_findings_and_conversation():
 async def test_blank_symptoms_are_refused_before_kicad_runs():
     kicad = FakeKicad()
     with pytest.raises(BadRequestError, match="bench"):
-        await service.prepare(_files(), " \n ", [], kicad)
+        await service.prepare(_files(), " \n ", [], kicad, FakeDatasheets())
     assert kicad.projects == []
 
 
 async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
-    prepared = await service.prepare(_files(), "", [], FakeKicad(), "review")
+    prepared = await service.prepare(_files(), "", [], FakeKicad(), FakeDatasheets(), "review")
     systems: list[str] = []
     users: list[str] = []
 
@@ -842,7 +863,9 @@ async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
 
 
 async def test_japanese_changes_only_the_write_up_and_ask_prompts():
-    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), language="ja")
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), language="ja"
+    )
     systems: list[str] = []
 
     async def diagnose(system: str, user: str) -> str:
@@ -865,6 +888,7 @@ async def test_japanese_changes_only_the_write_up_and_ask_prompts():
 @pytest.fixture
 def fake_backends(monkeypatch):
     monkeypatch.setattr(router, "KicadCli", FakeKicad)
+    monkeypatch.setattr(router, "Datasheets", FakeDatasheets)
     monkeypatch.setattr(router, "Ngspice", FakeSpice)
 
     monkeypatch.setattr(router, "_diagnose", _diagnose)
@@ -923,6 +947,11 @@ async def test_ask_result_answers_in_the_envelope(client, monkeypatch):
     res = await client.post("/api/v1/debug/ask-result", json=body)
     assert res.status_code == 200
     assert res.json() == {"success": True, "data": {"answer": "Rewire U2.9."}}
+
+    # A run saved before datasheets were looked up still gets an answer.
+    del summary["datasheets"]
+    res = await client.post("/api/v1/debug/ask-result", json=body)
+    assert res.status_code == 200
 
 
 # --- reference designs ------------------------------------------------------------------------

@@ -3,6 +3,7 @@ stream the result as SSE (exempt from the envelope, see app.core.responses);
 answer questions about a simulation or a finished run in the envelope."""
 
 import json
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, UploadFile
@@ -15,6 +16,7 @@ from app.core.config import settings
 from app.core.errors import BadRequestError
 from app.core.responses import SuccessResponse, ok
 from app.features.debug import service
+from app.features.debug.datasheet import Datasheets, DatasheetStore, HttpFetcher
 from app.features.debug.kicad import KicadCli
 from app.features.debug.schemas import (
     Analysis,
@@ -99,7 +101,8 @@ async def analyze(
             )
         raw.append((f.filename or "", data))
 
-    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), mode, language)
+    datasheets = Datasheets(HttpFetcher(), DatasheetStore(Path(settings.DATASHEET_DIR)))
+    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), datasheets, mode, language)
     return EventSourceResponse(
         service.stream(prepared, service.Model(diagnose=_diagnose, structure=_structure), Ngspice())
     )

@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-07 | 2026-11-07 | Proposed | — | `001-mvp-scope.md`, `003-simulate-and-ask.md`, `DECISIONS.md` ("Datasheet facts come from memory until retrieval") |
+| 2026-11-07 | 2026-11-07 | In progress | — | `001-mvp-scope.md`, `003-simulate-and-ask.md`, `DECISIONS.md` ("Datasheet facts come from memory until retrieval") |
 
 Part facts come from the model's memory today, so they're labelled
 "unverified" and can't back a finding on their own. A hand-written pin table
@@ -30,7 +30,7 @@ Decided (2026-11-07): a part whose model is encrypted, or that has no model,
 is left out of the simulation and shown as such ("encrypted model", "no
 model"). No model is made up from datasheet numbers.
 
-## 1. Each part's datasheet is found and downloaded: proposed
+## 1. Each part's datasheet is found and downloaded: done
 
 - `design.parse_netlist` keeps each part's `Datasheet` field and its part-
   number fields (`MPN`, `Manufacturer`, `LCSC`, …), which it drops today.
@@ -49,9 +49,36 @@ Decided (2026-11-07): PDFs and SPICE models are kept as files under the
 git-ignored `data/` (mounted at `/app/data`), keyed by part number, until
 deleted. Extracted facts go in Redis like model answers. No database.
 
+Decided (2026-11-07): only ICs (`U`/`IC` refs) are looked up, in the
+order of the summary's IC list, while the run is prepared; the first run
+of a board waits for the downloads. Their statuses go in the design
+summary (`datasheets`), the kept PDF's path stays on the server.
+Decided (2026-11-07): an MPN alone can't be looked up. LCSC's keyword
+search is a bot wall, and the app doesn't get past bot walls, so those
+parts are "not found" ("no LCSC number to look up"). Only LCSC's product
+record by LCSC number is used, with the app's name as User-Agent.
+Decided (2026-11-07): the fetcher reaches only public addresses, checked
+on each redirect hop, with a size cap (`DATASHEET_MAX_BYTES`) and a
+per-request timeout (`DATASHEET_TIMEOUT_S`, ×3 per part). A body counts
+as a PDF only if it starts with `%PDF`. Misses aren't kept, so a later
+run tries again.
+
 **Checks:** unit tests with a faked fetcher (URL field, part-number lookup,
 skipped passives, a 404); run on the orbit and rp-micro boards' real
 schematics and record how many ICs got a datasheet.
+14 tests in `test_debug_datasheet.py`: the parser's fields, URL first and
+the kept file reused with no fetch, LCSC fallback when the URL gives HTML,
+not-found reasons (LCSC has no PDF, a 404 URL, MPN only), skipped generic
+values, a shared lookup for two of the same part, a part's time budget,
+and the fetcher refusing private addresses and a redirect to the LAN, a
+404 and an oversized body. Live, from the backend container (8 s, cold):
+orbit 5 of 6 ICs found (U17 "~" skipped; STM32F030 from ST's URL, three
+from LCSC), rp-micro 3 of 3, rust-board 3 of 6 (U4 skipped; SHTC3's
+C194656 is unknown to LCSC; ICM-42670-P has only a manufacturer field).
+`make lint` and `make test`: clean (one existing react-refresh warning),
+backend 133 passed, frontend 29 passed. Self-review caught that
+`/ask-result` would have rejected a summary saved before this change
+(`datasheets` was required); it now defaults to empty, with a test.
 
 ## 2. Datasheet facts are extracted and cited by page: proposed
 
