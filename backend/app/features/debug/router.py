@@ -117,14 +117,15 @@ async def analyze(
     fetcher = HttpFetcher()
     datasheets = Datasheets(fetcher, DatasheetStore(Path(settings.DATASHEET_DIR)))
     models = SpiceModels(fetcher, SpiceModelStore(Path(settings.SPICE_MODEL_DIR)))
+    ngspice = Ngspice()
     prepared = await service.prepare(
-        raw, symptoms, parsed, KicadCli(), datasheets, models, mode, language
+        raw, symptoms, parsed, KicadCli(), datasheets, models, mode, language, ngspice=ngspice
     )
     return EventSourceResponse(
         service.stream(
             prepared,
             service.Model(diagnose=_diagnose, structure=_structure),
-            Ngspice(),
+            ngspice,
             FactReader(_extract, RedisFactsCache()),
         )
     )

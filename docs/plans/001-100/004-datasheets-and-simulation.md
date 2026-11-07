@@ -364,7 +364,7 @@ Bugs found:
   check again, as before.
 - A test line over ruff's 100 columns.
 
-## 5. PSpice and LTspice models are converted to run in ngspice: proposed
+## 5. PSpice and LTspice models are converted to run in ngspice: done
 
 - First ngspice's own compatibility modes (`ngbehavior=ps` / `lt`).
 - What those don't cover is rewritten: `VALUE={…}`, `TABLE`, `LAPLACE`,
@@ -399,6 +399,83 @@ error goes in `reason`. An operating point that doesn't converge with
 the pins grounded still counts as loaded, noted in `reason`. Converted
 text isn't kept: conversion is deterministic, and step 6 converts again
 from `path` or the upload.
+Decided (2026-11-07): only TI serves models to a plain HTTP client from
+here (ADI and ST reject non-browser clients; Microchip, onsemi, Nexperia,
+Diodes and Toshiba answer 403; ROHM downloads go through a JavaScript
+licence dialog), and bot walls aren't worked around. The corpus is a
+list of TI parts run through the app's own finder (step 4) with each
+part's TI datasheet URL, as on a real run, kept in
+`data/spice-corpus/web/`; the script also loads any model files put by
+hand in `data/spice-corpus/manual/` (downloaded in a browser), which is
+how LTspice and the other vendors get covered.
+Decided (2026-11-07): no rewrite was needed. ngspice 44.2's modes load
+every corpus model. A parameter the model leaves to its schematic (TI's
+TPS7A02 divides by `V_out`, set on the schematic symbol) isn't a
+conversion failure: when ngspice names an undefined parameter the model
+uses as a value, the check sets it to 1 and runs again (up to three),
+and `reason` says "needs V_out set by the schematic". Step 6 sets it from
+the circuit.
+Decided (2026-11-07): a model is untrusted text. One with a
+`.control`/`.endc` line (ngspice runs its commands, `shell` included) or
+an include path that is absolute, starts with `~`, has a drive letter or
+climbs out with `..` is refused with a reason, not run. Only the picked
+file and the files it includes, transitively, are checked and put beside
+the deck. Upload paths outside the project are left out.
+
+**Checks.** `make spice-corpus` on 2026-11-07, ngspice 44.2 in the
+backend container: 8 of 8 checked models load.
+
+| Model | Dialect | Subckt | Loads | Note |
+|---|---|---|---|---|
+| TPS63802 | pspice | TPS63802_TRANS | yes |  |
+| TPS62840 | pspice | TPS62840_TRANS | yes |  |
+| TPS54202 | encrypted | TPS54202_TRANS | – |  |
+| TLV755P | pspice | TLV75507P_TRANS | yes |  |
+| TPS7A02 | pspice | TPS7A02_03 | yes | needs v_out set by the schematic (1 here) |
+| TLV9001 | pspice | TLV9002 | yes | loads; no operating point with the pins grounded |
+| OPA333 | pspice | OPAx333 | yes | loads; no operating point with the pins grounded |
+| TLV3201 | pspice | TLV3201 | yes |  |
+| INA180 | pspice | INA180A1 | yes |  |
+
+No LTspice model is in it yet: none is reachable without a browser. Put
+some in `manual/` and rerun.
+
+`test_debug_spice_convert.py` has 37 tests (19 functions, parametrized).
+- The deck, `.spiceinit`, subcircuit pins with `+` lines and `PARAMS:`.
+- The refusals: `.control`, absolute, `~`, drive and `..` includes, and a
+  deck name with a quote or control character.
+- A vendor test bench that includes `..\SCHEMATIC1.net` is ignored.
+- Verdicts on canned logs, the same model checked once, a `.model` card
+  skipped, ngspice missing, and a schematic parameter set and noted.
+- `Ngspice.load` with fake ngspice scripts: the timeout, and a file name
+  outside the work dir.
+- Real ngspice: 11 constructs that load in ps/lt mode (`VALUE`,
+  `PARAMS:`, `IF()`, `TABLE`, `STP()`, G `VALUE`, `VSWITCH`, `uplim`,
+  LTspice `params:`, `SW`, LTspice diode `Vfwd`/`Ron`), and three that don't (PSpice
+  `LAPLACE`, LTspice `Rser=` on C/L, LTspice `if()`). A rewrite for those
+  waits for a real model that needs it. A `.control` canary isn't run.
+`test_debug_service.py` checks that `prepare` load-checks each found
+model.
+
+`make lint` and `make test` are clean (one existing react-refresh
+warning). Backend 241 passed, frontend 29 passed.
+
+Bugs found:
+- TI's model ZIPs hold test benches that include `..\SCHEMATIC1.net` and
+  `../../../tlv3201.lib`, so the include check refused TLV9001 and
+  TLV3201 at first. Only the picked file and what it includes are
+  checked now.
+- Without a datasheet URL the finder names TI's product page from the
+  MPN's stem, which gives `TLV755` for TLV755P and `TPS7` for TPS7A02:
+  no model. The corpus passes the datasheet URL, as a real run does.
+  Later: a better stem for names like TPS7A02 in step 4's finder.
+- TPS7A02 failed with "Undefined parameter [v_out]" until the
+  schematic-parameter retry.
+- With a failed op, ngspice fell back to its transient op, over 20 s on
+  TPS63802. `.spiceinit` now sets a 2 ns `optran`.
+- Lint: a docstring line over 100 columns, an unsorted import, and a
+  `Log(...)` call as a default argument (B008). The diff review added
+  `Ngspice.load`'s own docstring.
 
 ## 6. Circuits simulate with real models and their results become findings: proposed
 

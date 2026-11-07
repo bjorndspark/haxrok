@@ -37,6 +37,7 @@ from app.features.debug.schemas import (
     PinFact,
     SpiceModelStatus,
 )
+from app.features.debug.spice import Log
 
 ROOT_SCH = b'(kicad_sch (version 20231120)\n (sheet (property "Sheetfile" "power.kicad_sch"))\n)'
 SUB_SCH = b"(kicad_sch (version 20231120))"
@@ -526,6 +527,9 @@ class FakeSpice:
         self.decks.append(netlist)
         return _rc_wrdata(netlist) if self.reply == "rc" else self.reply
 
+    async def load(self, netlist: str, files: dict[str, bytes]) -> Log | None:
+        return None  # as if ngspice weren't installed
+
 
 def _vbus_i2c() -> Design:
     """SDA pulled up to VBUS (5 V) on an MCU and a sensor powered from +3V3;
@@ -667,6 +671,36 @@ def _script(tmp_path, body: str) -> str:
     path.write_text("#!/bin/sh\n" + body)
     path.chmod(0o755)
     return str(path)
+
+
+async def test_prepare_load_checks_each_found_model(tmp_path):
+    """With ``ngspice``, each model the finder found is run once in a load
+    deck and its status says whether it loaded."""
+    lib = tmp_path / "tps63070.lib"
+    lib.write_bytes(b".SUBCKT TPS63070 VIN VOUT GND\nR1 VIN VOUT 1\n.ENDS\n")
+
+    class Found(FakeSpiceModels):
+        async def find(self, parts, datasheets, files, root):
+            found = await super().find(parts, datasheets, files, root)
+            update = {"status": "pspice", "source": "web", "file": lib.name, "reason": ""}
+            update |= {"subckt": "TPS63070", "path": str(lib)}
+            found[0] = found[0].model_copy(update=update)
+            return found
+
+    decks: list[str] = []
+
+    class Loader:
+        async def load(self, netlist: str, files: dict[str, bytes]) -> Log | None:
+            decks.append(netlist)
+            return Log(1, "Error on line 3 or its substitute:\nunknown parameter (rser)\n")
+
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), Found(), ngspice=Loader()
+    )
+    u2, u9 = prepared.summary.spice_models
+    assert u2.loads is False and "unknown parameter (rser)" in u2.reason
+    assert u9.loads is None and u9.status == "none"
+    assert len(decks) == 1 and "X1 p1 p2 p3 TPS63070" in decks[0]
 
 
 async def test_ngspice_runner_reads_wrdata_and_falls_back_to_none(tmp_path):

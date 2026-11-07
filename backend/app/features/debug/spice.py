@@ -52,8 +52,25 @@ class SpiceRunner(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class Log:
+    """What one ngspice run printed. ``code`` is its exit status, None when
+    it was stopped for taking too long."""
+
+    code: int | None
+    text: str
+
+
+class SpiceLoader(Protocol):
+    async def load(self, netlist: str, files: dict[str, bytes]) -> Log | None:
+        """Run ``netlist`` with ``files`` (relative path -> content, such as
+        model files and a ``.spiceinit``) beside it; None if ngspice isn't
+        installed."""
+        ...
+
+
 class Ngspice:
-    """Writes the netlist to a temp dir and runs ``ngspice -b`` there."""
+    """Writes the deck to a temp dir and runs ``ngspice -b`` there."""
 
     def __init__(self, binary: str | None = None, timeout_s: float | None = None) -> None:
         self.binary = binary or settings.NGSPICE
@@ -63,35 +80,62 @@ class Ngspice:
         with tempfile.TemporaryDirectory(prefix="haxrok-spice-") as tmp:
             work = Path(tmp)
             (work / "line.cir").write_text(netlist, "utf-8")
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    self.binary,
-                    "-b",
-                    "line.cir",
-                    cwd=work,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                )
-            except FileNotFoundError:
-                logger.info("ngspice isn't installed; skipping the simulation")
-                return None
-            try:
-                out, _ = await asyncio.wait_for(proc.communicate(), self.timeout_s)
-            except TimeoutError:
-                proc.kill()
-                await proc.wait()
-                logger.warning("ngspice took longer than %.0f s", self.timeout_s)
-                return None
-            except asyncio.CancelledError:
-                # The client went away mid-run: don't leave ngspice behind.
-                proc.kill()
-                raise
+            log = await self._exec(work, "-b", "line.cir")
             data = work / "out.txt"
-            if proc.returncode != 0 or not data.exists():
-                text = out.decode("utf-8", errors="replace").strip()
-                logger.warning("ngspice failed (%s): %s", proc.returncode, text[-1000:])
+            if log is None or log.code is None:
+                return None
+            if log.code != 0 or not data.exists():
+                logger.warning("ngspice failed (%s): %s", log.code, log.text.strip()[-1000:])
                 return None
             return data.read_text("utf-8")
+
+    async def load(self, netlist: str, files: dict[str, bytes]) -> Log | None:
+        """Run ``netlist`` with ``files`` beside it, for a load check: the
+        log ngspice wrote and printed. Raises ValueError for a file path
+        that leaves the work dir."""
+        with tempfile.TemporaryDirectory(prefix="haxrok-spice-") as tmp:
+            work = Path(tmp)
+            for name, data in files.items():
+                path = (work / name).resolve()
+                if not path.is_relative_to(work.resolve()):
+                    raise ValueError(f"{name!r} is outside the work dir")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            (work / "load.cir").write_text(netlist, "utf-8")
+            # ``-o`` writes the log to a file, so a run stopped by the
+            # timeout still says how far it got.
+            if (log := await self._exec(work, "-b", "-o", "load.log", "load.cir")) is None:
+                return None
+            kept = work / "load.log"
+            text = kept.read_text("utf-8", errors="replace") if kept.exists() else ""
+            return Log(log.code, text + log.text)
+
+    async def _exec(self, work: Path, *args: str) -> Log | None:
+        """Run ngspice in ``work``: its exit status (None after the timeout)
+        and stdout and stderr together; None if it isn't installed."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                self.binary,
+                *args,
+                cwd=work,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except FileNotFoundError:
+            logger.info("ngspice isn't installed; skipping the simulation")
+            return None
+        try:
+            out, _ = await asyncio.wait_for(proc.communicate(), self.timeout_s)
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
+            logger.warning("ngspice took longer than %.0f s", self.timeout_s)
+            return Log(None, "")
+        except asyncio.CancelledError:
+            # The client went away mid-run: don't leave ngspice behind.
+            proc.kill()
+            raise
+        return Log(proc.returncode, out.decode("utf-8", errors="replace"))
 
 
 def _deck(title: str, v: float, r: float, c: float, node: str) -> str:

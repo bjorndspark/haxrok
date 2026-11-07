@@ -107,6 +107,9 @@ frontend/src/
 - `make eval-app case=<name> [mode=review]` — run an `evals/cases/` case
   through the app's debug (or pre-fab review) prompts
   (`evals/app_prompts.py`); `evals/README.md` has the rest
+- `make spice-corpus` — download TI's SPICE models through the app's finder
+  (plus any put in `data/spice-corpus/manual/`) and load-check each in
+  ngspice (`backend/scripts/spice_corpus.py`); not committed, not in CI
 - `make docs` — regenerate `docs/architecture/api/routes.md` from the route
   table; run after changing routes
 - CI runs the same checks on GitHub Actions (`.github/workflows/`) on pushes
@@ -164,7 +167,8 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `004-datasheets-and-simulation.md` step 5 (convert PSpice and LTspice
-   models to run in ngspice), then its steps in order.
+1. `004-datasheets-and-simulation.md` step 6 (simulate circuits with the
+   real models and turn the results into findings), then its steps in
+   order.
 2. `003-simulate-and-ask.md` steps 3–4 (what-if re-runs, circuits a
    formula can't answer): ask first.

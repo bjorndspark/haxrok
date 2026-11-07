@@ -3,9 +3,10 @@
 Two phases, so failures land where the UI can show them:
 
 1. ``prepare`` (before the response starts): validate the upload, run
-   kicad-cli, parse the netlist and ERC, find each IC's datasheet PDF. A
-   bad folder or a schematic the server's KiCad can't open is an ordinary
-   error response; a datasheet that can't be found is only a status.
+   kicad-cli, parse the netlist and ERC, find each IC's datasheet PDF and
+   SPICE model, and check that each model loads in ngspice. A bad folder
+   or a schematic the server's KiCad can't open is an ordinary error
+   response; a datasheet that can't be found is only a status.
 2. ``stream`` (the SSE body): design summary at once, then each found
    datasheet read for facts (``facts``, cached per part), then our own stage
    updates while the model thinks (it streams nothing for ~90 s per call),
@@ -26,7 +27,16 @@ from dataclasses import dataclass
 
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
-from app.features.debug import application, calc, diagram, pins, prompt, reference, spice
+from app.features.debug import (
+    application,
+    calc,
+    diagram,
+    pins,
+    prompt,
+    reference,
+    spice,
+    spice_convert,
+)
 from app.features.debug.datasheet import DatasheetFinder
 from app.features.debug.design import (
     Design,
@@ -109,9 +119,12 @@ async def prepare(
     spice_models: SpiceModelFinder,
     mode: Mode = "debug",
     language: Language = "en",
+    *,
+    ngspice: spice.SpiceLoader | None = None,
 ) -> Prepared:
     """Validate the upload, run kicad-cli and parse its output, then look
-    up each IC's datasheet and SPICE model. Raises
+    up each IC's datasheet and SPICE model, and with ``ngspice`` check that
+    each found model loads (``spice_convert``). Raises
     ``AppError`` subclasses with messages the user can act on. In review
     mode the symptoms are optional notes on what the board is for.
     ``language`` is the one the structured answer is written in."""
@@ -131,6 +144,8 @@ async def prepare(
     ic_parts = [design.parts[ic.ref] for ic in lookup.ics]
     sheets = await datasheets.find(ic_parts)
     models = await spice_models.find(ic_parts, sheets, project.files, project.root)
+    if ngspice is not None:
+        models = await spice_convert.check(models, project.files, ngspice)
     numbered = [
         Measurement(id=f"m{i}", step_id=m.step_id, context=m.context, value=m.value)
         for i, m in enumerate(measurements, start=1)

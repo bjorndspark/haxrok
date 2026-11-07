@@ -366,6 +366,12 @@ class SpiceModelStatus(BaseModel):
     reason: str = Field(
         "", description="Why none or skipped, or a note on the model used, in a few words."
     )
+    loads: bool | None = Field(
+        None,
+        description="Whether the subcircuit loads in ngspice (in its PSpice or LTspice "
+        "compatibility mode); None when nothing was checked or ngspice isn't installed. "
+        "A failure's ngspice error is in reason.",
+    )
     # The kept model file on the server, for the simulation step; "" for an
     # uploaded one, which isn't kept. Not sent to the browser.
     path: str = Field("", exclude=True)

@@ -553,3 +553,27 @@ lines of tested code, right before the hackathon deadline).
 **Consequence:** a Japanese page still shows English check text. One live
 review of `rust-board-i2c-vbus` in Japanese found the planted bug at #1
 and kept every claim's label.
+
+## SPICE models are untrusted text
+
+**Decision:** a found or uploaded SPICE model is refused, not run, when it
+has a `.control`/`.endc` line or includes a file by an absolute path, `~`,
+a drive letter or `..`. Only the picked file and the files it includes
+are copied beside the deck. The reason goes in the model's status
+(`spice_convert.unsafe`).
+
+**Why:** models come from vendor ZIPs found on the web, and from uploads.
+ngspice runs a `.control` block's commands, `shell` among them, and an
+include can read any file the server can. A vendor library never needs
+either.
+
+**Alternatives rejected:** running ngspice in a sandbox (a container or
+seccomp profile per run; more machinery than the risk warrants while
+vendor models load without either). Stripping the `.control` block and
+running the rest (a model that carries one isn't the plain library it
+claims to be).
+
+**Consequence:** a model that includes a shared file from a parent folder
+is refused even when it's harmless. Vendor ZIPs' test benches do that,
+which is why only what the picked file reaches is checked.
+
