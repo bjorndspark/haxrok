@@ -26,7 +26,7 @@ from dataclasses import dataclass
 
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
-from app.features.debug import calc, diagram, pins, prompt, reference, spice
+from app.features.debug import application, calc, diagram, pins, prompt, reference, spice
 from app.features.debug.datasheet import DatasheetFinder
 from app.features.debug.design import (
     Design,
@@ -261,6 +261,12 @@ async def _review(
         if reading.sources
         else ""
     )
+    deviations = application.check(prepared.design, reading.application)
+    if deviations:
+        n_dev = len(deviations)
+        read += (
+            f" {n_dev} deviation{'s' if n_dev > 1 else ''} from a datasheet's typical application."
+        )
     yield _progress(
         "pin_lookup",
         f"Pin data for {with_data} of {len(table.ics)} ICs.{read}{found}{notes}{calcs}",
@@ -284,6 +290,7 @@ async def _review(
         references=reference.format_notes(prepared.references),
         calculations=calc.format_calculations(prepared.calculations),
         datasheet_facts=reading.text,
+        deviations=application.format_deviations(deviations) if reading.application else "",
     )
     start = time.monotonic()
     try:
@@ -332,7 +339,7 @@ async def _review(
         reference_ids=frozenset(
             [n.id for n in prepared.references] + [c.id for c in prepared.calculations]
         ),
-        datasheet_ids=reading.ids,
+        datasheet_ids=reading.ids | {d.id for d in deviations},
     )
     checked = check(analysis, ctx)
     miswired = diagram.miswired_pins(prepared.pin_lookup.findings, prepared.calculations)

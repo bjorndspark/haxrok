@@ -49,7 +49,10 @@ Scope, the go/no-go result and the ideas weighed against this one are in
       about each one (`docs/plans/001-100/003-simulate-and-ask.md`)
 - [x] Datasheets: each IC's PDF is fetched from the schematic's URL or
       LCSC, read once per part by the model, and its pins, limits and
-      typical application are cited by page
+      typical application are cited by page. The board is checked against
+      each typical application in code: a missing required part, a value
+      outside the datasheet's range, a tied pin left open, an inductor whose
+      value field disagrees with its part number
       (`docs/plans/001-100/004-datasheets-and-simulation.md`)
 - [ ] Stretch: agent loop, what-if re-runs ("try C5 = 1 µF")
 

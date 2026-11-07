@@ -88,7 +88,9 @@ def setup_logging() -> None:
                 "Cannot rotate frontend log %s", settings.FRONTEND_LOG_FILE
             )
 
-    for name in ("uvicorn.access", "httpx", "openai"):
+    # Libraries that log every request, connection or PDF object at DEBUG/INFO
+    # (pdfminer is pdfplumber's parser; httpx2/httpcore2 the SDK's client).
+    for name in ("uvicorn.access", "httpx", "httpx2", "httpcore2", "openai", "pdfminer"):
         logging.getLogger(name).setLevel(logging.WARNING)
 
 

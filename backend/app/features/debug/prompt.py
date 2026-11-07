@@ -32,7 +32,8 @@ Input: numbered symptoms (s1, s2, ...), the compact netlist (one line per \
 part, then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
 (erc-1, ...), a pin table copied from datasheets for some ICs, facts read \
 from the ICs' datasheets (ds1, ...: limits and typical application parts, \
-each with its page), verified findings (wf1, ...) the backend computed from \
+each with its page), deviations from those typical applications (dv1, ...), \
+verified findings (wf1, ...) the backend computed from \
 the netlist and pin table, reference notes (rd1, ...) copied from \
 manufacturers' reference designs and datasheets, values the backend \
 calculated from the netlist with datasheet formulas (cf1, ...), and \
@@ -68,6 +69,15 @@ it) is a verified design error. Rank it on how well it explains the \
 symptoms; don't demote it for want of a datasheet check. The datasheet \
 facts (ds1, ...) are read from the datasheets too, so they are verified \
 the same way: use them instead of recalling the part.
+
+The deviations (dv1, ...) are found by a deterministic check of the netlist \
+against the typical applications in the datasheet facts: a part the \
+datasheet doesn't call optional that the board lacks, a value outside the \
+range the datasheet allows, an IC pin the datasheet ties to a part left \
+open, or an inductor whose value field disagrees with its part number (the \
+part number is what gets fitted). They are verified facts about the board, \
+not recalled ones. Report each with its consequence and rank it on that; a \
+deviation that explains a symptom is a strong candidate.
 
 The verified findings are such faults, found by a deterministic check of the \
 netlist against the pin table (e.g. an inductor pin that shares a net with \
@@ -125,8 +135,9 @@ gives it, and use that same name in the text).
 - erc: a fact from an ERC entry. Cite its id.
 - datasheet: a pin function from the pin table, cited as pin_function with \
 the pin; or a datasheet fact (a limit or typical application part), cited \
-as kind datasheet with its id (ds...). Only pins listed in the pin table \
-and ids listed under the datasheet facts can be cited. State only what the \
+as kind datasheet with its id (ds...); a deviation is cited the same way \
+(dv...). Only pins listed in the pin table and ids listed under the \
+datasheet facts or deviations can be cited. State only what the \
 pin does or what the fact says; put which net it is on in a separate \
 schematic claim.
 - reference: a fact from a reference note (rd...) or a calculated value \
@@ -215,7 +226,8 @@ Input: optional notes from the designer on what the board is for (s1, s2, \
 then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
 (erc-1, ...), a pin table copied from datasheets for some ICs, facts read \
 from the ICs' datasheets (ds1, ...: limits and typical application parts, \
-each with its page), verified findings (wf1, ...) the backend computed from \
+each with its page), deviations from those typical applications (dv1, ...), \
+verified findings (wf1, ...) the backend computed from \
 the netlist and pin table, reference notes (rd1, ...) copied from \
 manufacturers' reference designs and datasheets, and values the backend \
 calculated from the netlist with datasheet formulas (cf1, ...)."""
@@ -334,10 +346,12 @@ def build_user_message(
     references: str = "",
     calculations: str = "",
     datasheet_facts: str = "",
+    deviations: str = "",
 ) -> str:
     """The user turn: symptoms (review: the designer's notes), measurements,
-    netlist, ERC, pin table, datasheet facts, verified findings, unverified
-    pin warnings, reference notes, calculated values."""
+    netlist, ERC, pin table, datasheet facts, deviations from their typical
+    applications, verified findings, unverified pin warnings, reference
+    notes, calculated values."""
     parts = []
     if mode == "debug":
         parts.append("## Symptoms\n" + "\n".join(f"{s.id}: {s.text}" for s in symptoms))
@@ -359,6 +373,11 @@ def build_user_message(
         parts.append(
             "## Datasheet facts (read from each IC's datasheet; p.N is the PDF's page)\n"
             + datasheet_facts
+        )
+    if deviations:
+        parts.append(
+            "## Deviations from the datasheets' typical applications (netlist checked "
+            "against them, verified)\n" + deviations
         )
     parts += [
         "## Verified findings (netlist checked against the pin table)\n" + findings,
@@ -533,7 +552,11 @@ printed; null where the table gives no min, typ or max.
 datasheet's reference schematic, or its component-selection text): each \
 external resistor, capacitor, inductor, diode or crystal, its value, and \
 which of the IC's pins (board numbering) it connects to. [] if there is \
-none.
+none. min and max are the range the datasheet allows for that part (a \
+recommended-components table, "CO ≥ 10 µF", "L = 0.33 µH to 1 µH"); match \
+symbols like CO or L to the part they name. A typical value alone sets \
+neither. required is false when the datasheet calls the part optional or \
+it serves a feature a board may not use.
 - page: the N of the '=== Page N ===' header the fact is under."""
 
 

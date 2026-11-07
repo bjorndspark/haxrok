@@ -170,7 +170,7 @@ Platform issues, not code: Docker's 192.168.0.0/20 pool overlapped the LAN
 gateway, fixed in Docker Desktop's address pools. The gateway also gave a
 transient 503 `pii_mask_error`, and a rerun passed.
 
-## 3. The board is checked against each datasheet's typical application: proposed
+## 3. The board is checked against each datasheet's typical application: done
 
 - A pure function compares the extracted application circuit with the
   part's neighbourhood in the netlist: a missing part, a value outside the
@@ -214,6 +214,54 @@ checked.
 **Checks:** unit tests per deviation kind; on `rp-micro-no-fault` review
 stays PASS (no false alarms); the L1 0.47 µH vs 2.2 µH mismatch on orbit is
 caught against the TPS63802's inductor range.
+`test_debug_application.py` has 29 tests:
+- missing, optional, a pull resistor on a rail vs not, single-pin presence,
+  a crystal reaching XOUT through a series resistor, `other` and 3-net
+  parts skipped;
+- an open pin reported once for two parts;
+- the inductor's part-number code vs its value field, out of range,
+  typical-only values, a resistor range in kΩ and "kohm", parallel
+  capacitors summed, a unit that doesn't fit the kind;
+- numbering, the prompt section's place, a `dv` cite backing `datasheet`
+  evidence, and parsing henries and R-codes.
+
+`test_debug_facts.py` adds a range read from a page not sent (dropped) and
+the fact line's range and "optional". The service stream test checks the
+progress count, the prompt's deviation line and a `dv1` cite.
+
+Live run on 2026-11-07, real model, every datasheet read again under the
+new schema:
+- orbit: 4 sheets read, 134 facts, 2 deviations, both L1 on U15
+  (TPS63802): its value field says 0.47 µH but `DFE201612E-2R2M=P2` codes
+  2.2 µH, and 2.2 µH is outside the datasheet's inductor range. The review
+  ranked "TPS63802 inductor will be fitted 2.2 µH, out of spec" #1
+  [will_fail], citing dv1, dv2 and ds31, and BOOT0 #2 [will_fail].
+- rp-micro-no-fault: 3 sheets read, 60 facts, no deviations, and the
+  review is PASS (no issues).
+
+`make eval-app case=orbit-boot0-high mode=review`, which runs without
+datasheets, ranks BOOT0 #1 [will_fail] and the L1 mismatch #2 [may_fail].
+
+`make lint` and `make test` are clean (one existing react-refresh warning).
+Backend 185 passed, frontend 29 passed.
+
+Bugs found:
+- The first live rp run flagged "no crystal" on the RP2040. Its crystal
+  reaches XOUT through R3 (1 kΩ in series), so it wasn't on XOUT's net. A
+  part other than a resistor now counts as present through one series
+  resistor. The model had already called the deviation a false positive.
+- A second required part on an already-open pin was reported as missing
+  too. An open pin is now one deviation, however many parts the datasheet
+  ties to it.
+- `parse_henries` missed "2.2 µH 3A", and 0.47 µH printed as "470 nH".
+- pdfminer (under pdfplumber, since step 2) and the SDK's httpx2/httpcore2
+  logged at DEBUG and INFO: 11M lines in one session's `app.log`. They're
+  quieted to WARNING like httpx.
+
+Platform issues, not code: the gateway's 503 `pii_mask_error` failed two of
+rp's datasheet reads and then its review, and held orbit's reads past
+curl's 15 minutes; a rerun passed. A backend hot reload while editing also
+cut one pair of runs short.
 
 ## 4. Each part's SPICE model is found and classified: proposed
 

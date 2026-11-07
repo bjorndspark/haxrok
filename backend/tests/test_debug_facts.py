@@ -167,8 +167,26 @@ MCU_FACTS = DatasheetFacts(
             value="100 nF",
             pins=["1", "48"],  # 48 isn't wired on this board
             page=44,
-        )
+            min=None,
+            max=None,
+            unit="",
+            range_page=None,
+            required=True,
+        ),
     ],
+)
+
+VDDA = AppPart(
+    role="VDDA filter capacitor",
+    kind="capacitor",
+    value="1 µF",
+    pins=["9"],
+    page=44,
+    min=0.1,
+    max=None,
+    unit="µF",
+    range_page=99,
+    required=False,
 )
 
 LDO_FACTS = DatasheetFacts(
@@ -235,6 +253,7 @@ async def test_reader_keeps_only_facts_on_sent_pages_and_board_pins():
         "p.44 typical application: decoupling capacitor, capacitor 100 nF, on pins 1"
     )
     assert reading.ids == {"ds1", "ds2", "ds3", "ds4"}
+    assert [a.role for a in reading.application["U1"]] == ["decoupling capacitor"]
     assert reading.text.startswith("U1, from https://example.com/stm32f030.pdf:\n  ds1 p.44 VDD")
     assert not reading.failed
 
@@ -298,6 +317,28 @@ def test_check_filters_application_pins_to_the_board():
     assert [p.pin for p in checked.pins] == ["44"]
     assert checked.application[0].pins == ["1"]
     assert len(checked.limits) == 1
+
+
+def test_check_keeps_a_part_but_drops_a_range_read_from_a_page_not_sent():
+    with_vdda = DatasheetFacts(pins=[], limits=[], application=[VDDA])
+    [kept] = facts.check(with_vdda, {44, 45}, {"9"}).application
+    assert (kept.role, kept.min, kept.unit, kept.range_page) == (
+        "VDDA filter capacitor",
+        None,
+        "",
+        None,
+    )
+    [ranged] = facts.check(with_vdda, {44, 99}, {"9"}).application
+    assert (ranged.min, ranged.unit, ranged.range_page) == (0.1, "µF", 99)
+
+
+def test_fact_line_shows_the_allowed_range_and_optional_parts():
+    vdda = VDDA.model_copy(update={"max": 22})
+    lines = facts._fact_lines(DatasheetFacts(pins=[], limits=[], application=[vdda]))
+    assert lines == [
+        "p.44 typical application: VDDA filter capacitor, capacitor 1 µF, on pins 9, "
+        "allowed min 0.1, max 22 µF (p.99), optional"
+    ]
 
 
 # --- where the facts go --------------------------------------------------------------

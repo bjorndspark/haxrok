@@ -22,6 +22,7 @@ from app.features.debug.project import Project, load_project, missing_sheets, no
 from app.features.debug.prompt import number_symptoms
 from app.features.debug.schemas import (
     Analysis,
+    AppPart,
     Calculation,
     CheckedClaim,
     Cite,
@@ -729,7 +730,21 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
                     page=5,
                 )
             ],
-            application=[],
+            # L1 (1u5) is outside this range: one deviation, dv1.
+            application=[
+                AppPart(
+                    role="inductor",
+                    kind="inductor",
+                    value="1 µH",
+                    pins=["11", "9"],
+                    page=4,
+                    min=0.47,
+                    max=1.0,
+                    unit="µH",
+                    range_page=5,
+                    required=True,
+                )
+            ],
         )
 
     class Cache:
@@ -755,6 +770,13 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
                 cites=[Cite(kind="datasheet", pin=None, net=None, id="ds1")],
             )
         )
+        analysis.hypotheses[0].claims.append(
+            Claim(
+                text="L1 is outside the datasheet's inductor range.",
+                evidence="datasheet",
+                cites=[Cite(kind="datasheet", pin=None, net=None, id="dv1")],
+            )
+        )
         return analysis
 
     model = service.Model(diagnose=diagnose, structure=structure)
@@ -764,13 +786,27 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
     ]
     progress = [data["message"] for name, data in events if name == "progress"]
     assert progress[0] == "Reading 1 datasheet (once per part, then cached)."
-    assert "1 datasheet read, 1 fact." in progress[1]
+    assert (
+        "1 datasheet read, 2 facts. 1 deviation from a datasheet's typical application."
+        in (progress[1])
+    )
 
     assert "U2 (TPS63070RNMR), from its datasheet:" in seen[0]
     assert "U2.9 L2: Output-side switch node. (p.4)" in seen[0]
     assert "ds1 p.5 VIN input voltage: min 2, max 16 V" in seen[0]
+    assert "## Deviations from the datasheets' typical applications" in seen[0]
+    assert (
+        "dv1: U2 (TPS63070RNMR): inductor L1 1.5 µH is outside the datasheet's 0.47–1 µH"
+        in (seen[0])
+    )
     claims = events[-1][1]["hypotheses"][0]["claims"]
-    assert [c["evidence"] for c in claims] == ["schematic", "datasheet", "none", "datasheet"]
+    assert [c["evidence"] for c in claims] == [
+        "schematic",
+        "datasheet",
+        "none",
+        "datasheet",
+        "datasheet",
+    ]
 
 
 async def test_model_failure_ends_the_stream_with_an_error_event():

@@ -32,7 +32,7 @@ from app.core.errors import AppError
 from app.core.logging import get_logger
 from app.features.debug import pdf, pins, prompt
 from app.features.debug.design import Design, Part
-from app.features.debug.schemas import DatasheetFacts, DatasheetStatus
+from app.features.debug.schemas import AppPart, DatasheetFacts, DatasheetStatus
 
 logger = get_logger(__name__)
 
@@ -79,6 +79,8 @@ class DatasheetReading:
     # ref -> pin number -> (datasheet name, "function (p.N)"), for pins.lookup
     pins: dict[str, dict[str, tuple[str, str]]] = field(default_factory=dict)
     facts: list[Fact] = field(default_factory=list)
+    # ref -> its typical application circuit, for application.check
+    application: dict[str, list[AppPart]] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)  # ref -> PDF URL
     failed: dict[str, str] = field(default_factory=dict)  # ref -> why
 
@@ -144,6 +146,8 @@ class FactReader:
                 reading.pins[sheet.ref] = {
                     p.pin: (p.name, f"{p.function} (p.{p.page})") for p in got.pins
                 }
+            if got.application:
+                reading.application[sheet.ref] = got.application
             for line in _fact_lines(got):
                 n += 1
                 reading.facts.append(Fact(f"ds{n}", sheet.ref, line))
@@ -203,7 +207,10 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
             kept.append(p)
     limits = [lim for lim in facts.limits if lim.page in pages]
     application = [
-        a.model_copy(update={"pins": [pin for pin in a.pins if pin in board_pins]})
+        a.model_copy(
+            update={"pins": [pin for pin in a.pins if pin in board_pins]}
+            | ({} if a.range_page in pages else _NO_RANGE)
+        )
         for a in facts.application
         if a.page in pages
     ]
@@ -220,6 +227,10 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
     return DatasheetFacts(pins=kept, limits=limits, application=application)
 
 
+# A range printed on a page the model wasn't sent isn't one it read.
+_NO_RANGE = {"min": None, "max": None, "unit": "", "range_page": None}
+
+
 def _fact_lines(facts: DatasheetFacts) -> list[str]:
     lines = []
     for lim in facts.limits:
@@ -233,7 +244,12 @@ def _fact_lines(facts: DatasheetFacts) -> list[str]:
     for a in facts.application:
         on = f", on pins {', '.join(a.pins)}" if a.pins else ""
         value = f" {a.value}" if a.value else ""
-        lines.append(f"p.{a.page} typical application: {a.role}, {a.kind}{value}{on}")
+        bounds = [f"{k} {_num(v)}" for k, v in (("min", a.min), ("max", a.max)) if v is not None]
+        allowed = f", allowed {', '.join(bounds)} {a.unit} (p.{a.range_page})" if bounds else ""
+        optional = "" if a.required else ", optional"
+        lines.append(
+            f"p.{a.page} typical application: {a.role}, {a.kind}{value}{on}{allowed}{optional}"
+        )
     return lines
 
 

@@ -79,7 +79,8 @@ class Cite(_Strict):
     kind: CiteKind = Field(
         description="pin_on_net: the pin is on that net in the netlist. pin_name: the pin's "
         "name as the netlist gives it, e.g. U2.9(L2). erc: an ERC entry. pin_function: what "
-        "the pin does, from the pin table. datasheet: a datasheet fact (ds1). reference: a "
+        "the pin does, from the pin table. datasheet: a datasheet fact (ds1) or a deviation "
+        "from a typical application (dv1). reference: a "
         "reference note (rd1) or calculated value (cf1). measurement: a value the user entered."
     )
     pin: str | None = Field(
@@ -88,8 +89,8 @@ class Cite(_Strict):
     )
     net: str | None = Field(description="Net name exactly as in the netlist. For pin_on_net.")
     id: str | None = Field(
-        description='ERC entry id ("erc-3"), datasheet fact id ("ds4"), reference id ("rd2", '
-        '"cf1") or measurement id ("m1").'
+        description='ERC entry id ("erc-3"), datasheet fact or deviation id ("ds4", "dv2"), '
+        'reference id ("rd2", "cf1") or measurement id ("m1").'
     )
 
 
@@ -227,6 +228,24 @@ class AppPart(_Strict):
         "it connects to none directly."
     )
     page: int
+    min: float | None = Field(
+        description="The smallest value the datasheet allows for this part, in unit; null "
+        "if it prints none (a typical value alone is not a minimum)."
+    )
+    max: float | None = Field(description="The largest value it allows, in unit; or null.")
+    unit: str = Field(
+        description='The unit of min and max as printed, e.g. "µF", "kΩ", "µH"; "" if both '
+        "are null."
+    )
+    range_page: int | None = Field(
+        description="The page min and max are printed on (it may be another page than the "
+        "circuit, e.g. a recommended-components table); null if both are null."
+    )
+    required: bool = Field(
+        description="false when the datasheet calls the part optional, or it only serves "
+        "a feature a board may not use (a power-good pull-up, a low-speed crystal, a "
+        "soft-start or feed-forward capacitor); true otherwise."
+    )
 
 
 class DatasheetFacts(_Strict):

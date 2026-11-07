@@ -53,7 +53,7 @@ class EvidenceContext:
     symptom_ids: frozenset[str]
     measurement_ids: frozenset[str]
     reference_ids: frozenset[str] = frozenset()  # rd1…, cf1… from reference.lookup
-    datasheet_ids: frozenset[str] = frozenset()  # ds1… from facts.FactReader
+    datasheet_ids: frozenset[str] = frozenset()  # ds1… facts.FactReader, dv1… application
 
 
 def check(analysis: Analysis[Claim], ctx: EvidenceContext) -> CheckedAnalysis:
