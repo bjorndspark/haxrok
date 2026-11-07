@@ -37,6 +37,9 @@ class Part:
     lcsc: str = ""  # LCSC/JLCPCB part number, "C424093"
     mpn: str = ""  # manufacturer part number
     manufacturer: str = ""
+    # The symbol's SPICE model (see ``_sim_fields``); "" if absent.
+    sim_library: str = ""  # model file, e.g. "${KIPRJMOD}/spice/TPS63802.lib"
+    sim_name: str = ""  # subcircuit or model name in that file
 
 
 @dataclass(frozen=True)
@@ -157,6 +160,7 @@ def parse_netlist(text: str) -> Design:
                 sheet,
                 datasheet if datasheet.startswith(("http://", "https://")) else "",
                 **_part_numbers(comp),
+                **_sim_fields(comp),
             )
     nets: dict[str, list[Node]] = {}
     for net_block in _children(root, "nets"):
@@ -208,6 +212,29 @@ def _part_numbers(comp: list) -> dict[str, str]:
                 found["mpn"] = found["mpn"] or value
             elif key in _MANUFACTURER_KEYS:
                 found["manufacturer"] = found["manufacturer"] or value
+    return found
+
+
+# KiCad 7+ names, then KiCad 6's.
+_SIM_KEYS = {
+    "Sim.Library": "sim_library",
+    "Sim.Name": "sim_name",
+    "Spice_Lib_File": "sim_library",
+    "Spice_Model": "sim_name",
+}
+
+
+def _sim_fields(comp: list) -> dict[str, str]:
+    """``sim_library`` and ``sim_name`` from a netlist component's
+    ``Sim.Library``/``Sim.Name`` fields (KiCad 6: ``Spice_Lib_File``/
+    ``Spice_Model``); "" when absent."""
+    found = {"sim_library": "", "sim_name": ""}
+    for fields in _children(comp, "fields"):
+        for f in _children(fields, "field"):
+            key = _SIM_KEYS.get(_field(f, "name"))
+            value = f[2].strip() if len(f) > 2 and isinstance(f[2], str) else ""
+            if key and value and value != "~":
+                found[key] = found[key] or value
     return found
 
 

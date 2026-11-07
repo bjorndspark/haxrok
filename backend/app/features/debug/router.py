@@ -31,6 +31,7 @@ from app.features.debug.schemas import (
     ResultAskRequest,
 )
 from app.features.debug.spice import Ngspice
+from app.features.debug.spice_models import SpiceModels, SpiceModelStore
 
 router = APIRouter(prefix="/debug", tags=["debug"])
 
@@ -74,7 +75,8 @@ async def _answer(system: str, user: str) -> str:
 @router.post("/analyze")
 async def analyze(
     files: Annotated[
-        list[UploadFile], File(description="The project's .kicad_pro and .kicad_sch files")
+        list[UploadFile],
+        File(description="The project's .kicad_pro and .kicad_sch files, and SPICE model files"),
     ],
     symptoms: Annotated[
         str, Form(max_length=8000, description="Bench symptoms; review: optional board notes")
@@ -112,8 +114,12 @@ async def analyze(
             )
         raw.append((f.filename or "", data))
 
-    datasheets = Datasheets(HttpFetcher(), DatasheetStore(Path(settings.DATASHEET_DIR)))
-    prepared = await service.prepare(raw, symptoms, parsed, KicadCli(), datasheets, mode, language)
+    fetcher = HttpFetcher()
+    datasheets = Datasheets(fetcher, DatasheetStore(Path(settings.DATASHEET_DIR)))
+    models = SpiceModels(fetcher, SpiceModelStore(Path(settings.SPICE_MODEL_DIR)))
+    prepared = await service.prepare(
+        raw, symptoms, parsed, KicadCli(), datasheets, models, mode, language
+    )
     return EventSourceResponse(
         service.stream(
             prepared,

@@ -263,7 +263,7 @@ rp's datasheet reads and then its review, and held orbit's reads past
 curl's 15 minutes; a rerun passed. A backend hot reload while editing also
 cut one pair of runs short.
 
-## 4. Each part's SPICE model is found and classified: proposed
+## 4. Each part's SPICE model is found and classified: done
 
 - Looked for next to the datasheet (the manufacturer's product page) and in
   the schematic's `Sim.*` fields. Logins and "request a model" forms are
@@ -279,9 +279,90 @@ datasheet URL's site) and takes links to model files (`.lib`, `.cir`,
 Pages rendered only by JavaScript, logins and bot walls give "no model
 found". A site-specific adapter is added only where this fails on a demo
 board's part, and each one is recorded here.
+Decided (2026-11-07): this step is backend only. The statuses go in the
+design summary (`spice_models`, one per IC like `datasheets`); step 7's
+per-part panel shows them with the datasheet's.
+Decided (2026-11-07): a `Sim.Library` file (KiCad 6's `Spice_Lib_File`)
+is used before the web when it's in the upload. The backend accepts SPICE
+model files (`.lib`, `.cir`, `.sub`, `.mod`, `.sp`, `.spi`, `.spice`) in
+the upload now, never keeps them on disk, and otherwise says "<file> not
+uploaded". `Sim.Name` picks the subcircuit. Step 7 makes the browser send
+the files `Sim.Library` names, and changes the form's "only .kicad_pro and
+.kicad_sch are sent".
+Decided (2026-11-07), defaults: the module is `spice_models.py` ("model"
+alone means the AI model here). Models are looked up in `prepare` right
+after the datasheets, for the same ICs, in parallel, with a time budget
+per part. Downloaded model files are kept under `SPICE_MODEL_DIR`
+(`data/models/<key>/`, the datasheet's key), classified again on each
+read; misses aren't kept. A ZIP keeps only its model text files, with
+caps on their count and size. The classifier reads the text: encrypted
+(`$CDNENCSTART`, an LTspice encrypted header, binary), then a simulator
+named in its comments, then PSpice-only or LTspice-only syntax, else
+ngspice-ready. ngspice-ready is a guess from syntax; step 5 loads every
+model in ngspice for real. Nothing goes in the prompt until step 6.
 
 **Checks:** unit tests on sample model files of each class; the status of
 every IC on the orbit and rp-micro boards recorded here.
+Decided (2026-11-07): one site-specific adapter, TI's. LCSC's record
+names the brand and MPN but links no manufacturer page, so a TI part
+(by LCSC brand or a ti.com datasheet URL) is looked up at
+`ti.com/product/<base>`, the orderable suffix trimmed (`TPS63802DLAR`
+404s, `TPS63802` doesn't). Its "Unencrypted PSpice Transient Model
+Package" link redirects to a zip. The other demo-board vendors gave
+nothing to adapt to: Microchip's pages are behind a bot wall (403),
+Richtek's and Silergy's link no models, and the MCUs, flash, crystal,
+CP2102 and sensors have none. Their status is "no product page known
+for <brand>".
+Decided (2026-11-07): a status's `source` is `upload` (the file
+`Sim.Library` names) or `web` (a product page's link). An uploaded model
+isn't kept, so its `path` is ""; step 5 reads it from the upload.
+
+`test_debug_spice_models.py` has 16 tests:
+- the classifier on a sample of each class (ngspice, PSpice by comment
+  and by syntax, LTspice, Cadence- and LTspice-encrypted, binary), and
+  simulator words in code lines ignored;
+- the subcircuit pick: `Sim.Name`, then the MPN, then the first subckt;
+- ZIPs: basenames only, zip-slip names, member count and size caps; a
+  plain download counts only when it reads as a model;
+- link ranking on TI's real product page (the unencrypted package first),
+  TI product names, and `${KIPRJMOD}`-relative `Sim.Library` paths;
+- the lookup: a TI part found by LCSC brand, kept and read back with no
+  fetches; the schematic's URL searched as a product page only when it
+  gave no PDF; an uploaded `Sim.Library` used before the web and never
+  kept; "not uploaded" then the web; generic parts skipped and misses not
+  kept; the same part twice looked up once;
+- the netlist's `Sim.*` and KiCad 6 field names.
+
+`test_debug_service.py` checks that the stream passes the ICs, their
+datasheet statuses and the project root to the model finder, and that
+the summary lists the models; and that model files are kept in an upload
+and refused without a sheet.
+
+kicad-cli 9's netlist carries `Sim.Library`/`Sim.Name` as fields: tried
+by adding both to a copy of rp-micro's sheet. No demo board sets them.
+
+Live run on 2026-11-07, every IC on the demo boards:
+- orbit: U15 TPS63802DLAR is `pspice`, `TPS63802_TRANS` in
+  `TPS63802_TRANS.LIB` from `ti.com/lit/zip/SLVMCX1`. U1 MCP73031,
+  U10 8 MHz oscillator, U16 STM32F030C8Tx and U22 CP2102-GMR are `none`
+  (no product page known for the brand). U17 "~" is skipped.
+- rp-micro: U1 RP2040, U2 W25Q64JVXGIQ and U3 RT9013-33GB are `none`.
+- rust-board: U1 SHTC3, U3 ESP32-C3-MINI-1, U5 SY8088 and U6 MCP73831
+  are `none`; U2 ICM-42670-P has no part number or datasheet URL; U4
+  "Rust_Board" is skipped.
+A second orbit run read the TPS63802 from `data/models/` (2 s).
+
+`make lint` and `make test` are clean (one existing react-refresh
+warning). Backend 203 passed, frontend 29 passed.
+
+Bugs found:
+- The link ranking test expected TI's tool page above the part's
+  encrypted model; the code was right (a model of this part outranks a
+  page without one), so the test now asserts the full order.
+- Requiring a `.kicad_sch` once model files were accepted changed the
+  message for a `.kicad_pro`-only upload. Any KiCad file passes that
+  check again, as before.
+- A test line over ruff's 100 columns.
 
 ## 5. PSpice and LTspice models are converted to run in ngspice: proposed
 

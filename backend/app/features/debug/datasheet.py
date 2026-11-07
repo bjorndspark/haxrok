@@ -102,27 +102,25 @@ class HttpFetcher:
             ) as client:
                 for _ in range(_MAX_REDIRECTS + 1):
                     if not await self._is_public(url):
-                        logger.info("datasheet fetch refused, not a public address: %s", url)
+                        logger.info("fetch refused, not a public address: %s", url)
                         return None
                     async with client.stream("GET", url) as r:
                         if r.is_redirect and "location" in r.headers:
                             url = str(r.url.join(r.headers["location"]))
                             continue
                         if r.status_code != 200:
-                            logger.info("datasheet fetch got %s: %s", r.status_code, url)
+                            logger.info("fetch got %s: %s", r.status_code, url)
                             return None
                         body = bytearray()
                         async for chunk in r.aiter_bytes():
                             body += chunk
                             if len(body) > self.max_bytes:
-                                logger.info(
-                                    "datasheet fetch over %d bytes: %s", self.max_bytes, url
-                                )
+                                logger.info("fetch over %d bytes: %s", self.max_bytes, url)
                                 return None
                         return Fetched(str(r.url), r.headers.get("content-type", ""), bytes(body))
-                logger.info("datasheet fetch: too many redirects: %s", url)
+                logger.info("fetch: too many redirects: %s", url)
         except httpx.HTTPError as e:
-            logger.info("datasheet fetch failed (%s): %s", type(e).__name__, url)
+            logger.info("fetch failed (%s): %s", type(e).__name__, url)
         return None
 
     async def _is_public(self, url: str) -> bool:
@@ -215,7 +213,7 @@ class Datasheets:
         tasks: dict[str, asyncio.Task[DatasheetStatus]] = {}
         pending: list[tuple[Part, str | None]] = []
         for part in parts:
-            key = _key(part)
+            key = part_key(part)
             if key is not None and key not in tasks:
                 tasks[key] = asyncio.create_task(self._find_one(part, key))
             pending.append((part, key))
@@ -263,17 +261,26 @@ class Datasheets:
         return await asyncio.to_thread(self.store.put, key, body, source, url)
 
     async def _lcsc_pdf_url(self, code: str) -> str | None:
-        got = await self.fetcher.get(LCSC_PRODUCT_URL.format(code=code))
-        if got is None:
-            return None
-        try:
-            url = json.loads(got.body)["result"]["pdfUrl"]
-        except (ValueError, KeyError, TypeError):
-            return None
+        record = await lcsc_record(self.fetcher, code)
+        url = record.get("pdfUrl") if record else None
         return url if isinstance(url, str) and url.startswith("https://") else None
 
 
-def _key(part: Part) -> str | None:
+async def lcsc_record(fetcher: Fetcher, code: str) -> dict[str, object] | None:
+    """LCSC's product record for an LCSC number (``pdfUrl``, ``brandNameEn``,
+    ``productModel``, …); None when the unofficial endpoint gives anything
+    else."""
+    got = await fetcher.get(LCSC_PRODUCT_URL.format(code=code))
+    if got is None:
+        return None
+    try:
+        record = json.loads(got.body)["result"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def part_key(part: Part) -> str | None:
     """What a part's PDF is kept under; None when there's nothing to look up."""
     if part.lcsc:
         return f"lcsc-{part.lcsc}"

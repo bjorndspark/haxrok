@@ -345,6 +345,32 @@ class DatasheetStatus(BaseModel):
     path: str = Field("", exclude=True)
 
 
+class SpiceModelStatus(BaseModel):
+    """One IC's SPICE model and which simulator it's written for
+    (``spice_models.find``). ``ngspice`` is a guess from the text's syntax;
+    ``none`` means no model was found, ``skipped`` that nothing could be
+    looked up."""
+
+    ref: str
+    value: str
+    status: Literal["ngspice", "pspice", "ltspice", "encrypted", "none", "skipped"]
+    source: Literal["upload", "web"] | None = Field(
+        None,
+        description="Where the model came from: the uploaded file the symbol's Sim.Library "
+        "names, or a model link on the part's product page.",
+    )
+    url: str | None = Field(None, description="The model's download URL; None unless from the web.")
+    file: str | None = Field(None, description="The model file's name.")
+    subckt: str | None = Field(None, description="The subcircuit or model name to use.")
+    part_number: str | None = Field(None, description="The MPN looked up, if any.")
+    reason: str = Field(
+        "", description="Why none or skipped, or a note on the model used, in a few words."
+    )
+    # The kept model file on the server, for the simulation step; "" for an
+    # uploaded one, which isn't kept. Not sent to the browser.
+    path: str = Field("", exclude=True)
+
+
 class ErcEntry(BaseModel):
     """One KiCad ERC violation. ``id`` is what claims cite."""
 
@@ -490,6 +516,9 @@ class DesignSummary(BaseModel):
     # Defaults to empty: /ask-result gets summaries back from the browser,
     # including runs from before datasheets were looked up.
     datasheets: list[DatasheetStatus] = Field(
+        default_factory=list, description="One per IC, in the order of ``ics``."
+    )
+    spice_models: list[SpiceModelStatus] = Field(
         default_factory=list, description="One per IC, in the order of ``ics``."
     )
     erc: list[ErcEntry]

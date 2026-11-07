@@ -35,6 +35,7 @@ from app.features.debug.schemas import (
     LimitFact,
     MeasurementInput,
     PinFact,
+    SpiceModelStatus,
 )
 
 ROOT_SCH = b'(kicad_sch (version 20231120)\n (sheet (property "Sheetfile" "power.kicad_sch"))\n)'
@@ -118,6 +119,25 @@ class FakeDatasheets:
         return [
             DatasheetStatus(ref=p.ref, value=p.value, status="not_found", reason="faked")
             for p in parts
+        ]
+
+
+class FakeSpiceModels:
+    """Finds no model and touches no network; records what it was given."""
+
+    def __init__(self, *_: object) -> None:
+        self.asked: list[tuple[list[str], list[str], str]] = []
+
+    async def find(
+        self,
+        parts: Sequence[Part],
+        datasheets: Sequence[DatasheetStatus],
+        files: dict[str, bytes],
+        root: str,
+    ) -> list[SpiceModelStatus]:
+        self.asked.append(([p.ref for p in parts], [d.ref for d in datasheets], root))
+        return [
+            SpiceModelStatus(ref=p.ref, value=p.value, status="none", reason="faked") for p in parts
         ]
 
 
@@ -207,6 +227,22 @@ def test_several_sheets_without_project_file_is_refused():
 def test_paths_that_escape_the_folder_are_refused():
     with pytest.raises(BadRequestError, match="Unsafe"):
         normalize_paths([("../etc/x.kicad_sch", SUB_SCH)])
+
+
+def test_spice_model_files_are_kept_and_other_files_dropped():
+    files = normalize_paths(
+        [
+            ("b/board.kicad_sch", SUB_SCH),
+            ("b/spice/U1.LIB", b".subckt U1 1 2\n.ends"),
+            ("b/board.kicad_pcb", b"(kicad_pcb)"),
+        ]
+    )
+    assert set(files) == {"board.kicad_sch", "spice/U1.LIB"}
+
+
+def test_model_files_without_a_sheet_are_refused():
+    with pytest.raises(BadRequestError, match="No .kicad_sch"):
+        normalize_paths([("U1.lib", b".subckt U1 1 2\n.ends")])
 
 
 def test_sub_sheets_in_subfolders_resolve_relative_to_their_parent():
@@ -651,16 +687,20 @@ async def test_ngspice_runner_reads_wrdata_and_falls_back_to_none(tmp_path):
 async def test_stream_sends_summary_progress_then_checked_result():
     kicad = FakeKicad()
     datasheets = FakeDatasheets()
+    models = FakeSpiceModels()
     prepared = await service.prepare(
         _files(),
         "Fails on battery\nWorks on USB",
         [MeasurementInput(step_id="h1-c1", context="Ohms L2 to VOUT", value="0.2 ohm")],
         kicad,
         datasheets,
+        models,
     )
     assert kicad.projects[0].root == "board.kicad_sch"
     assert datasheets.asked == [["U2", "U9"]]
     assert [d.ref for d in prepared.summary.datasheets] == ["U2", "U9"]
+    assert models.asked == [(["U2", "U9"], ["U2", "U9"], "board.kicad_sch")]
+    assert [m.ref for m in prepared.summary.spice_models] == ["U2", "U9"]
     seen: list[str] = []
     structured: list[str] = []
 
@@ -705,7 +745,9 @@ async def test_stream_sends_summary_progress_then_checked_result():
 
 
 async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
-    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), FakeDatasheets())
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
     found = DatasheetStatus(
         ref="U2",
         value="TPS63070RNMR",
@@ -810,7 +852,9 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
 
 
 async def test_model_failure_ends_the_stream_with_an_error_event():
-    prepared = await service.prepare(_files(), "Dead board", [], FakeKicad(), FakeDatasheets())
+    prepared = await service.prepare(
+        _files(), "Dead board", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
 
     async def failing_diagnose(system: str, user: str) -> str:
         raise UpstreamError("The model call failed: 503")
@@ -831,7 +875,9 @@ async def test_model_failure_ends_the_stream_with_an_error_event():
 async def test_simulations_stream_alongside_the_model_and_the_result_comes_last():
     import asyncio
 
-    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), FakeDatasheets())
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
     prepared = dataclasses.replace(prepared, design=_rc_design())
     prepared = dataclasses.replace(prepared, calculations=calc_lookup(prepared.design))
 
@@ -858,7 +904,9 @@ async def test_simulations_stream_alongside_the_model_and_the_result_comes_last(
 
 
 async def test_a_failed_model_still_ends_with_the_error_after_simulations():
-    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), FakeDatasheets())
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
     prepared = dataclasses.replace(prepared, design=_rc_design())
     prepared = dataclasses.replace(prepared, calculations=calc_lookup(prepared.design))
 
@@ -906,7 +954,9 @@ async def test_ask_sends_the_deck_samples_and_conversation():
 
 async def _finished_run() -> tuple[dict, dict]:
     """The design summary and checked result of a faked run, as the browser holds them."""
-    prepared = await service.prepare(_files(), "Dead", [], FakeKicad(), FakeDatasheets())
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
     events = await _collect(prepared, service.Model(diagnose=_diagnose, structure=_structure))
     assert events[0][0] == "design_summary" and events[-1][0] == "result"
     return events[0][1], events[-1][1]
@@ -947,12 +997,14 @@ async def test_ask_result_sends_the_checks_findings_and_conversation():
 async def test_blank_symptoms_are_refused_before_kicad_runs():
     kicad = FakeKicad()
     with pytest.raises(BadRequestError, match="bench"):
-        await service.prepare(_files(), " \n ", [], kicad, FakeDatasheets())
+        await service.prepare(_files(), " \n ", [], kicad, FakeDatasheets(), FakeSpiceModels())
     assert kicad.projects == []
 
 
 async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
-    prepared = await service.prepare(_files(), "", [], FakeKicad(), FakeDatasheets(), "review")
+    prepared = await service.prepare(
+        _files(), "", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels(), "review"
+    )
     systems: list[str] = []
     users: list[str] = []
 
@@ -975,7 +1027,7 @@ async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
 
 async def test_japanese_changes_only_the_write_up_and_ask_prompts():
     prepared = await service.prepare(
-        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), language="ja"
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels(), language="ja"
     )
     systems: list[str] = []
 
@@ -1000,6 +1052,7 @@ async def test_japanese_changes_only_the_write_up_and_ask_prompts():
 def fake_backends(monkeypatch):
     monkeypatch.setattr(router, "KicadCli", FakeKicad)
     monkeypatch.setattr(router, "Datasheets", FakeDatasheets)
+    monkeypatch.setattr(router, "SpiceModels", FakeSpiceModels)
     monkeypatch.setattr(router, "Ngspice", FakeSpice)
 
     monkeypatch.setattr(router, "_diagnose", _diagnose)

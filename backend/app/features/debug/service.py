@@ -58,6 +58,7 @@ from app.features.debug.schemas import (
     ResultAskRequest,
     Symptom,
 )
+from app.features.debug.spice_models import SpiceModelFinder
 
 logger = get_logger(__name__)
 
@@ -105,10 +106,12 @@ async def prepare(
     measurements: list[MeasurementInput],
     kicad: KicadRunner,
     datasheets: DatasheetFinder,
+    spice_models: SpiceModelFinder,
     mode: Mode = "debug",
     language: Language = "en",
 ) -> Prepared:
-    """Validate the upload, run kicad-cli and parse its output. Raises
+    """Validate the upload, run kicad-cli and parse its output, then look
+    up each IC's datasheet and SPICE model. Raises
     ``AppError`` subclasses with messages the user can act on. In review
     mode the symptoms are optional notes on what the board is for.
     ``language`` is the one the structured answer is written in."""
@@ -125,7 +128,9 @@ async def prepare(
     lookup = pins.lookup(design, erc, parse_labels(project.files))
     notes = reference.lookup(design)
     calcs = calc.lookup(design)
-    sheets = await datasheets.find([design.parts[ic.ref] for ic in lookup.ics])
+    ic_parts = [design.parts[ic.ref] for ic in lookup.ics]
+    sheets = await datasheets.find(ic_parts)
+    models = await spice_models.find(ic_parts, sheets, project.files, project.root)
     numbered = [
         Measurement(id=f"m{i}", step_id=m.step_id, context=m.context, value=m.value)
         for i, m in enumerate(measurements, start=1)
@@ -138,6 +143,7 @@ async def prepare(
         nets=len(design.nets),
         ics=lookup.ics,
         datasheets=sheets,
+        spice_models=models,
         erc=erc,
         wiring=lookup.findings,
         pin_warnings=lookup.warnings,

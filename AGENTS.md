@@ -164,7 +164,7 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `004-datasheets-and-simulation.md` step 4 (find and classify each
-   part's SPICE model), then its steps in order.
+1. `004-datasheets-and-simulation.md` step 5 (convert PSpice and LTspice
+   models to run in ngspice), then its steps in order.
 2. `003-simulate-and-ask.md` steps 3–4 (what-if re-runs, circuits a
    formula can't answer): ask first.
