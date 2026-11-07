@@ -374,6 +374,32 @@ Bugs found:
 **Checks:** a test corpus of real vendor models (one PSpice, one LTspice per
 major vendor) that each loads and runs a DC operating point in ngspice.
 
+Decided (2026-11-07): vendor models aren't committed (their licences
+don't clearly allow redistribution). The corpus is a committed list of
+vendor model URLs in a check script, `backend/scripts/spice_corpus.py`
+(`make spice-corpus`), that downloads them into `data/spice-corpus/`,
+converts and loads each, and prints a table; its results are recorded
+here. `make test` runs small hand-written snippets of each construct in
+real ngspice (skipped where ngspice isn't installed).
+Decided (2026-11-07): the converter starts from ngspice's own modes
+(`ngbehavior=ps` / `lt`, set in a `.spiceinit` in the work dir; PSpice
+mode already reads `IF()`, `PARAMS:` and `VALUE={}`, tried in the
+container). A rewrite is added only for a construct a real corpus model
+fails on, with a test and a line here. No speculative rewriters.
+Decided (2026-11-07), defaults: the module is `spice_convert.py`;
+ngspice stays behind `spice.py`'s `Ngspice` (a new method for a load
+check). Every found model (`ngspice`, `pspice`, `ltspice`) is
+load-checked on each run in `prepare`, right after the finder, a few at
+once. The deck instantiates the picked subcircuit with each pin to
+ground through 1 MΩ and runs `.op`, with every file of the model's
+folder (or the upload's) beside it. `SpiceModelStatus.status` stays the
+dialect; a new `loads: bool | None` says whether ngspice loaded it
+(None: nothing to load, or ngspice missing), and a failure's ngspice
+error goes in `reason`. An operating point that doesn't converge with
+the pins grounded still counts as loaded, noted in `reason`. Converted
+text isn't kept: conversion is deterministic, and step 6 converts again
+from `path` or the upload.
+
 ## 6. Circuits simulate with real models and their results become findings: proposed
 
 - The circuits around each modelled IC (regulator plus its passives and
