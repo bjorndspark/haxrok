@@ -179,6 +179,38 @@ transient 503 `pii_mask_error`, and a rerun passed.
   citing the datasheet page. The hand-written notes stay where no datasheet
   was read.
 
+Decided (2026-11-07): each application part's allowed range comes from
+the extraction. Its schema gives every application part a min, a max and
+the page they're on, copied from the datasheet (the model links "CO" to
+the output capacitor), so every cached datasheet is read once more. A part
+with only a typical value is never flagged for its value.
+Decided (2026-11-07): only a missing required part is a deviation. The
+extraction also marks each application part optional or required
+(optional: the datasheet says so, or it serves a feature the board may
+not use, like an LSE crystal or a power-good pull-up). A pull resistor
+isn't missing when the board ties that pin straight to a rail.
+Decided (2026-11-07): for inductors, an "R as decimal point" code in the
+part number or library part (`2R2` = 2.2 µH, `R47` = 0.47 µH) is read
+as a value too. It's checked against the range, and a value field that
+disagrees with it is reported. Plain 3-digit codes (`100`, `101`) are
+ambiguous and ignored, and resistor and capacitor part numbers aren't
+decoded.
+Decided (2026-11-07): `reference.py`'s notes stay for every part they
+cover, whether its datasheet was read or not. They hold app-note and
+design-guide facts (the RP2040's intended 1 kΩ crystal resistor) that the
+datasheet read doesn't replace.
+Decided (2026-11-07), defaults: the check is a pure function in a new
+`application.py`, run in the review stream once the datasheets are read.
+Deviations are numbered `dv1`, `dv2`, … and listed with the datasheet
+facts in the prompt. They're cited with kind `datasheet` and back
+`datasheet` evidence. A progress line counts them, and the UI shows them
+in step 7. A part is present when a board part of the same kind joins the
+nets of its IC pins (with one IC pin, when it's on that pin's net).
+Capacitors in parallel are summed. For capacitors only a value below the
+minimum is flagged, since datasheets give effective (derated) capacitance
+and the nominal value is always above it. Parts of kind `other` aren't
+checked.
+
 **Checks:** unit tests per deviation kind; on `rp-micro-no-fault` review
 stays PASS (no false alarms); the L1 0.47 µH vs 2.2 µH mismatch on orbit is
 caught against the TPS63802's inductor range.
