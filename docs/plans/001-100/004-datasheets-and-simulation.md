@@ -495,9 +495,62 @@ leaves regulation). The user picks which to run per run on the upload form;
 start-up is ticked by default, load step and dropout are opt-in since they
 add the most time.
 
+Tried on 2026-11-07: TI's TPS63802 model, as orbit wires it (VIN 3.6 V,
+0.47 µH, 44 µF, 560k/100k, 3.3 Ω), simulates 1.5 ms of start-up in about
+150 s in the backend container (ngspice 44.2, PSpice mode, only `v(vout)`
+and `v(pg)` saved; saving every node ran out of memory). It overshot to
+4.3 V and then sat at 3.50 V with PG low, a deck or model detail for the
+build to explain. Only this IC has a model on the demo boards (step 4),
+so the ESP32-EN-against-soft-start example can't be simulated.
+
+Decided (2026-11-07): simulations run alongside the review, as plan 003's
+do. The backend checks each waveform against the datasheet limits and
+streams a verdict (passed or flagged), a finding it makes itself with
+`simulation` evidence, like a flagged `Calculation`. The model's review
+doesn't see or cite them, so no run waits on them before the review. Ask
+works on them as on plan 003's simulations.
+Decided (2026-11-07): in start-up, the regulator drives a resistor that
+draws the datasheet's rated output current at the nominal output, the
+worst case, and the same current the load step steps to. The ICs on the
+rail are replaced by it. Without a rated current in the datasheet facts,
+the regulator isn't simulated and its status says why.
+Decided (2026-11-07): the eval case is `orbit-vout-cap-small`: orbit's
+C13 (22 µF on +3.3V) shrunk to 2.2 µF, so the start-up overshoot and the
+load-step droop leave the STM32's VDD range. The netlist formulas only
+check that a cap is there. The no-fault orbit cases stay quiet.
+Decided (2026-11-07): one vendor-model simulation is stopped after 4
+minutes and shown as "timed out". The result still waits for the
+simulations, at most about 2 minutes past the review. Windows are sized
+from the datasheet's start-up time; only the nodes a verdict reads are
+saved.
+Decided (2026-11-07), defaults:
+- the module is `spice_circuits.py` (the cut-out, decks and verdicts);
+  ngspice stays behind `spice.py`'s `Ngspice`, the model text comes from
+  `spice_convert` (converted again from `path` or the upload, with its
+  `.spiceinit`), and the include and `.control` checks apply as in step 5.
+- The cut-out is the IC's pin nets with the passives (R, C, L, D) that
+  touch them; rails and ground end it. Other ICs on the output are the
+  load. A reset or enable RC on the output to an MCU pin is kept, and its
+  release is checked against the rail reaching tolerance.
+- The input is a source ramped up at power-on. It takes the voltage the
+  input net's name gives (`+5V`, `VBUS` → 5 V) or else the datasheet's
+  typical input. Without either, the regulator isn't simulated.
+- The limits are the regulator's output accuracy from its facts (±5 %
+  without one) and the downstream ICs' maximum supply voltage from their
+  facts (nominal +10 % without one). The start-up time is the datasheet's.
+- Only models with `loads` true are simulated. Two vendor-model
+  simulations run at once. The SSE `simulation` event carries them,
+  with a verdict (`passed`, `flagged`, `timed_out`, `failed`) and the
+  limits as reference lines.
+- The analyses a run does come from a new upload form field, `analyses`
+  (`startup`, `load_step`, `dropout`; `startup` when absent). Step 7 adds
+  the checkboxes. Dropout runs only for regulators whose datasheet gives
+  a dropout voltage; a buck-boost like the TPS63802 has none.
+- This step is big (it adds an SSE payload and a form field; step 7 draws
+  them), so it's built in its own session.
+
 **Checks:** a planted-fault eval case the simulation catches and a formula
-can't (e.g. the ESP32 EN RC against an LDO's soft-start); no-fault cases
-stay quiet.
+can't (`orbit-vout-cap-small`, above); no-fault cases stay quiet.
 
 ## 7. The UI shows datasheets, models and simulated findings: proposed
 
