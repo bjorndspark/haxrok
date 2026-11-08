@@ -8,8 +8,10 @@ files, so a deck always includes the model. A rewrite is added only for a
 construct a real vendor model gets wrong (plan 004 steps 5 and 6): in a
 PSpice expression, ``LIMIT(x, a, b)``, which ngspice 44 evaluates to 0, and
 the XOR operator ``^``, which ngspice reads as a power (TI's XNOR gates
-then give the wrong answer). Converted text isn't kept: each run converts
-again from the model's ``path`` or the upload.
+then give the wrong answer); and a zero-delay loop of behavioural sources,
+which PSpice solves and ngspice aborts on ("timestep too small"), broken
+with a 100 ps RC (``break_loops``). Converted text isn't kept: each run
+converts again from the model's ``path`` or the upload.
 
 The load check instantiates the picked subcircuit with each pin to ground
 through 1 MΩ and runs ``.op``, with every model file of the model's folder
@@ -120,10 +122,129 @@ def unsafe(files: dict[str, bytes]) -> str | None:
 
 def convert(files: dict[str, bytes], status: str) -> dict[str, bytes]:
     """The model files rewritten for ngspice: a PSpice model's ``LIMIT`` and
-    ``^`` (see the module docstring); others are returned as they are."""
+    ``^``, and its zero-delay loops (see the module docstring); others are
+    returned as they are."""
     if status != "pspice":
         return files
-    return {name: pspice_rewrite(data) for name, data in files.items()}
+    return {name: break_loops(pspice_rewrite(data)) for name, data in files.items()}
+
+
+# A behavioural voltage source: ``E<name> <out> <ref> VALUE {…}`` (or ``VALUE={…}``).
+_E_VALUE = re.compile(r"^\s*(e\S*)\s+(\S+)\s+(\S+)\s+value\s*=?\s*\{", re.IGNORECASE)
+_READS = re.compile(r"\bv\(\s*([^,\s()]+)\s*(?:,\s*([^\s()]+)\s*)?\)", re.IGNORECASE)
+_GROUNDS = {"0", "gnd"}
+# The delay put into each loop: 1 Ω into 100 pF is 100 ps, far below any
+# timing a model's logic sets (TI's shortest one-shot is 50 ns).
+_LOOP_R, _LOOP_C, _LOOP_TAG = "1", "100p", "_hxd"
+
+
+def break_loops(data: bytes) -> bytes:
+    """One PSpice file with each zero-delay loop of behavioural sources
+    broken by a 1 Ω / 100 pF delay on one source's output.
+
+    A loop is ``E`` sources (``VALUE {…}``) in one subcircuit whose
+    expressions read each other's outputs with nothing between them, like
+    TI's ``one_shot`` (``ch`` reads ``out``, ``out`` reads ``ch``). PSpice
+    solves it; ngspice's time step collapses on it ("timestep too small"),
+    so a regulator's model aborts once it starts switching. The source cut
+    is the loop's one that drives a subcircuit pin (the delay is then the
+    gate's output delay), else its first in the file; its output moves to
+    ``<node>_hxd``, which drives the old node through the RC. A file with
+    no loop comes back unchanged."""
+    text = data.decode("latin-1")
+    lines = text.splitlines(keepends=True)
+    groups: list[list[str]] = []
+    i = 0
+    while i < len(lines):
+        j = i + 1
+        while j < len(lines) and lines[j].lstrip().startswith("+"):
+            j += 1
+        groups.append(lines[i:j])
+        i = j
+    cuts: set[int] = set()
+    for pins, scope in _scopes(groups):
+        cuts |= _loop_cuts(groups, scope, pins)
+    if not cuts:
+        return data
+    out: list[str] = []
+    for k, group in enumerate(groups):
+        if k not in cuts:
+            out.extend(group)
+            continue
+        m = _E_VALUE.match(group[0])
+        assert m is not None  # only E sources are cut
+        name, node = m.group(1), m.group(2)
+        moved = node + _LOOP_TAG
+        out.append(group[0][: m.start(2)] + moved + group[0][m.end(2) :])
+        out.extend(group[1:])
+        eol = "\r\n" if group[-1].endswith("\r\n") else "\n"
+        if not group[-1].endswith(("\n", "\r")):
+            out.append(eol)
+        out.append(f"R{_LOOP_TAG}_{name} {moved} {node} {_LOOP_R}{eol}")
+        out.append(f"C{_LOOP_TAG}_{name} {node} 0 {_LOOP_C}{eol}")
+    return "".join(out).encode("latin-1")
+
+
+def _scopes(groups: list[list[str]]) -> list[tuple[set[str], list[int]]]:
+    """(pins, line groups) of each subcircuit body, and the top level's
+    (no pins)."""
+    top: list[int] = []
+    scopes: list[tuple[set[str], list[int]]] = [(set(), top)]
+    current = top
+    for k, group in enumerate(groups):
+        words = " ".join(g.lstrip().lstrip("+") for g in group).split()
+        word = words[0].lower() if words else ""
+        if word == ".subckt":
+            current = []
+            pins = subckt_pins("".join(group).encode("latin-1"), words[1]) if len(words) > 1 else []
+            scopes.append(({p.lower() for p in pins or []}, current))
+        elif word == ".ends":
+            current = top
+        else:
+            current.append(k)
+    return scopes
+
+
+def _loop_cuts(groups: list[list[str]], scope: list[int], pins: set[str]) -> set[int]:
+    """The groups whose output to delay so no loop is left in ``scope``."""
+    drives: dict[str, tuple[int, set[str]]] = {}  # out node -> (group, nodes read)
+    for k in scope:
+        body = "".join(groups[k])
+        if body.lstrip().startswith("*") or not (m := _E_VALUE.match(body)):
+            continue
+        if m.group(3).lower() not in _GROUNDS:
+            continue  # a differential output; not seen in a loop yet
+        reads = {n.lower() for pair in _READS.findall(body[m.end() :]) for n in pair if n}
+        drives[m.group(2).lower()] = (k, reads)
+    cuts: set[int] = set()
+    while cycle := _cycle(drives):
+        node = min(cycle, key=lambda n: (n not in pins, drives[n][0]))
+        cuts.add(drives.pop(node)[0])
+    return cuts
+
+
+def _cycle(drives: dict[str, tuple[int, set[str]]]) -> list[str] | None:
+    """Some loop among the sources' outputs, as its nodes; None if none."""
+    state: dict[str, int] = {}  # 1 on the path, 2 done
+
+    def visit(node: str, path: list[str]) -> list[str] | None:
+        state[node] = 1
+        path.append(node)
+        for nxt in sorted(drives[node][1]):
+            if nxt not in drives:
+                continue
+            if state.get(nxt) == 1:
+                return path[path.index(nxt) :]
+            if nxt not in state and (found := visit(nxt, path)):
+                return found
+        path.pop()
+        state[node] = 2
+        return None
+
+    for start in sorted(drives, key=lambda n: drives[n][0]):
+        if start not in state and (found := visit(start, [])):
+            return found
+    return None
 
 
 def pspice_rewrite(data: bytes) -> bytes:

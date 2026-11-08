@@ -13,6 +13,7 @@ import pytest
 from app.features.debug.schemas import SpiceModelStatus
 from app.features.debug.spice import Log, Ngspice
 from app.features.debug.spice_convert import (
+    break_loops,
     check,
     convert,
     deck,
@@ -133,6 +134,47 @@ def test_convert_rewrites_pspice_only():
     files = {"m.lib": CLAMP}
     assert b"LIMIT" not in convert(files, "pspice")["m.lib"]
     assert convert(files, "ltspice") is files
+
+
+# TI's one-shot (TPS63802): ``ch`` reads ``out`` and ``out`` reads ``ch``.
+ONE_SHOT = b""".subckt one_shot in out
++ params:  t=100
+e_abm1         ch 0 value { if( v(in)>0.5 | v(out)>0.5,1,0)    }\r
+e_abm3         out 0 value { if( v(meas)<0.5 &
++ v(ch)>0.5,1,0)    }\r
+r_r1         meas ch  {t}
+c_c1         0 meas  1.4427n
+.ends one_shot
+"""
+
+
+def test_break_loops_delays_the_loops_output_pin():
+    assert break_loops(ONE_SHOT) == (
+        b".subckt one_shot in out\n+ params:  t=100\n"
+        b"e_abm1         ch 0 value { if( v(in)>0.5 | v(out)>0.5,1,0)    }\r\n"
+        b"e_abm3         out_hxd 0 value { if( v(meas)<0.5 &\n+ v(ch)>0.5,1,0)    }\r\n"
+        b"R_hxd_e_abm3 out_hxd out 1\r\nC_hxd_e_abm3 out 0 100p\r\n"
+        b"r_r1         meas ch  {t}\nc_c1         0 meas  1.4427n\n.ends one_shot\n"
+    )
+
+
+def test_break_loops_cuts_every_loop_and_leaves_chains_alone():
+    # a <-> b is a loop at the top level (no pins: the first is cut); c only
+    # reads a, and d reads b through a resistor, so neither is in a loop.
+    text = (
+        b"Ea a 0 VALUE {V(b)}\nEb b 0 VALUE {V(a, c)}\nEc c 0 VALUE {V(a)}\n"
+        b"Rd b bd 1k\nEd d 0 VALUE {V(bd)}\nEe e 0 VALUE {V(e) + 1}\n"
+    )
+    out = break_loops(text).decode()
+    assert "Ea a_hxd 0" in out and "Ee e_hxd 0" in out  # a self-loop too
+    assert out.count("R_hxd_") == 2
+    chain = b"E1 x 0 VALUE {V(in)}\nE2 y 0 VALUE {V(x) * 2}\n* E3 x 0 VALUE {V(y)}\n"
+    assert break_loops(chain) is chain
+
+
+def test_convert_breaks_loops_in_pspice_only():
+    assert b"out_hxd" in convert({"m.lib": ONE_SHOT}, "pspice")["m.lib"]
+    assert convert({"m.lib": ONE_SHOT}, "ltspice")["m.lib"] is ONE_SHOT
 
 
 # --- what isn't run ---------------------------------------------------------------

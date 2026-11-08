@@ -520,8 +520,9 @@ C13 (22 µF on +3.3V) shrunk to 2.2 µF, so the start-up overshoot and the
 load-step droop leave the STM32's VDD range. The netlist formulas only
 check that a cap is there. The no-fault orbit cases stay quiet.
 Decided (2026-11-07): one vendor-model simulation is stopped after 4
-minutes and shown as "timed out". The result still waits for the
-simulations, at most about 2 minutes past the review. Windows are sized
+minutes (15 since 2026-11-08, below) and shown as "timed out". The
+result still waits for the simulations, at most about 2 minutes past the
+review (no longer: 2026-11-08, below). Windows are sized
 from the datasheet's start-up time; only the nodes a verdict reads are
 saved.
 Decided (2026-11-07), defaults:
@@ -583,9 +584,43 @@ next session. Found on the TPS63802 model:
   `itl4`, `maxord`, `gmin`, `rshunt`). A 1 Ω / 10 pF RC on the one_shot's
   `ch` and `out` made every run hang past 600 s. The one_shot alone
   simulates fine.
-- Open for the next session: get the start-up past these loops, and fit
-  it in the 4-minute timeout with two runs at once (2–9 min per 1 ms
-  now), before building the decks on it.
+
+Built on 2026-11-08, second part (the loops); the simulation build
+(`spice_circuits.py`, the SSE payload, the form field, the service
+wiring) is still left for the next session. Found:
+- `spice_convert.break_loops` delays each zero-delay loop of
+  `E … VALUE` sources, in every PSpice-classed file after the rewrites:
+  one source per loop drives `<node>_hxd`, and a 1 Ω / 100 pF RC carries
+  it to the node. It cuts the source that drives a subckt pin, else the
+  first in the file. In the one_shot that's `e_abm3` on `out`, the only
+  hand-made cut that worked (RCs on both `ch` and `out`, above, hung).
+  Of the corpus's models, the TPS63802 and TPS62840 have such a loop,
+  both in their one_shot.
+- With it, orbit's TPS63802 start-up runs through without "timestep too
+  small" (3.6 V in, ramped over 50 µs; 0.47 µH, 44 µF, 560k/100k,
+  3.3 Ω): switching starts near 330 µs, VOUT reaches 3.30 V by 450 µs
+  and stays within 3.299–3.304 V to 700 µs, PG goes high by 500 µs, and
+  the peak is 3.56 V.
+- It's slow. Before switching (the first ~320 µs) costs ~25 s; switching
+  runs at ~0.75 µs of circuit time per second. The 360 µs window took
+  60 s without a max step and 62 s with a 5 ns one plus `.options klu`,
+  against 79 s before (two at once). The full ~750 µs start-up, two at
+  once, didn't finish in 600 s with `.options klu` (with or without
+  `reltol=0.003`). With a 900 s cap, `.options klu reltol=0.003`
+  finished in 710 s, while the default `reltol` beside it still hadn't.
+  So the decks use both options, and a window ending soon after the rail
+  settles (about 600 µs here) saves more. TI ships no averaged model
+  for either part, so the 4-minute timeout can't cover a switching
+  start-up.
+
+Decided (2026-11-08), replacing the 4-minute timeout of 2026-11-07: a
+vendor-model simulation is stopped after 15 minutes. The review's
+`result` is sent when the review ends (with plan 003's quick
+simulations), and vendor-model `simulation` events follow it on the same
+stream, which closes after the last one; the frontend already appends
+simulations that arrive after the result. A run with orbit's TPS63802
+takes about 10–12 minutes in total. Step 7 shows that simulations are
+still running after the review.
 
 **Checks:** a planted-fault eval case the simulation catches and a formula
 can't (`orbit-vout-cap-small`, above); no-fault cases stay quiet.
@@ -594,6 +629,11 @@ ngspice runs of a PSpice-mode XNOR (full truth table) and LIMIT clamp
 through the rewrite; ruff, ruff format, mypy, eslint, tsc and prettier
 clean (one existing eslint warning in `shared/ui/button.tsx`). No
 frontend change, so `make test-frontend` wasn't run.
+Second part (2026-11-08): `make test-backend` 252 passed, including
+the one_shot loop's exact cut, every loop in a file cut with chains left
+alone, and loops broken in PSpice files only; ruff, ruff format and mypy
+clean. No frontend change. The start-up timings above are from runs in
+the backend container, two at once.
 
 ## 7. The UI shows datasheets, models and simulated findings: proposed
 
