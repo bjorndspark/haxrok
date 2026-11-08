@@ -402,22 +402,32 @@ def build_structure_message(*, diagnosis: str, user: str) -> str:
 
 ASK_SIMULATION = """\
 You answer a hardware engineer's question about one ngspice simulation of a \
-node on their schematic. You get the netlist that was run, the caption, the \
-reference lines and a table of samples.
+node on their schematic. You get its kind, the netlist that was run, the \
+caption, the reference lines and a table of samples.
 
 - Answer from those numbers. Quote times and voltages from the table or the \
 caption, with units, and say which you used. Interpolate between samples when \
 you need to, and say that you did.
-- The simulation is an ideal model: an ideal rail switched on at t = 0, one \
+- An RC simulation is an ideal model: an ideal rail switched on at t = 0, one \
 resistor, one capacitor. When the answer depends on something it leaves out \
 (an IC's threshold or leakage, the real rail's ramp, trace capacitance), say \
-so, name the datasheet value to look up, and don't make one up.
-- When asked what a different part value would do, work it out from R×C and \
-say it's a calculation, not a re-run.
+so, name the datasheet value to look up, and don't make one up. When asked \
+what a different part value would do, work it out from R×C and say it's a \
+calculation, not a re-run.
+- A vendor-model simulation runs a regulator's SPICE model from its vendor \
+with the board's passives around it and a resistor (plus a current step in a \
+load step) standing in for the load. The backend checked the output against \
+the datasheet limits; the verdict and the measured points are in the caption. \
+The table is the output voltage, thinned to its envelope. It is only as good \
+as the vendor's model. When asked what a different part value would do, say \
+it needs a re-run, and give your estimate as one. A skipped one has no \
+samples: answer from the caption.
 - Short and plain: a few sentences, or a short list. No headings."""
 
 
 def _samples(sim: Simulation, rows: int = 25) -> str:
+    if not sim.t:
+        return "(none)"
     step = max(1, len(sim.t) // rows)
     picked = list(range(0, len(sim.t), step))
     if picked[-1] != len(sim.t) - 1:
@@ -426,16 +436,22 @@ def _samples(sim: Simulation, rows: int = 25) -> str:
 
 
 def build_ask_message(sim: Simulation, history: list[AskTurn], question: str) -> str:
-    """The user turn for a question about ``sim``: the deck, the caption,
-    the reference lines, a sample table, the conversation so far, then the
-    question."""
+    """The user turn for a question about ``sim``: its kind (RC, or a
+    vendor model with its verdict), the deck, the caption, the reference
+    lines, a sample table, the conversation so far, then the question."""
     levels = "\n".join(
         f"- {lv.label}" + (" (a limit the waveform shouldn't cross)" if lv.danger else "")
         for lv in sim.levels
     )
+    if sim.verdict is None:
+        kind = "RC (an ideal model)"
+    else:
+        what = sim.analysis.replace("_", " ") if sim.analysis else "not run"
+        kind = f"vendor model of {sim.ref}: {what}, verdict {sim.verdict.replace('_', ' ')}"
     parts = [
         f"## Simulation: {sim.title}",
-        "## Netlist that was run\n" + sim.deck.strip(),
+        f"## Kind\n{kind}",
+        "## Netlist that was run\n" + (sim.deck.strip() or "(none)"),
         "## Caption\n" + sim.text,
         "## Reference lines\n" + (levels or "(none)"),
         f"## Samples (time, voltage)\n{_samples(sim)}",

@@ -32,7 +32,7 @@ from app.core.errors import AppError
 from app.core.logging import get_logger
 from app.features.debug import pdf, pins, prompt
 from app.features.debug.design import Design, Part
-from app.features.debug.schemas import AppPart, DatasheetFacts, DatasheetStatus
+from app.features.debug.schemas import AppPart, DatasheetFacts, DatasheetStatus, LimitFact
 
 logger = get_logger(__name__)
 
@@ -81,6 +81,8 @@ class DatasheetReading:
     facts: list[Fact] = field(default_factory=list)
     # ref -> its typical application circuit, for application.check
     application: dict[str, list[AppPart]] = field(default_factory=dict)
+    # ref -> its limits as read, for the vendor-model simulations' ratings
+    limits: dict[str, list[LimitFact]] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)  # ref -> PDF URL
     failed: dict[str, str] = field(default_factory=dict)  # ref -> why
 
@@ -148,6 +150,8 @@ class FactReader:
                 }
             if got.application:
                 reading.application[sheet.ref] = got.application
+            if got.limits:
+                reading.limits[sheet.ref] = got.limits
             for line in _fact_lines(got):
                 n += 1
                 reading.facts.append(Fact(f"ds{n}", sheet.ref, line))

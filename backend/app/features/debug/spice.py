@@ -69,6 +69,25 @@ class SpiceLoader(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class Run:
+    """One vendor-model transient: the ``wrdata`` output (None when there
+    is none) and the log, with ngspice's exit status (None when it was
+    stopped for taking too long)."""
+
+    code: int | None
+    data: str | None
+    log: str
+
+
+class ModelRunner(Protocol):
+    async def transient(self, netlist: str, files: dict[str, bytes]) -> Run | None:
+        """Run ``netlist`` (it writes ``out.txt``) with ``files`` (model
+        files and a ``.spiceinit``) beside it; None if ngspice isn't
+        installed."""
+        ...
+
+
 class Ngspice:
     """Writes the deck to a temp dir and runs ``ngspice -b`` there."""
 
@@ -95,12 +114,7 @@ class Ngspice:
         that leaves the work dir."""
         with tempfile.TemporaryDirectory(prefix="haxrok-spice-") as tmp:
             work = Path(tmp)
-            for name, data in files.items():
-                path = (work / name).resolve()
-                if not path.is_relative_to(work.resolve()):
-                    raise ValueError(f"{name!r} is outside the work dir")
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(data)
+            _write(work, files)
             (work / "load.cir").write_text(netlist, "utf-8")
             # ``-o`` writes the log to a file, so a run stopped by the
             # timeout still says how far it got.
@@ -109,6 +123,20 @@ class Ngspice:
             kept = work / "load.log"
             text = kept.read_text("utf-8", errors="replace") if kept.exists() else ""
             return Log(log.code, text + log.text)
+
+    async def transient(self, netlist: str, files: dict[str, bytes]) -> Run | None:
+        """Run a vendor-model deck with ``files`` beside it. Raises
+        ValueError for a file path that leaves the work dir."""
+        with tempfile.TemporaryDirectory(prefix="haxrok-spice-") as tmp:
+            work = Path(tmp)
+            _write(work, files)
+            (work / "circuit.cir").write_text(netlist, "utf-8")
+            if (log := await self._exec(work, "-b", "-o", "run.log", "circuit.cir")) is None:
+                return None
+            kept, data = work / "run.log", work / "out.txt"
+            text = kept.read_text("utf-8", errors="replace") if kept.exists() else ""
+            out = data.read_text("utf-8") if data.exists() else None
+            return Run(log.code, out, text + log.text)
 
     async def _exec(self, work: Path, *args: str) -> Log | None:
         """Run ngspice in ``work``: its exit status (None after the timeout)
@@ -138,17 +166,24 @@ class Ngspice:
         return Log(proc.returncode, out.decode("utf-8", errors="replace"))
 
 
+def _write(work: Path, files: dict[str, bytes]) -> None:
+    """Put ``files`` (relative path -> content) in ``work``; ValueError for
+    a path that leaves it."""
+    for name, data in files.items():
+        path = (work / name).resolve()
+        if not path.is_relative_to(work.resolve()):
+            raise ValueError(f"{name!r} is outside the work dir")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+
 def _deck(title: str, v: float, r: float, c: float, node: str) -> str:
     """The transient deck: rail → resistor → node, capacitor to ground,
     starting at 0 V and run to 5 RC."""
     stop = _TAUS * r * c
-    # The title carries a net name from the uploaded netlist. A line break in
-    # it would start a new deck line, and a ``.control`` block can run shell
-    # commands, so keep the title to one line of printable text.
-    safe_title = "".join(ch if ch.isprintable() else " " for ch in title)
     return "\n".join(
         [
-            safe_title,
+            one_line(title),
             f"Vpull rail 0 DC {v:g}",
             f"Rpull rail {node} {r:g}",
             f"Cbus {node} 0 {c:g} IC=0",
@@ -161,6 +196,14 @@ def _deck(title: str, v: float, r: float, c: float, node: str) -> str:
             "",
         ]
     )
+
+
+def one_line(text: str) -> str:
+    """``text`` as one line of printable text, for a deck's title or a
+    comment. Such text carries net names from the uploaded netlist: a line
+    break in it would start a new deck line, and a ``.control`` block can
+    run shell commands."""
+    return "".join(ch if ch.isprintable() else " " for ch in text)
 
 
 def netlist(line: I2cLine) -> str:
@@ -201,7 +244,7 @@ def _thin(rows: list[tuple[float, float]]) -> list[tuple[float, float]]:
 _UNITS: tuple[tuple[TimeUnit, float], ...] = (("ns", 1e9), ("µs", 1e6), ("ms", 1e3))
 
 
-def _unit(stop: float) -> tuple[TimeUnit, float]:
+def time_unit(stop: float) -> tuple[TimeUnit, float]:
     """The smallest time unit that keeps the axis under 10,000 of it: an
     I²C rise stays in ns, an RC delay of tens of ms goes to ms."""
     for name, scale in _UNITS:
@@ -228,7 +271,7 @@ class Job:
 def simulation(job: Job, line: I2cLine, rows: list[tuple[float, float]]) -> Simulation:
     """The I²C waveform and the caption the UI shows under it."""
     rows = _thin(rows)
-    unit, scale = _unit(rows[-1][0])
+    unit, scale = time_unit(rows[-1][0])
     lo, hi = _crossing(rows, 0.3 * line.v_pull), _crossing(rows, 0.7 * line.v_pull)
     over = _crossing(rows, line.v_supply + 0.3)
     text = (
@@ -262,7 +305,7 @@ def simulation(job: Job, line: I2cLine, rows: list[tuple[float, float]]) -> Simu
 def rc_simulation(job: Job, line: RcLine, rows: list[tuple[float, float]]) -> Simulation:
     """The enable/reset pin's rise, with the 63% point at one time constant."""
     rows = _thin(rows)
-    unit, scale = _unit(rows[-1][0])
+    unit, scale = time_unit(rows[-1][0])
     tau = line.r_ohm * line.c_farad
     at_63 = round(0.632 * line.v_rail, 2)
     reached = _crossing(rows, at_63)

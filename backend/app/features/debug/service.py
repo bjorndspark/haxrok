@@ -11,7 +11,9 @@ Two phases, so failures land where the UI can show them:
    datasheet read for facts (``facts``, cached per part), then our own stage
    updates while the model thinks (it streams nothing for ~90 s per call),
    and, in parallel, each ngspice simulation as it finishes; then the
-   checked result or an error event.
+   checked result or an error event. The vendor-model simulations
+   (``spice_circuits``, minutes each) start once the datasheets are read
+   and follow the terminal event, each as it finishes.
 
 The model is called twice (see ``prompt``): a free-text diagnosis, then a
 conversion of it into the structured answer. ``ask`` answers a question
@@ -22,8 +24,8 @@ model calls are passed in, so tests fake them.
 
 import asyncio
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from dataclasses import dataclass, field
 
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
@@ -35,6 +37,7 @@ from app.features.debug import (
     prompt,
     reference,
     spice,
+    spice_circuits,
     spice_convert,
 )
 from app.features.debug.datasheet import DatasheetFinder
@@ -66,6 +69,7 @@ from app.features.debug.schemas import (
     ProgressEvent,
     ReferenceNote,
     ResultAskRequest,
+    SimAnalysis,
     Symptom,
 )
 from app.features.debug.spice_models import SpiceModelFinder
@@ -108,6 +112,8 @@ class Prepared:
     measurements: list[Measurement]
     datasheets: list[DatasheetStatus]
     language: Language = "en"
+    upload: dict[str, bytes] = field(default_factory=dict, repr=False)  # the model files
+    analyses: tuple[SimAnalysis, ...] = ("startup",)  # the vendor-model simulations
 
 
 async def prepare(
@@ -121,13 +127,15 @@ async def prepare(
     language: Language = "en",
     *,
     ngspice: spice.SpiceLoader | None = None,
+    analyses: Sequence[SimAnalysis] = ("startup",),
 ) -> Prepared:
     """Validate the upload, run kicad-cli and parse its output, then look
     up each IC's datasheet and SPICE model, and with ``ngspice`` check that
     each found model loads (``spice_convert``). Raises
     ``AppError`` subclasses with messages the user can act on. In review
     mode the symptoms are optional notes on what the board is for.
-    ``language`` is the one the structured answer is written in."""
+    ``language`` is the one the structured answer is written in;
+    ``analyses`` the vendor-model simulations ``stream`` runs."""
     symptoms = prompt.number_symptoms(symptoms_text)
     if mode == "debug" and not symptoms:
         raise BadRequestError("Describe what you see on the bench first.", field="symptoms")
@@ -168,7 +176,19 @@ async def prepare(
         measurements=numbered,
     )
     return Prepared(
-        mode, summary, design, erc, lookup, notes, calcs, symptoms, numbered, sheets, language
+        mode,
+        summary,
+        design,
+        erc,
+        lookup,
+        notes,
+        calcs,
+        symptoms,
+        numbered,
+        sheets,
+        language,
+        upload=project.files,
+        analyses=tuple(analyses),
     )
 
 
@@ -177,24 +197,80 @@ async def stream(
     model: Model,
     ngspice: spice.SpiceRunner | None = None,
     facts: FactReader | None = None,
+    models: spice.ModelRunner | None = None,
 ) -> AsyncIterator[SseEvent]:
     """The SSE body for one analysis run: the review (with ``facts``, after
     reading the found datasheets), and with ``ngspice`` the simulations
     ``spice.plan`` picks, run alongside it. The terminal event (result or
-    error) waits for the simulations, so it stays last."""
+    error) waits for those. With ``models``, the vendor-model simulations
+    (``spice_circuits``) start once the datasheets are read; they take
+    minutes, so they come after the terminal event, each as it finishes.
+    Closing the stream cancels whatever still runs."""
     yield _event("design_summary", prepared.summary.model_dump_json())
-    sources = [_review(prepared, model, facts)]
-    jobs = spice.plan(prepared.calculations, prepared.design) if ngspice else []
-    if ngspice and jobs:
-        sources.append(_simulations(jobs, ngspice))
-    terminal: SseEvent | None = None
-    async for ev in _merge(sources):
-        if ev["event"] in ("result", "error"):
-            terminal = ev
-        else:
-            yield ev
-    if terminal is not None:
-        yield terminal
+    reading = asyncio.create_task(_read(prepared, facts))
+    vendor: asyncio.Queue[SseEvent] = asyncio.Queue()
+    later = (
+        asyncio.create_task(_vendor_simulations(prepared, reading, models, vendor))
+        if models is not None and prepared.analyses
+        else None
+    )
+    try:
+        sources = [_review(prepared, model, facts, reading)]
+        jobs = spice.plan(prepared.calculations, prepared.design) if ngspice else []
+        if ngspice and jobs:
+            sources.append(_simulations(jobs, ngspice))
+        terminal: SseEvent | None = None
+        async for ev in _merge(sources):
+            if ev["event"] in ("result", "error"):
+                terminal = ev
+            else:
+                yield ev
+        if terminal is not None:
+            yield terminal
+        if later is not None:
+            while (ev := await vendor.get()) is not _DONE:
+                yield ev
+    finally:
+        reading.cancel()
+        if later is not None:
+            later.cancel()
+
+
+async def _read(prepared: Prepared, facts: FactReader | None) -> DatasheetReading:
+    """The found datasheets' facts, read once for the review and the
+    vendor-model simulations."""
+    if facts is None or not any(s.status == "found" for s in prepared.datasheets):
+        return DatasheetReading()
+    return await facts.read(prepared.design, prepared.datasheets)
+
+
+async def _vendor_simulations(
+    prepared: Prepared,
+    reading: Awaitable[DatasheetReading],
+    runner: spice.ModelRunner,
+    out: asyncio.Queue[SseEvent],
+) -> None:
+    """Run the vendor-model simulations into ``out``, then ``_DONE``. A
+    failure here is logged and ends them; it never fails the analysis."""
+    start = time.monotonic()
+    n = 0
+    try:
+        got = await reading
+        async for sim in spice_circuits.simulate(
+            prepared.summary.spice_models,
+            prepared.upload,
+            prepared.design,
+            got,
+            prepared.analyses,
+            runner,
+        ):
+            n += 1
+            await out.put(_event("simulation", sim.model_dump_json()))
+    except Exception:
+        logger.exception("vendor-model simulations of %s failed", prepared.summary.project)
+    finally:
+        logger.info("vendor models: %d simulations in %.1fs", n, time.monotonic() - start)
+        out.put_nowait(_DONE)
 
 
 async def _simulations(
@@ -241,10 +317,13 @@ async def _merge(sources: list[AsyncIterator[SseEvent]]) -> AsyncIterator[SseEve
 
 
 async def _review(
-    prepared: Prepared, model: Model, facts: FactReader | None = None
+    prepared: Prepared,
+    model: Model,
+    facts: FactReader | None,
+    reading_task: Awaitable[DatasheetReading],
 ) -> AsyncIterator[SseEvent]:
-    """The model's part of the stream: progress, then result or error."""
-    reading = DatasheetReading()
+    """The model's part of the stream: progress, then result or error.
+    ``reading_task`` is ``_read``'s, shared with the vendor-model runs."""
     found_sheets = sum(1 for s in prepared.datasheets if s.status == "found")
     if facts is not None and found_sheets:
         yield _progress(
@@ -252,7 +331,7 @@ async def _review(
             f"Reading {found_sheets} datasheet{'s' if found_sheets > 1 else ''} "
             "(once per part, then cached).",
         )
-        reading = await facts.read(prepared.design, prepared.datasheets)
+    reading = await reading_task
     # Pins read from a datasheet replace that IC's hand-written table lines;
     # the wiring findings stay the ones prepare() made from the table.
     table = (

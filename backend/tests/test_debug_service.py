@@ -37,7 +37,7 @@ from app.features.debug.schemas import (
     PinFact,
     SpiceModelStatus,
 )
-from app.features.debug.spice import Log
+from app.features.debug.spice import Log, Run
 
 ROOT_SCH = b'(kicad_sch (version 20231120)\n (sheet (property "Sheetfile" "power.kicad_sch"))\n)'
 SUB_SCH = b"(kicad_sch (version 20231120))"
@@ -519,7 +519,7 @@ def _rc_wrdata(netlist: str) -> str:
 class FakeSpice:
     """Answers like ngspice for an RC deck, or with ``reply`` when given."""
 
-    def __init__(self, reply: str | None = "rc") -> None:
+    def __init__(self, reply: str | None = "rc", timeout_s: float | None = None) -> None:
         self.reply = reply
         self.decks: list[str] = []
 
@@ -529,6 +529,9 @@ class FakeSpice:
 
     async def load(self, netlist: str, files: dict[str, bytes]) -> Log | None:
         return None  # as if ngspice weren't installed
+
+    async def transient(self, netlist: str, files: dict[str, bytes]) -> Run | None:
+        return None
 
 
 def _vbus_i2c() -> Design:
@@ -954,6 +957,87 @@ async def test_a_failed_model_still_ends_with_the_error_after_simulations():
     assert "simulation" in events and events[-1] == "error"
 
 
+class FakeVendorSims:
+    """Stands in for ``spice_circuits.simulate``: one skipped simulation
+    after ``delay``, or an exception; records the analyses it was given."""
+
+    def __init__(self, delay: float = 0.0, fail: bool = False) -> None:
+        self.delay = delay
+        self.fail = fail
+        self.calls: list[tuple[str, ...]] = []
+
+    async def __call__(self, statuses, upload, design, reading, analyses, runner):
+        import asyncio
+
+        from app.features.debug import spice_circuits as sc
+
+        self.calls.append(tuple(analyses))
+        await asyncio.sleep(self.delay)
+        if self.fail:
+            raise RuntimeError("model blew up")
+        yield sc.skipped("vm1", sc.Skip("U15", "U15 (TPS63802)", "no rated current"))
+
+
+async def test_vendor_simulations_come_after_the_result(monkeypatch):
+    fake = FakeVendorSims(delay=0.05)
+    monkeypatch.setattr(service.spice_circuits, "simulate", fake)
+    prepared = await service.prepare(
+        _files(),
+        "Dead",
+        [],
+        FakeKicad(),
+        FakeDatasheets(),
+        FakeSpiceModels(),
+        analyses=["startup", "dropout"],
+    )
+    events = [
+        (e["event"], json.loads(e["data"]))
+        async for e in service.stream(
+            prepared, service.Model(_diagnose, _structure), models=FakeSpice()
+        )
+    ]
+    names = [n for n, _ in events]
+    assert names[-2:] == ["result", "simulation"]
+    assert events[-1][1]["id"] == "vm1" and events[-1][1]["verdict"] == "skipped"
+    assert fake.calls == [("startup", "dropout")]
+
+
+async def test_vendor_simulations_that_fail_or_arent_asked_for_dont_end_the_stream(
+    monkeypatch, caplog
+):
+    fake = FakeVendorSims(fail=True)
+    monkeypatch.setattr(service.spice_circuits, "simulate", fake)
+    model = service.Model(_diagnose, _structure)
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
+    names = [e["event"] async for e in service.stream(prepared, model, models=FakeSpice())]
+    assert names[-1] == "result" and "simulation" not in names
+    assert "vendor-model simulations of" in caplog.text and "model blew up" in caplog.text
+
+    prepared = dataclasses.replace(prepared, analyses=())
+    names = [e["event"] async for e in service.stream(prepared, model, models=FakeSpice())]
+    assert names[-1] == "result" and len(fake.calls) == 1
+
+
+def test_parse_analyses_reads_the_form_field():
+    assert router.parse_analyses("startup") == ["startup"]
+    assert router.parse_analyses(" load_step, dropout,load_step ") == ["load_step", "dropout"]
+    assert router.parse_analyses("") == []
+    with pytest.raises(BadRequestError) as err:
+        router.parse_analyses("startup,bode")
+    assert err.value.field == "analyses"
+
+
+async def test_analyze_rejects_an_unknown_analysis(client, fake_backends):
+    files = [("files", (name, data)) for name, data in _files()]
+    res = await client.post(
+        "/api/v1/debug/analyze", files=files, data={"symptoms": "x", "analyses": "bode"}
+    )
+    assert res.status_code == 400
+    assert res.json()["error"]["field"] == "analyses"
+
+
 async def _one_simulation():
     _, (sim,) = await _simulated(_rc_design(), FakeSpice())
     return sim
@@ -984,6 +1068,34 @@ async def test_ask_sends_the_deck_samples_and_conversation():
     assert "Rpull rail pin 10000" in user and "63% 2.09 V" in user
     assert "50 ms\t3.278 V" in user  # the last sample is always in the table
     assert user.index("Q: What is this?") < user.index("## Question\nWhen does EN pass 63%?")
+
+
+async def test_ask_names_the_kind_and_takes_a_vendor_model_run_without_samples():
+    from app.features.debug.schemas import AskRequest, Simulation
+
+    rc = prompt.build_ask_message(await _one_simulation(), [], "Why?")
+    assert "## Kind\nRC (an ideal model)" in rc
+    skipped = Simulation(
+        id="vm1",
+        ref="U17",
+        verdict="skipped",
+        title="U17 (AP2112K), vendor model",
+        deck="",
+        t=[],
+        t_unit="µs",
+        v=[],
+        levels=[],
+        text="Not simulated: its output net /VREG doesn't name a voltage.",
+    )
+    seen: list[str] = []
+
+    async def answer(system: str, user: str) -> str:
+        seen.append(user)
+        return "It wasn't run."
+
+    assert await service.ask(AskRequest(simulation=skipped, question="Why?"), answer)
+    assert "## Kind\nvendor model of U17: not run, verdict skipped" in seen[0]
+    assert "## Samples (time, voltage)\n(none)" in seen[0]
 
 
 async def _finished_run() -> tuple[dict, dict]:

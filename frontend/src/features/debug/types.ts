@@ -183,14 +183,27 @@ export interface SimLevel {
   danger: boolean
 }
 
-/** An ngspice transient of an RC node rising from 0 V: a flagged I²C line,
- *  or an enable/reset pin's RC delay. Streamed while the model works; the
- *  user can ask about it. */
+/** What a vendor-model simulation checks. */
+export type SimAnalysis = "startup" | "load_step" | "dropout"
+
+/** A vendor-model simulation's outcome against the datasheet limits;
+ *  `skipped` has no samples and its text says why. */
+export type SimVerdict = "passed" | "flagged" | "timed_out" | "failed" | "skipped"
+
+/** An ngspice transient, streamed as it finishes; the user can ask about
+ *  it. Either an RC node rising from 0 V (a flagged I²C line, or an
+ *  enable/reset pin's RC delay), with `calc_id`; or a regulator's circuit
+ *  run with its vendor model, with `ref`, `analysis` and `verdict`, which
+ *  arrives after the result. */
 export interface Simulation {
-  /** sim1, sim2, … */
+  /** sim1, … (RC); vm1, … (vendor model). */
   id: string
-  /** The Calculation it simulates. */
-  calc_id: string
+  /** The Calculation it simulates (RC only). */
+  calc_id: string | null
+  /** The modelled IC (vendor model only). */
+  ref?: string | null
+  analysis?: SimAnalysis | null
+  verdict?: SimVerdict | null
   title: string
   /** The ngspice netlist that was run. */
   deck: string

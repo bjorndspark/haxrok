@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # ngspice draws a flagged I²C line; missing or failing, the card has no plot.
     NGSPICE: str = "ngspice"
     NGSPICE_TIMEOUT_S: float = 10.0
+    # A vendor model's circuit (a switching regulator's start-up) runs for
+    # minutes: orbit's TPS63802 takes 10-12 (plan 004 step 6).
+    NGSPICE_MODEL_TIMEOUT_S: float = 900.0
     # Each IC's datasheet PDF, kept by part number (git-ignored data/ is
     # bind-mounted at /app/data). The timeout is per request; a part may
     # take three. PDFs over the size cap count as not found.

@@ -440,15 +440,33 @@ class SimLevel(BaseModel):
     danger: bool = Field(description="A limit the waveform shouldn't cross.")
 
 
-class Simulation(BaseModel):
-    """An ngspice transient of an RC node rising from 0 V (``spice.py``): a
-    flagged I²C line through its pull-up and estimated bus capacitance, or
-    an enable/reset pin through its RC delay. Streamed as its own
-    ``simulation`` event while the model works; the review never sees it,
-    but the user can ask about it (``AskRequest``)."""
+SimAnalysis = Literal["startup", "load_step", "dropout"]
+"""What a vendor-model simulation checks (``spice_circuits``)."""
 
-    id: str = Field(max_length=20, description="sim1, sim2, … in plan order.")
-    calc_id: str = Field(max_length=20, description="The Calculation it simulates.")
+SimVerdict = Literal["passed", "flagged", "timed_out", "failed", "skipped"]
+"""A vendor-model simulation's outcome: within the datasheet limits, outside
+them, stopped at the timeout, ngspice failed, or not run (the text says why)."""
+
+
+class Simulation(BaseModel):
+    """An ngspice transient, streamed as its own ``simulation`` event. The
+    review never sees it, but the user can ask about it (``AskRequest``).
+
+    Two kinds: an RC node rising from 0 V (``spice.py``: a flagged I²C line
+    through its pull-up and estimated bus capacitance, or an enable/reset
+    pin through its RC delay), with ``calc_id`` set; or a regulator's
+    circuit run with its vendor model (``spice_circuits.py``), with ``ref``,
+    ``analysis`` and ``verdict`` set, the backend's own finding checked
+    against the datasheet limits. ``skipped`` says why a regulator whose
+    model loads wasn't simulated (``text``); it has no samples."""
+
+    id: str = Field(max_length=20, description="sim1, … (RC); vm1, … (vendor model).")
+    calc_id: str | None = Field(
+        default=None, max_length=20, description="The Calculation it simulates."
+    )
+    ref: str | None = Field(default=None, max_length=40, description="The modelled IC.")
+    analysis: SimAnalysis | None = None
+    verdict: SimVerdict | None = None
     title: str = Field(max_length=200)
     deck: str = Field(max_length=4000, description="The ngspice netlist that was run.")
     t: list[float] = Field(max_length=500, description="Sample times, in t_unit.")

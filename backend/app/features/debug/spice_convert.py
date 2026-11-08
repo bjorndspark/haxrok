@@ -30,6 +30,7 @@ import asyncio
 import posixpath
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from app.features.debug.project import MODEL_SUFFIXES
@@ -392,7 +393,7 @@ def verdict(log: Log) -> tuple[bool, str]:
         return True, "loads; no operating point with the pins grounded"
     if log.code is None:
         return False, "ngspice ran out of time loading it"
-    return False, _error(log.text) or f"ngspice exited with {log.code}"
+    return False, ngspice_error(log.text) or f"ngspice exited with {log.code}"
 
 
 def missing_param(log: Log, files: dict[str, bytes]) -> str | None:
@@ -407,7 +408,7 @@ def missing_param(log: Log, files: dict[str, bytes]) -> str | None:
     return None
 
 
-def _error(text: str) -> str:
+def ngspice_error(text: str) -> str:
     """ngspice's error, from the first line that names one, in a few lines."""
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     lines = [ln for ln in lines if not _BOILERPLATE.match(ln)]
@@ -465,20 +466,33 @@ def _key(s: SpiceModelStatus) -> tuple[str, str, str]:
     return (s.path or s.file or "", s.subckt or "", s.status)
 
 
-async def _one(
-    s: SpiceModelStatus,
-    upload: dict[str, bytes],
-    loader: SpiceLoader,
-    gate: asyncio.Semaphore,
-) -> tuple[bool | None, str]:
-    """(loads, note) for one status; loads is None when nothing ran."""
-    files = await asyncio.to_thread(model_folder, s, upload)
+@dataclass(frozen=True)
+class ModelFiles:
+    """A model ready for a deck to include: the file it names, the picked
+    subcircuit and its pins, the files it reaches as found, and the same
+    converted, with the ``.spiceinit``, to put beside the deck."""
+
+    name: str
+    subckt: str
+    pins: list[str]
+    found: dict[str, bytes]
+    files: dict[str, bytes]
+
+
+def model_files(
+    s: SpiceModelStatus, upload: dict[str, bytes]
+) -> ModelFiles | tuple[bool | None, str]:
+    """The status's model ready to run, or (loads, why not) when it can't
+    be: loads is False when the model is refused, None when nothing could
+    run. Reads files; ``upload`` is the project's, for an uploaded model."""
+    files = model_folder(s, upload)
     name = s.file if s.source == "upload" else Path(s.path).name
     if files is None or name is None or name not in files:
         return None, "model file missing on the server"
     if not _PLAIN_PATH.fullmatch(name):
         return False, f"{name!r} can't be named in a deck; not run"
-    assert s.subckt is not None  # checked by the caller
+    if not s.subckt:
+        return None, "no subcircuit picked"
     if s.subckt.lower() in (n.lower() for n in model_names(files[name])[1]):
         return None, "a .model card; only subcircuits are load-checked"
     pins = subckt_pins(files[name], s.subckt)
@@ -487,16 +501,28 @@ async def _one(
     files = reached(files, name)
     if reason := unsafe(files):
         return False, reason
-    models = files
-    files = {**convert(files, s.status), ".spiceinit": spiceinit(s.status).encode()}
+    converted = {**convert(files, s.status), ".spiceinit": spiceinit(s.status).encode()}
+    return ModelFiles(name, s.subckt, pins, files, converted)
+
+
+async def _one(
+    s: SpiceModelStatus,
+    upload: dict[str, bytes],
+    loader: SpiceLoader,
+    gate: asyncio.Semaphore,
+) -> tuple[bool | None, str]:
+    """(loads, note) for one status; loads is None when nothing ran."""
+    m = await asyncio.to_thread(model_files, s, upload)
+    if not isinstance(m, ModelFiles):
+        return m
     params: list[str] = []
     while True:
         async with gate:
-            log = await loader.load(deck(name, s.subckt, pins, params), files)
+            log = await loader.load(deck(m.name, m.subckt, m.pins, params), m.files)
         if log is None:
             return None, ""  # ngspice isn't installed
         loads, note = verdict(log)
-        param = None if loads else missing_param(log, models)
+        param = None if loads else missing_param(log, m.found)
         if param is None or param in params or len(params) == _MAX_PARAMS:
             break
         params.append(param)

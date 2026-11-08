@@ -29,6 +29,7 @@ from app.features.debug.schemas import (
     MeasurementInput,
     Mode,
     ResultAskRequest,
+    SimAnalysis,
 )
 from app.features.debug.spice import Ngspice
 from app.features.debug.spice_models import SpiceModels, SpiceModelStore
@@ -36,6 +37,18 @@ from app.features.debug.spice_models import SpiceModels, SpiceModelStore
 router = APIRouter(prefix="/debug", tags=["debug"])
 
 _measurements = TypeAdapter(list[MeasurementInput])
+_analyses = TypeAdapter(list[SimAnalysis])
+
+
+def parse_analyses(text: str) -> list[SimAnalysis]:
+    """The ``analyses`` form field: comma-separated names, "" for none."""
+    names = [a.strip() for a in text.split(",") if a.strip()]
+    try:
+        return list(dict.fromkeys(_analyses.validate_python(names)))
+    except ValidationError as e:
+        raise BadRequestError(
+            "analyses must be startup, load_step or dropout, comma-separated.", field="analyses"
+        ) from e
 
 
 async def _diagnose(system: str, user: str) -> str:
@@ -86,6 +99,13 @@ async def analyze(
     language: Annotated[
         Language, Form(description="Language of the written-up answer: en or ja")
     ] = "en",
+    analyses: Annotated[
+        str,
+        Form(
+            description="Vendor-model simulations, comma-separated: startup, load_step, "
+            "dropout; empty for none"
+        ),
+    ] = "startup",
 ) -> EventSourceResponse:
     """Analyze a KiCad project against bench symptoms, or (``mode=review``)
     review it for design mistakes before the board is ordered.
@@ -93,13 +113,15 @@ async def analyze(
     Upload errors, missing sub-sheets and kicad-cli failures return the
     error envelope. Otherwise the response is an SSE stream:
     ``design_summary``, ``progress`` and ``simulation`` (Simulation, as each
-    ngspice run finishes)…, then ``result`` (CheckedAnalysis) or ``error``.
-    File names carry the path inside the dropped folder.
+    ngspice run finishes)…, then ``result`` (CheckedAnalysis) or ``error``,
+    then a ``simulation`` for each vendor-model run in ``analyses`` (minutes
+    each). File names carry the path inside the dropped folder.
     """
     try:
         parsed = _measurements.validate_python(json.loads(measurements))
     except (json.JSONDecodeError, ValidationError) as e:
         raise BadRequestError("measurements must be a JSON list.", field="measurements") from e
+    picked = parse_analyses(analyses)
     if len(files) > settings.DEBUG_MAX_FILES:
         raise BadRequestError(f"Too many files; at most {settings.DEBUG_MAX_FILES}.")
 
@@ -119,7 +141,16 @@ async def analyze(
     models = SpiceModels(fetcher, SpiceModelStore(Path(settings.SPICE_MODEL_DIR)))
     ngspice = Ngspice()
     prepared = await service.prepare(
-        raw, symptoms, parsed, KicadCli(), datasheets, models, mode, language, ngspice=ngspice
+        raw,
+        symptoms,
+        parsed,
+        KicadCli(),
+        datasheets,
+        models,
+        mode,
+        language,
+        ngspice=ngspice,
+        analyses=picked,
     )
     return EventSourceResponse(
         service.stream(
@@ -127,6 +158,7 @@ async def analyze(
             service.Model(diagnose=_diagnose, structure=_structure),
             ngspice,
             FactReader(_extract, RedisFactsCache()),
+            Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S),
         )
     )
 

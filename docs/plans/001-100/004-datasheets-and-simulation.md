@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-07 | 2026-11-07 | In progress | — | `001-mvp-scope.md`, `003-simulate-and-ask.md`, `DECISIONS.md` ("Datasheet facts come from memory until retrieval") |
+| 2026-11-07 | 2026-11-08 | In progress | — | `001-mvp-scope.md`, `003-simulate-and-ask.md`, `DECISIONS.md` ("Datasheet facts come from memory until retrieval") |
 
 Part facts come from the model's memory today, so they're labelled
 "unverified" and can't back a finding on their own. A hand-written pin table
@@ -478,7 +478,7 @@ Bugs found:
   `Log(...)` call as a default argument (B008). The diff review added
   `Ngspice.load`'s own docstring.
 
-## 6. Circuits simulate with real models and their results become findings: in progress
+## 6. Circuits simulate with real models and their results become findings: done
 
 - The circuits around each modelled IC (regulator plus its passives and
   load, a supervisor against its rail, a reset RC) are cut out of the
@@ -622,6 +622,53 @@ simulations that arrive after the result. A run with orbit's TPS63802
 takes about 10–12 minutes in total. Step 7 shows that simulations are
 still running after the review.
 
+Decided (2026-11-08): dropout is flagged when the output leaves its
+tolerance band at an input within 10 % of the nominal input (5 V in,
+dropping out above 4.5 V): a modest sag would take the rail down. The
+measured point is in the text either way.
+Decided (2026-11-08): the order between regulators' rails is left for
+later. Each regulator gets its own deck, so start-up checks each rail on
+its own (tolerance, overshoot, start-up time, reset release); ordering
+needs chained regulators in one deck, and no demo board has two modelled
+regulators to test it on.
+Decided (2026-11-08), defaults taken in the build:
+- a regulator whose model loads but can't be simulated streams a
+  `simulation` with verdict `skipped`, no samples and the reason as its
+  text, so step 7 can say why. That makes five verdicts, not four.
+- `analyses` is comma-separated (`startup,load_step`). An empty field runs
+  none, an unknown name is a 400 on `analyses`, and repeats count once.
+- Ask covers vendor-model runs. The ask message names the kind (RC, or a
+  vendor model with its analysis and verdict). The prompt's "ideal model"
+  wording now covers only plan 003's RC runs. A vendor-model run's
+  what-if is an estimate that needs a re-run.
+
+Built on 2026-11-08, third part (the simulations):
+- `spice_circuits.py` cuts each loading regulator out of the netlist. The
+  cut is its pins' nets, the R/C/L/D between them, ground and leak
+  resistors, and a reset RC from the output to an IC pin. It plans one
+  deck per analysis, runs two at once through `Ngspice.transient`
+  (`NGSPICE_MODEL_TIMEOUT_S`, 900 s) and checks `v(out)` against the
+  limits:
+  - start-up: reaches the band, settles in it, peaks under the downstream
+    ICs' maximum supply, and any reset releases after the rail;
+  - load step: in band before the step, droop above the downstream ICs'
+    minimum supply, back in band by the end;
+  - dropout: the 10 % rule above.
+  The samples are thinned to a min/max envelope of 240 points.
+- `service.stream` sends the `result`, then each vendor-model
+  `simulation` as it finishes. A failing simulation is logged and ends
+  only the simulations, not the stream. `Simulation` gains `ref`,
+  `analysis` and `verdict`, and `calc_id` is now optional; `types.ts`
+  matches.
+- Found on orbit: the `data/nets/*.net` files were exported by Eeschema
+  10.0.8, which writes every `pinfunction` with its pin number (`VOUT_6`,
+  `GND_A12`). So no TPS63802 pin matched the model's, and the regulator
+  was dropped as "no input and output pin". The backend's kicad-cli
+  9.0.2 writes `VOUT`, so uploads aren't affected today. A KiCad 10
+  kicad-cli would break every pin-name lookup (`pins.py`, `evidence.py`,
+  the diagram, this step), so that upgrade needs the suffix stripped in
+  `parse_netlist`.
+
 **Checks:** a planted-fault eval case the simulation catches and a formula
 can't (`orbit-vout-cap-small`, above); no-fault cases stay quiet.
 First part (2026-11-08): `make test-backend` 249 passed, including real
@@ -634,10 +681,43 @@ the one_shot loop's exact cut, every loop in a file cut with chains left
 alone, and loops broken in PSpice files only; ruff, ruff format and mypy
 clean. No frontend change. The start-up timings above are from runs in
 the backend container, two at once.
+Third part (2026-11-08): backend pytest 274 passed, including a real
+ngspice run of a toy regulator through `Ngspice.transient` and the
+verdicts for each analysis; frontend 29 passed; ruff, ruff format, mypy,
+eslint, tsc and prettier clean. `make eval-app` runs the prompts on a
+compact netlist and can't run vendor models, so orbit was run through
+`spice_circuits.simulate` in the backend container. The inputs were the
+container's kicad-cli export, TI's `TPS63802_TRANS` and the datasheet
+facts by hand (2 A, ±1 %, 224 + 321 µs; STM32 VDD 1.7–3.6 V), two runs
+at once:
+- C13 22 µF (as built): start-up passed in 392 s (3.267 V at 414 µs,
+  settles at 3.299 V, peak 3.418 V). The load step from 0.2 to 2 A passed
+  in 435 s (droops to 3.102 V, back in band 31 µs after the step).
+- C13 2.2 µF (the planned fault): start-up passed in 481 s, with a lower
+  peak (3.317 V). The load step timed out at 900 s. C2 (4.7 µF) and four
+  100 nF caps are still on the rail, and the droop is only flagged below
+  VDD's 1.7 V minimum. So the planted fault isn't caught.
+Decided (2026-11-08): the step closes with the fault not caught; these
+results are the record, and `orbit-vout-cap-small` waits until
+`make eval-app` can run vendor models (a later step). The verdict limits
+stay as built.
+
+**Bugs found** (third part): `parse_columns` raised a float error on
+ngspice's "No. of Data Rows : 0" line instead of "no samples"; a test
+caught it, and it now skips lines that aren't numbers. In `_cut`, a loop
+variable `net` (a `str`) was later reused for a `str | None`, which mypy
+caught. The first dropout test couldn't fail: a 3.3 V rail from 3.6 V
+always leaves its band within 10 %, so it became three cases (holds,
+flagged, passed at 4.0 V in). Asking about a skipped run raised
+`IndexError` (no samples) and the prompt called every run an ideal RC.
+Orbit's KiCad 10 netlist pin names, above.
 
 ## 7. The UI shows datasheets, models and simulated findings: proposed
 
 - Upload form: which analyses to run (step 6).
+- Vendor-model simulations (step 6) arrive after the `result`, with
+  `ref`, `analysis` and `verdict` and no `calc_id`. A `skipped` or
+  `failed` one has no samples; its text says why.
 - Design summary: per part, datasheet (link, pages used) and model status.
 - Findings citing `datasheet` and `simulation` evidence get their labels.
 - `README.md` (what the app does), `evals/README.md` (new results),
