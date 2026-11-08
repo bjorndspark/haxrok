@@ -724,3 +724,44 @@ Orbit's KiCad 10 netlist pin names, above.
   `make docs` if routes change.
 
 **Checks:** `make lint`, `make test`; a full run from the UI on orbit.
+
+Decided (2026-11-08): the datasheet facts (ds1, …, with their page) and
+the deviations (dv1, …) reach the browser in a new SSE event,
+`datasheet_facts`, sent once the datasheets are read, before the review.
+The frontend merges it into the run's summary (new `DesignSummary`
+fields, empty by default), so the summary card shows the pages used while
+the model works and `/ask-result` gets them back with the summary. They
+stayed on the server until now, so a claim citing ds4 had nothing to show.
+Decided (2026-11-08): a claim with `datasheet` evidence is labelled
+"Based on the datasheet" (not "… pin table"). Under it, each cited fact
+or deviation is listed as `ds4 · p.44 VDD supply voltage: …`, the page
+linking to the PDF at that page (`url#page=44`).
+Decided (2026-11-08): vendor-model simulations get their own card under
+the result, "Simulated with vendor models", one row per simulation: ref ·
+analysis, a verdict badge (flagged warn, passed ok, the rest neutral),
+then the plot, or the text alone when there are no samples. While the
+stream is still open after the result, the card shows "Vendor-model
+simulations still running · m:ss" with a stop button; stopping ends the
+stream without turning the finished run into an error. Plan 003's RC
+simulations keep their card.
+Decided (2026-11-08), defaults:
+- the upload form has a checkbox per analysis (start-up ticked, load
+  step, dropout), sent as `analyses`; the choice lives in the Zustand
+  store like `mode`, not saved across reloads.
+- each IC row in the summary card gets a datasheet badge (found: a link
+  to the PDF and the pages its facts came from, "pp. 4, 7, 44"; not
+  found, skipped or read failed, with the reason in muted text) and a
+  model badge (PSpice, LTspice or ngspice with "loads" or "doesn't
+  load"; encrypted; no model; with the reason).
+- the summary card has a collapsed "Datasheet facts (N)" section, like
+  the reference notes: the facts by IC, then the deviations in warn.
+- `datasheet_facts` also carries each IC whose read failed and why; it's
+  sent only when a datasheet was found.
+- `/ask-result`'s prompt includes the facts and deviations that come
+  back with the summary.
+- the Markdown report includes the vendor-model verdicts and each
+  claim's cited fact lines.
+- `README.md` gets a line on datasheets and vendor models;
+  `evals/README.md` changes only if results do; routes don't change.
+- This step is big (backend and frontend), so it's built in its own
+  session.
