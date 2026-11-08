@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-04 | 2026-11-04 | In progress | — | `001-mvp-scope.md`, `002-verified-wiring-checks.md` |
+| 2026-11-04 | 2026-11-08 | In progress | — | `001-mvp-scope.md`, `002-verified-wiring-checks.md` |
 
 Until now, ngspice ran inside `service.prepare`, one deck at a time, before
 the stream opened. Its plot was only drawn under a finding that cited the
@@ -44,12 +44,50 @@ work the same way.
 - UI: a question box under each plot, with the conversation kept in the
   component (TanStack Query mutation for the call).
 
-## 3. What-if re-runs: later
+## 3. What-if re-runs: in progress
 
 "Try C5 = 1 µF" would re-run ngspice with the changed value and draw the new
-curve over the old one. This needs the model to propose a parameter change
-the backend can apply (structured output), and the plot to show two traces.
-Not before the deadline.
+curve over the old one.
+
+Decided (2026-11-08): the user types the new values, not the model. Each RC
+plot gets R and C fields and a Re-run button. The backend re-runs ngspice
+(about 0.1 s) and the new curve is drawn over the old one, with no model
+call. A question asked afterwards sees both traces. The model proposing a
+change in a structured answer (the earlier sketch) was rejected: it costs
+two model calls per what-if and depends on the model reading the intent.
+Decided (2026-11-08): only plan 003's RC runs (I²C lines, enable/reset
+RCs) get the fields. A vendor-model run (plan 004) takes 6–15 minutes and
+would need its circuit re-cut, so it keeps only the ask box.
+Decided (2026-11-08): a plot keeps the original and the latest what-if.
+Each re-run replaces the previous what-if, and Reset drops it.
+Decided (2026-11-08), defaults:
+- the fields are R and C, labelled with the part refs where the netlist
+  has a single part (`R5`, `C5`). On an I²C line, C is "bus C
+  (estimated)". The rail voltage can't be edited. Values take SI suffixes
+  (`4.7k`, `1u`, `1µ`, `100n`) and are parsed in `present.ts`. The
+  backend rejects values outside 1 Ω–100 MΩ and 0.1 pF–0.1 F with a 400.
+- `POST /api/v1/debug/rerun` takes `{simulation, r_ohm, c_farad}` and
+  returns `SuccessResponse[Simulation]`. It's stateless, like `/ask`.
+  `Simulation` gains an optional `circuit` (kind, net, R, C, rail, the
+  IC's supply, part refs), set only on RC runs, so the backend can
+  rebuild the deck.
+- both traces share one time axis, long enough for the slower one. The
+  what-if is dashed. The caption gives both runs' numbers ("rise time
+  120 ns → 48 ns").
+- the what-if is kept in the Zustand store per run and simulation, like
+  the ask turns. The call itself is a TanStack Query mutation.
+- `AskRequest` gains an optional `what_if`. In `ASK_SIMULATION`, the RC
+  rule changes. With a what-if, the model compares the two sets of
+  samples. Without one, it still gives the R×C estimate and points to the
+  Re-run fields. `ASK_SIMULATION` isn't one of the debug prompts, so
+  there's no `make eval-app` run.
+- the Markdown report leaves what-ifs out.
+- the step touches both backend and frontend, so it's big and is built in
+  its own session. `make docs` runs for the new route.
+
+**Checks:** `make lint`, `make test`, with tests for the re-run deck and
+caption, the bounds, the value parser and the overlay layout; a re-run
+from the UI on an I²C line and an RC delay.
 
 ## 4. Circuits a formula can't answer: later
 
