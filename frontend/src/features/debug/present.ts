@@ -6,6 +6,8 @@ import type {
   Calculation,
   Simulation,
   CheckedAnalysis,
+  CheckedClaim,
+  DatasheetLine,
   DesignSummary,
   Diagram,
   GlossaryEntry,
@@ -157,6 +159,115 @@ export function symptomText(summary: DesignSummary | null, id: string): string {
   return summary?.symptoms.find((s) => s.id === id)?.text ?? id
 }
 
+/** A datasheet PDF opened at `page`, or null when there is no URL. */
+export function pageUrl(url: string | null | undefined, page: number): string | null {
+  return url ? `${url}#page=${String(page)}` : null
+}
+
+/** A regulator run with its vendor model (plan 004), as opposed to an RC
+ *  node's transient (plan 003). */
+export function isVendorModel(sim: Simulation): boolean {
+  return sim.analysis != null
+}
+
+export type StatusTone = "ok" | "warn" | "neutral"
+
+/** An IC's datasheet or model status in the summary card: a label, the PDF
+ *  to link (datasheet only), the pages its facts came from, and why there
+ *  is none or it failed. */
+export interface StatusBadge {
+  label: string
+  tone: StatusTone
+  url: string | null
+  pages: string | null
+  reason: string | null
+}
+
+/** Where `ref`'s datasheet stands. Null in runs recorded before datasheets
+ *  were looked up. A found datasheet whose read failed is shown in warn
+ *  with the reason; one that was read lists the pages its facts cite. */
+export function datasheetBadge(
+  ref: string,
+  summary: DesignSummary,
+  m: Messages,
+): StatusBadge | null {
+  const status = summary.datasheets?.find((d) => d.ref === ref)
+  if (!status) return null
+  const t = m.summary
+  if (status.status !== "found")
+    return { label: t.noDatasheet, tone: "neutral", url: null, pages: null, reason: status.reason }
+  const failed = summary.datasheet_failures?.find((f) => f.ref === ref)
+  const pages = [
+    ...new Set((summary.datasheet_facts ?? []).filter((f) => f.ref === ref).map((f) => f.page)),
+  ].sort((a, b) => a - b)
+  return {
+    label: t.datasheet,
+    tone: failed ? "warn" : "ok",
+    url: status.url,
+    pages: pages.length > 0 ? t.pages(pages) : null,
+    reason: failed?.reason ?? null,
+  }
+}
+
+/** Where `ref`'s SPICE model stands: its format and whether ngspice loads
+ *  it, encrypted, or none (with the reason). Null in older runs. */
+export function modelBadge(ref: string, summary: DesignSummary, m: Messages): StatusBadge | null {
+  const model = summary.spice_models?.find((s) => s.ref === ref)
+  if (!model) return null
+  const t = m.summary
+  const loadable =
+    model.status === "ngspice" || model.status === "pspice" || model.status === "ltspice"
+  const loads = loadable ? model.loads : null
+  return {
+    label:
+      loads === null
+        ? t.model[model.status]
+        : `${t.model[model.status]} · ${loads ? t.loads : t.doesntLoad}`,
+    tone:
+      loads === true ? "ok" : loads === false || model.status === "encrypted" ? "warn" : "neutral",
+    url: null,
+    pages: null,
+    reason: loads === true ? null : model.reason,
+  }
+}
+
+/** A datasheet fact or deviation a claim cites, with its page's link. */
+export interface CitedLine extends DatasheetLine {
+  url: string | null
+}
+
+function linkPage(line: DatasheetLine, summary: DesignSummary): CitedLine {
+  const sheet = summary.datasheets?.find((d) => d.ref === line.ref)
+  return { ...line, url: pageUrl(sheet?.url, line.page) }
+}
+
+/** The datasheet facts (ds…) and deviations (dv…) `claim` cites, in the
+ *  order cited, each linking to its datasheet at its page. */
+export function citedLines(claim: CheckedClaim, summary: DesignSummary | null): CitedLine[] {
+  if (!summary) return []
+  const lines = [...(summary.datasheet_facts ?? []), ...(summary.deviations ?? [])]
+  const ids = [...new Set(claim.cites.flatMap((c) => (c.id ? [c.id] : [])))]
+  return ids.flatMap((id) => {
+    const line = lines.find((l) => l.id === id)
+    return line ? [linkPage(line, summary)] : []
+  })
+}
+
+/** Everything read from the datasheets, for the summary card: the facts
+ *  grouped by IC (in reading order), then the deviations. */
+export function datasheetLines(summary: DesignSummary): {
+  facts: { ref: string; lines: CitedLine[] }[]
+  deviations: CitedLine[]
+} {
+  const facts: { ref: string; lines: CitedLine[] }[] = []
+  for (const fact of summary.datasheet_facts ?? []) {
+    const group = facts.find((g) => g.ref === fact.ref)
+    if (group) group.lines.push(linkPage(fact, summary))
+    else facts.push({ ref: fact.ref, lines: [linkPage(fact, summary)] })
+  }
+  return { facts, deviations: (summary.deviations ?? []).map((d) => linkPage(d, summary)) }
+}
+
 /** The latest finished run as a Markdown bench report, headed with `app`
  *  (the project name, which is config). */
 export function toMarkdown(
@@ -221,6 +332,10 @@ export function toMarkdown(
     for (const c of h.claims) {
       const note = c.downgraded && c.reason ? t.labelRemoved(c.reason) : ""
       lines.push(`- ${c.text} — *${m.present.evidence[c.evidence]}*${note}`)
+      for (const line of citedLines(c, summary)) {
+        const page = line.url ? `[p.${String(line.page)}](${line.url})` : `p.${String(line.page)}`
+        lines.push(`  - ${line.id} · ${page} ${line.text}`)
+      }
     }
     lines.push("", review ? t.check : t.confirm)
     for (const s of h.confirm) {
@@ -233,10 +348,19 @@ export function toMarkdown(
     for (const r of h.fix.rework) lines.push(`- ${t.rework} ${r.text}`)
     for (const s of h.fix.schematic) lines.push(`- ${t.nextRevision} ${s}`)
   }
-  if (run.simulations.length > 0) {
-    lines.push("", t.simulations)
-    for (const sim of run.simulations) {
-      lines.push("", `### ${sim.title}`, "", sim.text, "", "```spice", sim.deck.trim(), "```")
+  const rc = run.simulations.filter((sim) => !isVendorModel(sim))
+  const vendor = run.simulations.filter(isVendorModel)
+  for (const [heading, sims] of [
+    [t.simulations, rc],
+    [t.vendorSimulations, vendor],
+  ] as const) {
+    if (sims.length === 0) continue
+    lines.push("", heading)
+    for (const sim of sims) {
+      lines.push("", `### ${sim.title}`, "")
+      if (sim.verdict) lines.push(t.verdict(m.simulations.verdict[sim.verdict]), "")
+      lines.push(sim.text)
+      if (sim.deck.trim()) lines.push("", "```spice", sim.deck.trim(), "```")
       for (const q of run.chats[sim.id] ?? []) lines.push("", `**Q:** ${q.question}`, "", q.answer)
     }
   }

@@ -6,12 +6,14 @@ import type {
   AskAnswer,
   AskRequest,
   CheckedAnalysis,
+  DatasheetFacts,
   DesignSummary,
   MeasurementInput,
   ResultAskRequest,
   Mode,
   ProgressEvent,
   ProjectFile,
+  SimAnalysis,
   Simulation,
 } from "./types"
 
@@ -53,11 +55,13 @@ export async function* streamAnalysis(
   symptoms: string,
   measurements: MeasurementInput[],
   mode: Mode,
+  analyses: SimAnalysis[],
   language: Language,
   signal: AbortSignal,
 ): AsyncGenerator<AnalysisEvent> {
   const form = new FormData()
   form.append("mode", mode)
+  form.append("analyses", analyses.join(","))
   form.append("language", language)
   for (const f of files) form.append("files", f.file, f.path)
   form.append("symptoms", symptoms)
@@ -84,6 +88,8 @@ export async function* streamAnalysis(
       yield { type: "design_summary", summary: JSON.parse(data) as DesignSummary }
     else if (event === "progress")
       yield { type: "progress", progress: JSON.parse(data) as ProgressEvent }
+    else if (event === "datasheet_facts")
+      yield { type: "datasheet_facts", facts: JSON.parse(data) as DatasheetFacts }
     else if (event === "simulation")
       yield { type: "simulation", simulation: JSON.parse(data) as Simulation }
     else if (event === "result")

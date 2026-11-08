@@ -527,6 +527,23 @@ class Measurement(BaseModel):
     value: str
 
 
+class DatasheetLine(BaseModel):
+    """A fact read from a datasheet (ds1, …) or a deviation from its typical
+    application (dv1, …), as cited by a claim with ``datasheet`` evidence."""
+
+    id: str
+    ref: str = Field(description="The IC whose datasheet it comes from.")
+    page: int = Field(description="The datasheet page that says so.")
+    text: str
+
+
+class DatasheetReadFailure(BaseModel):
+    """An IC whose datasheet was found but couldn't be read."""
+
+    ref: str
+    reason: str
+
+
 class DesignSummary(BaseModel):
     """Parsed input, shown before the model call: lets the user check the
     parse, and shows which ICs have pin data."""
@@ -554,6 +571,11 @@ class DesignSummary(BaseModel):
         description="Bench symptoms; in review mode, the user's notes on what the board is for."
     )
     measurements: list[Measurement]
+    # Filled from the datasheet_facts event once the datasheets are read;
+    # the browser merges it into the summary, so /ask-result gets it back.
+    datasheet_facts: list[DatasheetLine] = Field(default_factory=list)
+    deviations: list[DatasheetLine] = Field(default_factory=list)
+    datasheet_failures: list[DatasheetReadFailure] = Field(default_factory=list)
 
 
 # --- input ----------------------------------------------------------------------
@@ -578,10 +600,12 @@ class MeasurementInput(BaseModel):
 # --- SSE events -------------------------------------------------------------------
 #
 # Order: design_summary, then any number of progress and simulation events
-# (simulations run in parallel with the model), then exactly one terminal event,
-# result or error, sent once the simulations are done. Parsing and ERC run
-# before the stream opens, so their failures come back as an ordinary error
-# response instead.
+# (simulations run in parallel with the model) and, when a datasheet was found,
+# one datasheet_facts once they're read; then exactly one terminal event,
+# result or error, sent once those simulations are done; then the vendor-model
+# simulation events, each as it finishes. Parsing and ERC run before the
+# stream opens, so their failures come back as an ordinary error response
+# instead.
 
 ProgressStage = Literal["pin_lookup", "reasoning", "structuring", "checking"]
 
@@ -593,6 +617,15 @@ class ProgressEvent(BaseModel):
 
 class ErrorEvent(BaseModel):
     message: str
+
+
+class DatasheetFactsEvent(BaseModel):
+    """What the found datasheets said, sent before the review: the facts and
+    deviations claims cite, and the ICs whose read failed."""
+
+    datasheet_facts: list[DatasheetLine]
+    deviations: list[DatasheetLine]
+    datasheet_failures: list[DatasheetReadFailure]
 
 
 # --- ask --------------------------------------------------------------------------------

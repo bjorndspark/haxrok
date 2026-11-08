@@ -260,6 +260,55 @@ export interface MeasurementInput {
   value: string
 }
 
+/** Where an IC's datasheet came from, or why there is none. */
+export interface DatasheetStatus {
+  ref: string
+  value: string
+  status: "found" | "not_found" | "skipped"
+  source: string | null
+  url: string | null
+  part_number: string | null
+  reason: string | null
+}
+
+/** An IC's SPICE model, its format and whether ngspice loads it. */
+export interface SpiceModelStatus {
+  ref: string
+  value: string
+  status: "ngspice" | "pspice" | "ltspice" | "encrypted" | "none" | "skipped"
+  source: string | null
+  url: string | null
+  file: string | null
+  subckt: string | null
+  part_number: string | null
+  reason: string | null
+  /** Null when it wasn't tried. */
+  loads: boolean | null
+}
+
+/** A fact read from a datasheet (ds1, …) or a deviation from its typical
+ *  application (dv1, …), as a datasheet claim cites it. */
+export interface DatasheetLine {
+  id: string
+  /** The IC whose datasheet it comes from. */
+  ref: string
+  page: number
+  text: string
+}
+
+/** An IC whose datasheet was found but couldn't be read. */
+export interface DatasheetReadFailure {
+  ref: string
+  reason: string
+}
+
+/** The datasheet_facts event: merged into the run's summary. */
+export interface DatasheetFacts {
+  datasheet_facts: DatasheetLine[]
+  deviations: DatasheetLine[]
+  datasheet_failures: DatasheetReadFailure[]
+}
+
 export interface DesignSummary {
   mode: Mode
   project: string
@@ -275,6 +324,13 @@ export interface DesignSummary {
   /** Bench symptoms; in review mode, the designer's notes on the board. */
   symptoms: Symptom[]
   measurements: Measurement[]
+  /** One per IC. Absent in runs recorded before they existed. */
+  datasheets?: DatasheetStatus[]
+  spice_models?: SpiceModelStatus[]
+  /** From the datasheet_facts event; absent until it arrives. */
+  datasheet_facts?: DatasheetLine[]
+  deviations?: DatasheetLine[]
+  datasheet_failures?: DatasheetReadFailure[]
 }
 
 export type ProgressStage = "pin_lookup" | "reasoning" | "structuring" | "checking"
@@ -287,6 +343,7 @@ export interface ProgressEvent {
 export type AnalysisEvent =
   | { type: "design_summary"; summary: DesignSummary }
   | { type: "progress"; progress: ProgressEvent }
+  | { type: "datasheet_facts"; facts: DatasheetFacts }
   | { type: "simulation"; simulation: Simulation }
   | { type: "result"; result: CheckedAnalysis }
   | { type: "error"; message: string }
@@ -307,6 +364,9 @@ export interface Run {
   stage: ProgressStage | null
   result: CheckedAnalysis | null
   error: string | null
+  /** The stream is open: until the result, and after it while the
+   *  vendor-model simulations run. */
+  streaming: boolean
   /** In the order they finished. */
   simulations: Simulation[]
   /** Questions asked about each simulation, by simulation id. */

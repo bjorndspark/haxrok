@@ -58,6 +58,9 @@ from app.features.debug.schemas import (
     AskRequest,
     Calculation,
     Claim,
+    DatasheetFactsEvent,
+    DatasheetLine,
+    DatasheetReadFailure,
     DatasheetStatus,
     DesignSummary,
     ErcEntry,
@@ -322,8 +325,9 @@ async def _review(
     facts: FactReader | None,
     reading_task: Awaitable[DatasheetReading],
 ) -> AsyncIterator[SseEvent]:
-    """The model's part of the stream: progress, then result or error.
-    ``reading_task`` is ``_read``'s, shared with the vendor-model runs."""
+    """The model's part of the stream: progress, the datasheet facts (when a
+    datasheet was found), then result or error. ``reading_task`` is
+    ``_read``'s, shared with the vendor-model runs."""
     found_sheets = sum(1 for s in prepared.datasheets if s.status == "found")
     if facts is not None and found_sheets:
         yield _progress(
@@ -367,6 +371,8 @@ async def _review(
         read += (
             f" {n_dev} deviation{'s' if n_dev > 1 else ''} from a datasheet's typical application."
         )
+    if facts is not None and found_sheets:
+        yield _event("datasheet_facts", _datasheet_facts(reading, deviations).model_dump_json())
     yield _progress(
         "pin_lookup",
         f"Pin data for {with_data} of {len(table.ics)} ICs.{read}{found}{notes}{calcs}",
@@ -490,6 +496,23 @@ def _progress(stage: str, message: str) -> SseEvent:
     return _event(
         "progress",
         ProgressEvent.model_validate({"stage": stage, "message": message}).model_dump_json(),
+    )
+
+
+def _datasheet_facts(
+    reading: DatasheetReading, deviations: list[application.Deviation]
+) -> DatasheetFactsEvent:
+    """The datasheet_facts event: what claims can cite, for the browser."""
+    return DatasheetFactsEvent(
+        datasheet_facts=[
+            DatasheetLine(id=f.id, ref=f.ref, page=f.page, text=f.body) for f in reading.facts
+        ],
+        deviations=[
+            DatasheetLine(id=d.id, ref=d.ref, page=d.page, text=d.text) for d in deviations
+        ],
+        datasheet_failures=[
+            DatasheetReadFailure(ref=ref, reason=why) for ref, why in reading.failed.items()
+        ],
     )
 
 

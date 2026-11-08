@@ -336,8 +336,11 @@ def test_fact_line_shows_the_allowed_range_and_optional_parts():
     vdda = VDDA.model_copy(update={"max": 22})
     lines = facts._fact_lines(DatasheetFacts(pins=[], limits=[], application=[vdda]))
     assert lines == [
-        "p.44 typical application: VDDA filter capacitor, capacitor 1 µF, on pins 9, "
-        "allowed min 0.1, max 22 µF (p.99), optional"
+        (
+            44,
+            "typical application: VDDA filter capacitor, capacitor 1 µF, on pins 9, "
+            "allowed min 0.1, max 22 µF (p.99), optional",
+        )
     ]
 
 

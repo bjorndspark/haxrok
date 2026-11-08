@@ -8,6 +8,7 @@ import { Prompt } from "@/shared/ui/prompt"
 import { useMessages } from "../messages"
 import {
   assess,
+  citedLines,
   confidenceLabel,
   findingTokens,
   isReview,
@@ -27,6 +28,7 @@ import type {
   Severity,
   Simulation,
 } from "../types"
+import { DatasheetLineText } from "./DatasheetLineText"
 import { GlossaryText } from "./GlossaryText"
 import { MarkedText } from "./MarkedText"
 import { SimulationPlot } from "./SimulationPlot"
@@ -137,9 +139,10 @@ function Disclosure({
   )
 }
 
-function ClaimRow({ claim }: { claim: CheckedClaim }) {
+function ClaimRow({ claim, summary }: { claim: CheckedClaim; summary: DesignSummary | null }) {
   const m = useMessages()
   const label = m.present.evidence
+  const cited = citedLines(claim, summary)
   return (
     <div className="flex flex-col gap-1 border-l-2 pl-[1ch] sm:flex-row sm:items-start sm:gap-[1ch]">
       <Badge tone={EVIDENCE_TONE[claim.evidence]} bracket className="self-start">
@@ -147,6 +150,15 @@ function ClaimRow({ claim }: { claim: CheckedClaim }) {
       </Badge>
       <div className="space-y-1">
         <p className="leading-relaxed">{claim.text}</p>
+        {cited.length > 0 && (
+          <ul className="space-y-0.5 text-xs">
+            {cited.map((line) => (
+              <li key={line.id} className="leading-relaxed">
+                <DatasheetLineText line={line} />
+              </li>
+            ))}
+          </ul>
+        )}
         {claim.downgraded && claim.claimed_evidence && (
           <p className="text-warn">
             {m.hypothesis.labelledBy(label[claim.claimed_evidence], claim.reason ?? "")}
@@ -391,7 +403,7 @@ export function HypothesisCard({
             </div>
           ))}
           {h.claims.map((c, i) => (
-            <ClaimRow key={i} claim={c} />
+            <ClaimRow key={i} claim={c} summary={summary} />
           ))}
         </Disclosure>
 

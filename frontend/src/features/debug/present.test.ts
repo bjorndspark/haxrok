@@ -7,7 +7,11 @@ import {
   markTokens,
   assess,
   calculationBadge,
+  citedLines,
+  datasheetBadge,
+  datasheetLines,
   diagramLayout,
+  modelBadge,
   nearestPoint,
   simulationLayout,
   splitGlossary,
@@ -361,6 +365,7 @@ describe("toMarkdown", () => {
       stage: null,
       result: null,
       error: null,
+      streaming: false,
       simulations: [sim],
       chats: { sim1: [{ question: "When does it pass 63%?", answer: "At 10 ms." }] },
       resultChat: [{ question: "Which finding first?", answer: "None were found." }],
@@ -386,6 +391,226 @@ describe("toMarkdown", () => {
     expect(md).toContain(
       "## Follow-up questions\n\n**Q:** Which finding first?\n\nNone were found.",
     )
+  })
+})
+
+const sheetSummary = {
+  mode: "review",
+  project: "board",
+  parts: 3,
+  nets: 2,
+  erc: [],
+  symptoms: [],
+  measurements: [],
+  datasheets: [
+    {
+      ref: "U2",
+      value: "STM32G0",
+      status: "found",
+      source: "lcsc",
+      url: "https://x.test/u2.pdf",
+      part_number: null,
+      reason: null,
+    },
+    {
+      ref: "U3",
+      value: "TPS63020",
+      status: "found",
+      source: "lcsc",
+      url: "https://x.test/u3.pdf",
+      part_number: null,
+      reason: null,
+    },
+    {
+      ref: "U4",
+      value: "ESP32",
+      status: "not_found",
+      source: null,
+      url: null,
+      part_number: null,
+      reason: "no LCSC part number",
+    },
+  ],
+  spice_models: [
+    {
+      ref: "U2",
+      value: "STM32G0",
+      status: "none",
+      source: null,
+      url: null,
+      file: null,
+      subckt: null,
+      part_number: null,
+      reason: "no model on the vendor's page",
+      loads: null,
+    },
+    {
+      ref: "U3",
+      value: "TPS63020",
+      status: "pspice",
+      source: "web",
+      url: null,
+      file: "tps63020.lib",
+      subckt: "TPS63020",
+      part_number: null,
+      reason: "ngspice: unknown parameter",
+      loads: false,
+    },
+  ],
+  datasheet_facts: [
+    { id: "ds1", ref: "U2", page: 44, text: "VDD supply voltage: 1.7 to 3.6 V" },
+    { id: "ds2", ref: "U2", page: 4, text: "VDDA must equal VDD" },
+    { id: "ds3", ref: "U2", page: 44, text: "VDDA filter: 1 µF" },
+  ],
+  deviations: [{ id: "dv1", ref: "U2", page: 44, text: "VDDA has no 1 µF capacitor" }],
+  datasheet_failures: [{ ref: "U3", reason: "the PDF has no text (a scan?)" }],
+} as unknown as DesignSummary
+
+const datasheetClaim: CheckedClaim = {
+  text: "VDDA has no filter capacitor.",
+  evidence: "datasheet",
+  cites: [
+    { kind: "datasheet", pin: null, net: null, id: "dv1" },
+    { kind: "datasheet", pin: null, net: null, id: "ds3" },
+    { kind: "datasheet", pin: null, net: null, id: "ds9" },
+    { kind: "pin_on_net", pin: "U2.9", net: "+3V3", id: null },
+  ],
+  downgraded: false,
+  claimed_evidence: null,
+  reason: null,
+}
+
+describe("datasheetBadge", () => {
+  it("links a read datasheet and lists the pages its facts came from", () => {
+    expect(datasheetBadge("U2", sheetSummary, en)).toEqual({
+      label: "datasheet",
+      tone: "ok",
+      url: "https://x.test/u2.pdf",
+      pages: "pp. 4, 44",
+      reason: null,
+    })
+  })
+
+  it("warns about a datasheet that was found but couldn't be read", () => {
+    const badge = datasheetBadge("U3", sheetSummary, en)
+    expect([badge?.tone, badge?.pages, badge?.reason]).toEqual([
+      "warn",
+      null,
+      "the PDF has no text (a scan?)",
+    ])
+  })
+
+  it("says why there is no datasheet, and nothing for older runs", () => {
+    expect(datasheetBadge("U4", sheetSummary, en)?.reason).toBe("no LCSC part number")
+    expect(datasheetBadge("U9", sheetSummary, en)).toBeNull()
+  })
+})
+
+describe("modelBadge", () => {
+  it("names the format and that ngspice doesn't load it, with why", () => {
+    expect(modelBadge("U3", sheetSummary, en)).toMatchObject({
+      label: "PSpice model · doesn't load",
+      tone: "warn",
+      reason: "ngspice: unknown parameter",
+    })
+  })
+
+  it("shows no model with the reason", () => {
+    expect(modelBadge("U2", sheetSummary, en)).toMatchObject({
+      label: "no model",
+      tone: "neutral",
+      reason: "no model on the vendor's page",
+    })
+  })
+})
+
+describe("citedLines", () => {
+  it("lists the cited facts and deviations in order, linked to their page", () => {
+    expect(citedLines(datasheetClaim, sheetSummary).map((l) => [l.id, l.url])).toEqual([
+      ["dv1", "https://x.test/u2.pdf#page=44"],
+      ["ds3", "https://x.test/u2.pdf#page=44"],
+    ])
+  })
+
+  it("is empty without a summary", () => {
+    expect(citedLines(datasheetClaim, null)).toEqual([])
+  })
+})
+
+describe("datasheetLines", () => {
+  it("groups the facts by IC and keeps the deviations apart", () => {
+    const read = datasheetLines(sheetSummary)
+    expect(read.facts.map((g) => [g.ref, g.lines.map((l) => l.id)])).toEqual([
+      ["U2", ["ds1", "ds2", "ds3"]],
+    ])
+    expect(read.deviations[0].url).toBe("https://x.test/u2.pdf#page=44")
+  })
+})
+
+describe("toMarkdown with datasheets and vendor models", () => {
+  const vendor: Simulation = {
+    id: "vm1",
+    calc_id: null,
+    ref: "U3",
+    analysis: "startup",
+    verdict: "flagged",
+    title: "U3 start-up with its vendor model",
+    deck: "",
+    t: [],
+    t_unit: "ms",
+    v: [],
+    levels: [],
+    text: "+3V3 overshoots to 4.3 V, past U2's 3.6 V.",
+  }
+  const run: Run = {
+    number: 1,
+    trigger: "Review before ordering",
+    startedAt: 0,
+    finishedAt: 1,
+    summary: null,
+    stage: null,
+    result: null,
+    error: null,
+    streaming: false,
+    simulations: [vendor],
+    chats: {},
+    resultChat: [],
+  }
+  const result = {
+    hypotheses: [
+      {
+        id: "h1",
+        rank: 1,
+        severity: "will_fail",
+        title: "VDDA unfiltered",
+        summary: "s",
+        claims: [datasheetClaim],
+        explains: [],
+        does_not_explain: [],
+        confirm: [],
+        fix: { schematic: [], rework: [] },
+      },
+    ],
+    open_questions: [],
+    glossary: [],
+  } as unknown as CheckedAnalysis
+  const md = toMarkdown(run, sheetSummary, result, en, "Häxrök")
+
+  it("lists each claim's cited datasheet lines with a page link", () => {
+    expect(md).toContain(
+      "- VDDA has no filter capacitor. — *Based on the datasheet*\n" +
+        "  - dv1 · [p.44](https://x.test/u2.pdf#page=44) VDDA has no 1 µF capacitor\n" +
+        "  - ds3 · [p.44](https://x.test/u2.pdf#page=44) VDDA filter: 1 µF\n",
+    )
+  })
+
+  it("writes vendor-model runs under their own heading with the verdict", () => {
+    expect(md).toContain(
+      "## Simulated with vendor models\n\n### U3 start-up with its vendor model\n\n" +
+        "Verdict: **flagged**\n\n+3V3 overshoots to 4.3 V, past U2's 3.6 V.",
+    )
+    expect(md).not.toContain("## Simulations\n")
+    expect(md).not.toContain("```spice")
   })
 })
 

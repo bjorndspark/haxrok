@@ -8,11 +8,22 @@
 import { useLanguage, type Language } from "@/shared/lib/language"
 
 import type { Confidence } from "./present"
-import type { ConfirmStep, Evidence, ProgressStage, Severity } from "./types"
+import type {
+  ConfirmStep,
+  Evidence,
+  ProgressStage,
+  Severity,
+  SimAnalysis,
+  SimVerdict,
+  SpiceModelStatus,
+} from "./types"
 
 type StepKey = "upload" | ProgressStage
 
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`
+
+/** "p. 4" or "pp. 4, 7, 44". */
+const pageList = (pages: number[]) => `${pages.length === 1 ? "p." : "pp."} ${pages.join(", ")}`
 
 const en = {
   header: {
@@ -71,6 +82,8 @@ const en = {
     error: "ERROR",
     backToResults: "Back to results",
     submit: { review: "Review schematic", debug: "Analyze schematic" },
+    analysesTitle: "Simulate regulators with their vendor models",
+    analysesNote: "Only for ICs whose SPICE model loads in ngspice; each takes a few minutes.",
   },
   symptoms: {
     hints: {
@@ -227,9 +240,39 @@ Used outdoors, so it may see -10 °C.`,
     symptoms: "Symptoms",
     andMeasurements: " and measurements",
     step: (id: string) => ` (step ${id})`,
+    datasheet: "datasheet",
+    pages: pageList,
+    noDatasheet: "no datasheet",
+    model: {
+      ngspice: "ngspice model",
+      pspice: "PSpice model",
+      ltspice: "LTspice model",
+      encrypted: "encrypted model",
+      none: "no model",
+      skipped: "no model",
+    } satisfies Record<SpiceModelStatus["status"], string>,
+    loads: "loads",
+    doesntLoad: "doesn't load",
+    datasheetFacts: (n: number) => `Datasheet facts (${String(n)})`,
+    deviations: (n: number) => `Deviations from the typical application (${String(n)})`,
   },
   simulations: {
     title: (n: number) => `Simulations (${String(n)})`,
+    vendorTitle: (n: number) => `Simulated with vendor models (${String(n)})`,
+    running: "Vendor-model simulations still running",
+    stop: "Stop",
+    analysis: {
+      startup: "start-up",
+      load_step: "load step",
+      dropout: "dropout",
+    } satisfies Record<SimAnalysis, string>,
+    verdict: {
+      passed: "passed",
+      flagged: "flagged",
+      timed_out: "timed out",
+      failed: "failed",
+      skipped: "skipped",
+    } satisfies Record<SimVerdict, string>,
     netlist: "ngspice netlist",
     suggestions: ["What does this show?", "Is there enough margin?", "What should I check?"],
     reading: "reading the waveform…",
@@ -264,7 +307,7 @@ Used outdoors, so it may see -10 °C.`,
     evidence: {
       schematic: "Based on your schematic",
       erc: "Based on KiCad's checker",
-      datasheet: "Based on the datasheet pin table",
+      datasheet: "Based on the datasheet",
       reference: "Based on the manufacturer's design",
       measurement: "Based on your measurement",
       none: "No direct evidence",
@@ -327,6 +370,8 @@ Used outdoors, so it may see -10 °C.`,
     rework: "Rework:",
     nextRevision: "Next revision:",
     simulations: "## Simulations",
+    vendorSimulations: "## Simulated with vendor models",
+    verdict: (verdict: string) => `Verdict: **${verdict}**`,
     followUps: "## Follow-up questions",
     openQuestions: "## Open questions",
     suggestedCheck: (check: string) => ` (check: ${check})`,
@@ -389,6 +434,8 @@ const ja: Messages = {
     error: "エラー",
     backToResults: "結果に戻る",
     submit: { review: "回路図をレビュー", debug: "回路図を解析" },
+    analysesTitle: "レギュレータをメーカーのモデルでシミュレーション",
+    analysesNote: "SPICE モデルが ngspice で読み込める IC だけが対象で、1 つに数分かかります。",
   },
   symptoms: {
     hints: {
@@ -542,9 +589,39 @@ USB 5 V では動く: マイコンが起動する。
     symptoms: "症状",
     andMeasurements: "と測定値",
     step: (id: string) => ` (ステップ ${id})`,
+    datasheet: "データシート",
+    pages: pageList,
+    noDatasheet: "データシートなし",
+    model: {
+      ngspice: "ngspice モデル",
+      pspice: "PSpice モデル",
+      ltspice: "LTspice モデル",
+      encrypted: "暗号化モデル",
+      none: "モデルなし",
+      skipped: "モデルなし",
+    },
+    loads: "読み込み可",
+    doesntLoad: "読み込み不可",
+    datasheetFacts: (n: number) => `データシートの事実 (${String(n)})`,
+    deviations: (n: number) => `標準アプリケーションとの違い (${String(n)})`,
   },
   simulations: {
     title: (n: number) => `シミュレーション (${String(n)})`,
+    vendorTitle: (n: number) => `メーカーのモデルでのシミュレーション (${String(n)})`,
+    running: "メーカーのモデルでのシミュレーションを実行中",
+    stop: "停止",
+    analysis: {
+      startup: "起動",
+      load_step: "負荷ステップ",
+      dropout: "ドロップアウト",
+    },
+    verdict: {
+      passed: "合格",
+      flagged: "要注意",
+      timed_out: "タイムアウト",
+      failed: "失敗",
+      skipped: "スキップ",
+    },
     netlist: "ngspice ネットリスト",
     suggestions: ["これは何を示している?", "マージンは十分?", "何を確認すべき?"],
     reading: "波形を読んでいます…",
@@ -574,7 +651,7 @@ USB 5 V では動く: マイコンが起動する。
     evidence: {
       schematic: "回路図に基づく",
       erc: "KiCad のチェッカーに基づく",
-      datasheet: "データシートのピン表に基づく",
+      datasheet: "データシートに基づく",
       reference: "メーカーの設計に基づく",
       measurement: "あなたの測定値に基づく",
       none: "直接の根拠なし",
@@ -637,6 +714,8 @@ USB 5 V では動く: マイコンが起動する。
     rework: "改造:",
     nextRevision: "次の版:",
     simulations: "## シミュレーション",
+    vendorSimulations: "## メーカーのモデルでのシミュレーション",
+    verdict: (verdict: string) => `判定: **${verdict}**`,
     followUps: "## 追加の質問",
     openQuestions: "## 未解決の疑問",
     suggestedCheck: (check: string) => ` (確認: ${check})`,

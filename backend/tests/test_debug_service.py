@@ -887,6 +887,54 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
         "datasheet",
     ]
 
+    # The facts and deviations reach the browser before the review ends, so
+    # the UI can show what each datasheet claim cites, with its page.
+    names = [name for name, _ in events]
+    assert names.count("datasheet_facts") == 1
+    assert names.index("datasheet_facts") < names.index("result")
+    sheet = events[names.index("datasheet_facts")][1]
+    assert sheet["datasheet_facts"][0] == {
+        "id": "ds1",
+        "ref": "U2",
+        "page": 5,
+        "text": "VIN input voltage: min 2, max 16 V",
+    }
+    assert [d["id"] for d in sheet["deviations"]] == ["dv1"]
+    assert sheet["deviations"][0]["page"] == 5
+    assert sheet["datasheet_failures"] == []
+
+
+async def test_datasheet_facts_names_a_datasheet_that_couldnt_be_read():
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
+    found = DatasheetStatus(
+        ref="U2", value="TPS63070RNMR", status="found", path="/app/data/datasheets/scan.pdf"
+    )
+    prepared = dataclasses.replace(prepared, datasheets=[found, prepared.datasheets[1]])
+
+    async def extract(system: str, user: str) -> DatasheetFacts:
+        raise AssertionError("a PDF with no text isn't sent to the model")
+
+    class Cache:
+        async def get(self, key: str) -> str | None:
+            return None
+
+        async def put(self, key: str, value: str) -> None:
+            pass
+
+    reader = FactReader(extract, Cache(), lambda path: [])
+    events = [
+        (e["event"], json.loads(e["data"]))
+        async for e in service.stream(prepared, service.Model(_diagnose, _structure), facts=reader)
+    ]
+    sheet = next(data for name, data in events if name == "datasheet_facts")
+    assert sheet == {
+        "datasheet_facts": [],
+        "deviations": [],
+        "datasheet_failures": [{"ref": "U2", "reason": "the PDF has no text (a scan?)"}],
+    }
+
 
 async def test_model_failure_ends_the_stream_with_an_error_event():
     prepared = await service.prepare(
@@ -1132,12 +1180,53 @@ async def test_ask_result_sends_the_checks_findings_and_conversation():
     assert "## Symptoms\n- s1: Dead" in user
     assert "### h1 (#1): L2 is on the output rail" in user
     assert "U2.9 (L2) is on +3V3." in user
-    assert "downgraded): It reads 0 ohm." in user  # m2 was never measured
+    assert "downgraded; cites m2): It reads 0 ohm." in user  # m2 was never measured
     assert user.index("Q: Is h1 real?") < user.index("## Question\nHow do I fix h1?")
 
     seen.clear()
     await service.ask_result(req.model_copy(update={"language": "ja"}), answer)
     assert seen[0][0] == prompt.in_language(prompt.ASK_RESULT, "ja")
+
+
+async def test_ask_result_sends_the_datasheet_facts_and_what_each_claim_cites():
+    from app.features.debug.schemas import ResultAskRequest
+
+    summary, result = await _finished_run()
+    # As the browser holds it after merging the datasheet_facts event.
+    summary |= {
+        "datasheet_facts": [
+            {"id": "ds1", "ref": "U2", "page": 5, "text": "VIN input voltage: min 2, max 16 V"}
+        ],
+        "deviations": [
+            {"id": "dv1", "ref": "U2", "page": 5, "text": "U2: inductor L1 is out of range (p.5)."}
+        ],
+    }
+    seen: list[str] = []
+
+    async def answer(system: str, user: str) -> str:
+        seen.append(user)
+        return "16 V, ds1."
+
+    req = ResultAskRequest.model_validate(
+        {"summary": summary, "result": result, "question": "What's VIN's limit?"}
+    )
+    await service.ask_result(req, answer)
+    assert (
+        "## Read from the datasheets\n"
+        "- ds1 U2 p.5: VIN input voltage: min 2, max 16 V\n"
+        "- dv1 deviation: U2: inductor L1 is out of range (p.5)."
+    ) in seen[0]
+    assert "- claim (none, downgraded; cites m2): It reads 0 ohm." in seen[0]
+
+    # A summary from before the datasheets were read has no such section.
+    seen.clear()
+    await service.ask_result(
+        ResultAskRequest.model_validate(
+            {"summary": (await _finished_run())[0], "result": result, "question": "Why?"}
+        ),
+        answer,
+    )
+    assert "## Read from the datasheets" not in seen[0]
 
 
 async def test_blank_symptoms_are_refused_before_kicad_runs():

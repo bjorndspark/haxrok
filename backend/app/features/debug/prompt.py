@@ -19,6 +19,7 @@ user's language; the diagnosis stays English, since it is internal reasoning.
 from app.features.debug.schemas import (
     AskTurn,
     CheckedAnalysis,
+    CheckedClaim,
     DesignSummary,
     Language,
     Measurement,
@@ -472,14 +473,16 @@ ASK_RESULT = """\
 You answer a hardware engineer's follow-up question about an analysis of \
 their KiCad schematic that has already run. You get what the backend parsed \
 and checked (verified: ERC, wiring findings, calculations, reference notes; \
-unverified: pin warnings) and the findings the analysis reported, each with \
-its claims, tests and fixes.
+unverified: pin warnings), the facts read from the board's datasheets (ds1, \
+...) with the page each came from, the board's deviations from a datasheet's \
+typical application (dv1, ...), and the findings the analysis reported, each \
+with its claims, tests and fixes.
 
-- Answer from that input. Name the finding (h1, ...), part, pin or net you \
-mean, and say which entry you used.
-- You don't see the full netlist or the datasheets. When the answer depends \
-on a connection or part fact the input doesn't show, say so and say what to \
-check, and don't make it up.
+- Answer from that input. Name the finding (h1, ...), part, pin, net, fact or \
+deviation you mean, and say which entry you used.
+- You don't see the full netlist or the whole datasheets, only the facts \
+listed. When the answer depends on a connection or part fact the input \
+doesn't show, say so and say what to check, and don't make it up.
 - A claim marked downgraded didn't hold up against the input; don't repeat it \
 as fact.
 - When asked to change a fix or a part value, work it out and say it is a \
@@ -513,6 +516,12 @@ def build_result_ask_message(
         *(f"- {r.id} {r.part} ({r.source}): {r.text}" for r in summary.references),
     ]
     parts.append("## Checked by the backend\n" + ("\n".join(checked) or "(nothing)"))
+    if summary.datasheet_facts or summary.deviations:
+        read = [
+            *(f"- {f.id} {f.ref} p.{f.page}: {f.text}" for f in summary.datasheet_facts),
+            *(f"- {d.id} deviation: {d.text}" for d in summary.deviations),
+        ]
+        parts.append("## Read from the datasheets\n" + "\n".join(read))
     findings = []
     for h in result.hypotheses:
         lines = [
@@ -522,7 +531,7 @@ def build_result_ask_message(
             h.summary,
         ]
         lines += [
-            f"- claim ({c.evidence}{', downgraded' if c.downgraded else ''}): {c.text}"
+            f"- claim ({c.evidence}{', downgraded' if c.downgraded else ''}{_cited(c)}): {c.text}"
             for c in h.claims
         ]
         lines += [f"- test {s.id}: {s.instruction}" for s in h.confirm]
@@ -535,6 +544,12 @@ def build_result_ask_message(
             "## Open questions\n" + "\n".join(f"- {q.text}" for q in result.open_questions)
         )
     return _with_question(parts, history, question)
+
+
+def _cited(claim: CheckedClaim) -> str:
+    """'; cites ds4, dv1' for the ids a claim cites, '' for none."""
+    ids = [c.id for c in claim.cites if c.id]
+    return f"; cites {', '.join(ids)}" if ids else ""
 
 
 # --- datasheet facts -------------------------------------------------------------

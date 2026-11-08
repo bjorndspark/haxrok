@@ -167,7 +167,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `004-datasheets-and-simulation.md` step 7 (the UI shows datasheets,
-   models and simulated findings).
-2. `003-simulate-and-ask.md` steps 3–4 (what-if re-runs, circuits a
+1. `003-simulate-and-ask.md` steps 3–4 (what-if re-runs, circuits a
    formula can't answer): ask first.

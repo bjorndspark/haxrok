@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-07 | 2026-11-08 | In progress | — | `001-mvp-scope.md`, `003-simulate-and-ask.md`, `DECISIONS.md` ("Datasheet facts come from memory until retrieval") |
+| 2026-11-07 | 2026-11-08 | Done | — | `001-mvp-scope.md`, `003-simulate-and-ask.md`, `DECISIONS.md` ("Datasheet facts come from memory until retrieval") |
 
 Part facts come from the model's memory today, so they're labelled
 "unverified" and can't back a finding on their own. A hand-written pin table
@@ -712,7 +712,7 @@ flagged, passed at 4.0 V in). Asking about a skipped run raised
 `IndexError` (no samples) and the prompt called every run an ideal RC.
 Orbit's KiCad 10 netlist pin names, above.
 
-## 7. The UI shows datasheets, models and simulated findings: proposed
+## 7. The UI shows datasheets, models and simulated findings: done
 
 - Upload form: which analyses to run (step 6).
 - Vendor-model simulations (step 6) arrive after the `result`, with
@@ -765,3 +765,43 @@ Decided (2026-11-08), defaults:
   `evals/README.md` changes only if results do; routes don't change.
 - This step is big (backend and frontend), so it's built in its own
   session.
+Decided (2026-11-08), while building: claims never carry `simulation`
+evidence (the vendor-model runs come after the result, so no claim can
+cite them). The "simulation evidence" label is the vendor card's verdict
+badge, and `Evidence` keeps its values.
+
+Built on 2026-11-08:
+- Backend: `facts.py` keeps each fact's ref and page (`Fact`), and
+  `service.stream` sends `datasheet_facts` (facts, deviations, read
+  failures) before the review, only when a datasheet was found.
+  `DesignSummary` gains the three fields, empty by default.
+  `ASK_RESULT` lists them, with each claim's cited ids.
+- Frontend: `Run.streaming` is true until the stream closes, so a run
+  can be finished and still receiving vendor-model runs; stopping then
+  keeps the result. `present.ts` builds the badges (`datasheetBadge`,
+  `modelBadge`), the cited lines (`citedLines`, `datasheetLines`) and the
+  report's new sections; `DatasheetLineText` renders one line, used by
+  the claim rows and the summary card's "Datasheet facts (N)".
+  `VendorSimulationsCard` sits under the result's chat; the RC card
+  shows only plan 003's runs. The form's checkboxes are `AnalysisPicker`
+  over `SIM_ANALYSES`, toggled in the store.
+- `README.md` describes the vendor-model runs and the two new SSE events.
+  Routes don't change, and `evals/README.md` doesn't (no new results).
+
+**Checks:** backend pytest 276 passed, including the `datasheet_facts`
+event and its order, its absence with no datasheet, and `ASK_RESULT`
+with the facts; frontend vitest 39 passed (10 new: the datasheet and
+model badges, cited lines in order with their page links, and the
+report's cited lines, vendor heading and verdict with no empty netlist).
+ruff, ruff format, mypy, eslint, tsc and prettier clean. `ASK_RESULT`
+isn't a debug prompt, so no `make eval-app` run. The full run from the
+UI on orbit wasn't done in this session: the vendor-model runs take
+6–8 minutes each (step 6), so it's left to the review.
+
+**Bugs found:** none in the change itself. The first backend run failed
+three tests that still expected the old shapes (a fact line as one
+string, a claim line without its cited ids); they were updated. Typing a
+claim's cite ids needed `flatMap` instead of `filter(... !== null)`.
+ruff format and prettier each reformatted one long line. `make lint`
+and `make test` need GNU make's `--output-sync`, so on this machine
+their targets ran one by one.

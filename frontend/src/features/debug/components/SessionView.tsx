@@ -14,7 +14,7 @@ import { DesignSummaryCard } from "./DesignSummaryCard"
 import { GlossaryText } from "./GlossaryText"
 import { HypothesisCard } from "./HypothesisCard"
 import { ResultChatCard } from "./ResultChatCard"
-import { SimulationsCard } from "./SimulationsCard"
+import { SimulationsCard, VendorSimulationsCard } from "./SimulationsCard"
 
 function RunHeader({ run, total }: { run: Run; total: number }) {
   const t = useMessages().session
@@ -73,6 +73,7 @@ function RunBody({
           )}
         </Card>
         <SimulationsCard run={run} />
+        <VendorSimulationsCard run={run} onStop={actions.cancel} />
         {run.summary && latest && <DesignSummaryCard summary={run.summary} />}
       </div>
     )
@@ -107,6 +108,8 @@ function RunBody({
       ))}
 
       {run.summary && <ResultChatCard run={run} summary={run.summary} result={result} />}
+
+      <VendorSimulationsCard run={run} onStop={actions.cancel} />
 
       <SimulationsCard run={run} />
 

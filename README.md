@@ -52,7 +52,11 @@ Scope, the go/no-go result and the ideas weighed against this one are in
       typical application are cited by page. The board is checked against
       each typical application in code: a missing required part, a value
       outside the datasheet's range, a tied pin left open, an inductor whose
-      value field disagrees with its part number
+      value field disagrees with its part number. Regulators whose vendor
+      SPICE model loads in ngspice are then simulated (start-up, load step
+      or dropout, ticked per run) and flagged against the datasheet's
+      limits. The page shows each IC's datasheet and model, and under each
+      claim the facts it cites, linked to their page
       (`docs/plans/001-100/004-datasheets-and-simulation.md`)
 - [ ] Stretch: agent loop, what-if re-runs ("try C5 = 1 µF")
 
@@ -124,6 +128,7 @@ sequenceDiagram
     par ngspice runs alongside the model
         S-->>B: SSE simulation (each)
     and
+        S-->>B: SSE datasheet_facts (when a datasheet was read)
         S-->>B: SSE progress "reasoning"
         S->>AI: debug_diagnosis (free text)
         AI->>R: cache lookup
@@ -137,6 +142,7 @@ sequenceDiagram
         S->>S: evidence check, wiring diagrams
     end
     S-->>B: SSE result
+    S-->>B: SSE simulation (each vendor-model run)
 
     B->>S: POST /debug/ask
     S->>AI: debug_ask (free text)

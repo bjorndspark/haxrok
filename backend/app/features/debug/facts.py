@@ -68,7 +68,13 @@ class Fact:
 
     id: str  # "ds3"
     ref: str
-    text: str  # "p.44 VDD supply voltage: min 2.4, max 3.6 V"
+    page: int  # the datasheet page it was read from
+    body: str  # "VDD supply voltage: min 2.4, max 3.6 V"
+
+    @property
+    def text(self) -> str:
+        """The fact as the model reads it: "p.44 VDD supply voltage: …"."""
+        return f"p.{self.page} {self.body}"
 
 
 @dataclass(frozen=True)
@@ -152,9 +158,9 @@ class FactReader:
                 reading.application[sheet.ref] = got.application
             if got.limits:
                 reading.limits[sheet.ref] = got.limits
-            for line in _fact_lines(got):
+            for page, body in _fact_lines(got):
                 n += 1
-                reading.facts.append(Fact(f"ds{n}", sheet.ref, line))
+                reading.facts.append(Fact(f"ds{n}", sheet.ref, page, body))
             logger.info(
                 "datasheet facts %s (%s): %d pins, %d limits, %d application parts",
                 sheet.ref,
@@ -235,8 +241,9 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
 _NO_RANGE = {"min": None, "max": None, "unit": "", "range_page": None}
 
 
-def _fact_lines(facts: DatasheetFacts) -> list[str]:
-    lines = []
+def _fact_lines(facts: DatasheetFacts) -> list[tuple[int, str]]:
+    """Each limit and typical-application part as (page, text)."""
+    lines: list[tuple[int, str]] = []
     for lim in facts.limits:
         bounds = [
             f"{k} {_num(v)}"
@@ -244,7 +251,7 @@ def _fact_lines(facts: DatasheetFacts) -> list[str]:
             if v is not None
         ]
         cond = f" ({lim.conditions})" if lim.conditions else ""
-        lines.append(f"p.{lim.page} {lim.parameter}: {', '.join(bounds) or '?'} {lim.unit}{cond}")
+        lines.append((lim.page, f"{lim.parameter}: {', '.join(bounds) or '?'} {lim.unit}{cond}"))
     for a in facts.application:
         on = f", on pins {', '.join(a.pins)}" if a.pins else ""
         value = f" {a.value}" if a.value else ""
@@ -252,7 +259,7 @@ def _fact_lines(facts: DatasheetFacts) -> list[str]:
         allowed = f", allowed {', '.join(bounds)} {a.unit} (p.{a.range_page})" if bounds else ""
         optional = "" if a.required else ", optional"
         lines.append(
-            f"p.{a.page} typical application: {a.role}, {a.kind}{value}{on}{allowed}{optional}"
+            (a.page, f"typical application: {a.role}, {a.kind}{value}{on}{allowed}{optional}")
         )
     return lines
 

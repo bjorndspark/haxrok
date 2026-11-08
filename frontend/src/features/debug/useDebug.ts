@@ -30,6 +30,9 @@ function applyEvent(run: Run, ev: AnalysisEvent): Partial<Run> {
       return { summary: ev.summary }
     case "progress":
       return { stage: ev.progress.stage }
+    case "datasheet_facts":
+      // Into the summary, so the report and /ask-result carry the facts.
+      return { summary: run.summary && { ...run.summary, ...ev.facts } }
     case "simulation":
       return { simulations: [...run.simulations, ev.simulation] }
     case "result":
@@ -79,21 +82,31 @@ export function useDebugActions(): DebugActions {
         store.symptoms,
         useDebugStore.getState().measurements,
         store.mode,
+        store.analyses,
         useLanguage.getState().language,
         controller.signal,
       )) {
         update(number, (r) => applyEvent(r, ev))
       }
       update(number, (r) =>
-        r.finishedAt === null ? { error: errors.closedEarly, finishedAt: Date.now() } : {},
+        r.finishedAt === null
+          ? { error: errors.closedEarly, finishedAt: Date.now(), streaming: false }
+          : { streaming: false },
       )
     } catch (e) {
       const cancelled = controller.signal.aborted
-      update(number, () => ({
-        error: cancelled ? errors.cancelled : errorMessage(e, errors.failed),
-        finishedAt: Date.now(),
-        stage: null,
-      }))
+      update(number, (r) =>
+        // Stopped (or cut off) after the result, while the vendor-model
+        // simulations ran: the run itself finished, so it keeps its result.
+        r.finishedAt !== null
+          ? { streaming: false }
+          : {
+              error: cancelled ? errors.cancelled : errorMessage(e, errors.failed),
+              finishedAt: Date.now(),
+              stage: null,
+              streaming: false,
+            },
+      )
     }
   }, [])
 

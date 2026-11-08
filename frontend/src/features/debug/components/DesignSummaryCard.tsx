@@ -5,8 +5,16 @@ import { Card } from "@/shared/ui/card"
 import { Title } from "@/shared/ui/title"
 
 import { useMessages } from "../messages"
-import { calculationBadge, findingTokens } from "../present"
+import {
+  calculationBadge,
+  datasheetBadge,
+  datasheetLines,
+  findingTokens,
+  modelBadge,
+  type StatusBadge,
+} from "../present"
 import type { DesignSummary } from "../types"
+import { DatasheetLineText } from "./DatasheetLineText"
 import { MarkedText } from "./MarkedText"
 
 /** A sub-heading as a named rule: `LABEL ─────`, like aitop's machine rows. */
@@ -19,12 +27,33 @@ function Rule({ children }: { children: ReactNode }) {
   )
 }
 
+/** An IC's datasheet or model status: the badge (a link to the PDF when
+ *  there is one), the pages used, and the reason in muted text. */
+function StatusText({ badge }: { badge: StatusBadge }) {
+  return (
+    <span className="min-w-0">
+      {badge.url ? (
+        <a href={badge.url} target="_blank" rel="noreferrer" className="hover:underline">
+          <Badge tone={badge.tone}>{badge.label}</Badge>
+        </a>
+      ) : (
+        <Badge tone={badge.tone}>{badge.label}</Badge>
+      )}
+      {badge.pages && <span className="ml-[1ch] text-muted-foreground">{badge.pages}</span>}
+      {badge.reason && <span className="ml-[1ch] text-muted-foreground">({badge.reason})</span>}
+    </span>
+  )
+}
+
 /** What the backend parsed, shown before the model answers so the user
  *  can check the parse and see which ICs have pin data. */
 export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
   const [showErc, setShowErc] = useState(false)
   const [showSymptoms, setShowSymptoms] = useState(true)
   const [showRefs, setShowRefs] = useState(false)
+  const [showFacts, setShowFacts] = useState(false)
+  const read = datasheetLines(summary)
+  const factCount = (summary.datasheet_facts ?? []).length + read.deviations.length
   const refParts = new Set(summary.references.map((n) => n.part))
   const m = useMessages()
   const t = m.summary
@@ -45,23 +74,35 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
 
       <div className="space-y-2">
         <Rule>{t.icsAndPinData}</Rule>
-        <ul className="space-y-0.5 text-xs">
-          {summary.ics.map((ic) => (
-            <li key={ic.ref} className="flex min-w-0 items-baseline gap-[2ch]">
-              <span className="shrink-0 font-bold text-info">
-                {ic.ref} · {ic.value}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                {ic.footprint || t.noFootprint}
-              </span>
-              <span className="flex shrink-0 gap-[1ch]">
-                {refParts.has(ic.value) && <Badge tone="ok">{t.refDesign}</Badge>}
-                <Badge tone={ic.pin_data ? "ok" : "neutral"}>
-                  {ic.pin_data ? t.pinTable : t.noPinData}
-                </Badge>
-              </span>
-            </li>
-          ))}
+        <ul className="space-y-1.5 text-xs">
+          {summary.ics.map((ic) => {
+            const sheet = datasheetBadge(ic.ref, summary, m)
+            const model = modelBadge(ic.ref, summary, m)
+            return (
+              <li key={ic.ref} className="space-y-0.5">
+                <div className="flex min-w-0 items-baseline gap-[2ch]">
+                  <span className="shrink-0 font-bold text-info">
+                    {ic.ref} · {ic.value}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {ic.footprint || t.noFootprint}
+                  </span>
+                  <span className="flex shrink-0 gap-[1ch]">
+                    {refParts.has(ic.value) && <Badge tone="ok">{t.refDesign}</Badge>}
+                    <Badge tone={ic.pin_data ? "ok" : "neutral"}>
+                      {ic.pin_data ? t.pinTable : t.noPinData}
+                    </Badge>
+                  </span>
+                </div>
+                {(sheet ?? model) && (
+                  <div className="flex flex-col gap-0.5 pl-[2ch] sm:flex-row sm:gap-[2ch]">
+                    {sheet && <StatusText badge={sheet} />}
+                    {model && <StatusText badge={model} />}
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
         {summary.ics.some((ic) => !ic.pin_data) && (
           <p className="text-xs text-muted-foreground">{t.noPinDataNote}</p>
@@ -140,6 +181,50 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
                 </li>
               ))}
             </ul>
+          )}
+        </div>
+      )}
+
+      {factCount > 0 && (
+        <div className="border">
+          <button
+            type="button"
+            onClick={() => setShowFacts(!showFacts)}
+            aria-expanded={showFacts}
+            className="flex w-full items-center justify-between gap-[1ch] px-[1ch] py-2 text-left hover:bg-accent"
+          >
+            <span className="text-xs font-bold">
+              <span className="mr-[1ch]">{showFacts ? "▾" : "▸"}</span>
+              {t.datasheetFacts(factCount)}
+            </span>
+          </button>
+          {showFacts && (
+            <div className="space-y-3 border-t p-[1ch] text-xs">
+              {read.facts.map((group) => (
+                <div key={group.ref} className="space-y-0.5">
+                  <p className="font-bold text-info">{group.ref}</p>
+                  <ul className="space-y-0.5">
+                    {group.lines.map((line) => (
+                      <li key={line.id} className="leading-relaxed">
+                        <DatasheetLineText line={line} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              {read.deviations.length > 0 && (
+                <div className="space-y-0.5 border-l-2 border-warn pl-[1ch]">
+                  <p className="font-bold text-warn">{t.deviations(read.deviations.length)}</p>
+                  <ul className="space-y-0.5">
+                    {read.deviations.map((line) => (
+                      <li key={line.id} className="leading-relaxed">
+                        <DatasheetLineText line={line} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -1,6 +1,9 @@
 import { create } from "zustand"
 
-import type { AskTurn, MeasurementInput, Mode, ProjectFile, Run } from "./types"
+import type { AskTurn, MeasurementInput, Mode, ProjectFile, Run, SimAnalysis } from "./types"
+
+/** Every vendor-model analysis, in the order the form lists them. */
+export const SIM_ANALYSES: SimAnalysis[] = ["startup", "load_step", "dropout"]
 
 /**
  * Debug UI state. There is no server-side history (plan 001: no accounts),
@@ -11,6 +14,8 @@ interface DebugState {
   view: "input" | "session"
   /** Debug a board on the bench, or review one before ordering. */
   mode: Mode
+  /** The vendor-model simulations to run; not kept across reloads. */
+  analyses: SimAnalysis[]
   files: ProjectFile[]
   symptoms: string
   /** Every measurement entered so far; each re-run sends all of them. */
@@ -21,6 +26,8 @@ interface DebugState {
   controller: AbortController | null
   inputError: string | null
   setMode: (mode: Mode) => void
+  /** Tick or untick one analysis; the list keeps SIM_ANALYSES' order. */
+  toggleAnalysis: (analysis: SimAnalysis) => void
   setFiles: (files: ProjectFile[]) => void
   setSymptoms: (text: string) => void
   setInputError: (message: string | null) => void
@@ -39,6 +46,7 @@ interface DebugState {
 export const useDebugStore = create<DebugState>((set, get) => ({
   view: "input",
   mode: "review",
+  analyses: ["startup"],
   files: [],
   symptoms: "",
   measurements: [],
@@ -46,6 +54,10 @@ export const useDebugStore = create<DebugState>((set, get) => ({
   controller: null,
   inputError: null,
   setMode: (mode) => set({ mode, inputError: null }),
+  toggleAnalysis: (analysis) =>
+    set((s) => ({
+      analyses: SIM_ANALYSES.filter((a) => (a === analysis) !== s.analyses.includes(a)),
+    })),
   setFiles: (files) => set({ files, inputError: null }),
   setSymptoms: (symptoms) => set({ symptoms }),
   setInputError: (inputError) => set({ inputError }),
@@ -61,6 +73,7 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       stage: null,
       result: null,
       error: null,
+      streaming: true,
       simulations: [],
       chats: {},
       resultChat: [],

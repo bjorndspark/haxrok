@@ -9,7 +9,7 @@ import { Title } from "@/shared/ui/title"
 
 import { projectName } from "../files"
 import { useMessages } from "../messages"
-import { useDebugStore } from "../store"
+import { SIM_ANALYSES, useDebugStore } from "../store"
 import { fragmentLines, symptomHints, symptomLines } from "../symptoms"
 import type { Mode } from "../types"
 import type { DebugActions } from "../useDebug"
@@ -50,6 +50,34 @@ function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => 
         )
       })}
     </div>
+  )
+}
+
+/** A checkbox per vendor-model analysis (start-up ticked by default). */
+function AnalysisPicker() {
+  const m = useMessages()
+  const analyses = useDebugStore((s) => s.analyses)
+  const toggle = useDebugStore((s) => s.toggleAnalysis)
+  return (
+    <fieldset className="space-y-1.5 text-xs">
+      <legend className="font-bold tracking-wider text-muted-foreground uppercase">
+        {m.input.analysesTitle}
+      </legend>
+      <div className="flex flex-wrap gap-x-[2ch] gap-y-1">
+        {SIM_ANALYSES.map((a) => (
+          <label key={a} className="flex cursor-pointer items-center gap-[1ch]">
+            <input
+              type="checkbox"
+              checked={analyses.includes(a)}
+              onChange={() => toggle(a)}
+              className="accent-foreground"
+            />
+            {m.simulations.analysis[a]}
+          </label>
+        ))}
+      </div>
+      <p className="text-muted-foreground">{m.input.analysesNote}</p>
+    </fieldset>
   )
 }
 
@@ -243,6 +271,8 @@ export function InputView({ actions }: { actions: DebugActions }) {
             {fragments.length > 0 && <span className="text-warn">{t.shortLines(fragments)}</span>}
           </div>
         )}
+
+        <AnalysisPicker />
 
         {inputError && (
           <div className="text-sm" role="alert">
