@@ -4,6 +4,7 @@ logs; then PSpice and LTspice constructs in the real ngspice, skipped when
 it isn't installed. Vendor models aren't committed; ``make spice-corpus``
 runs real ones."""
 
+import re
 import shutil
 from pathlib import Path
 
@@ -13,8 +14,10 @@ from app.features.debug.schemas import SpiceModelStatus
 from app.features.debug.spice import Log, Ngspice
 from app.features.debug.spice_convert import (
     check,
+    convert,
     deck,
     missing_param,
+    pspice_rewrite,
     reached,
     spiceinit,
     subckt_pins,
@@ -92,6 +95,44 @@ def test_spiceinit_sets_the_dialect_mode():
     assert spiceinit("ltspice").startswith("set ngbehavior=lt\n")
     assert "ngbehavior" not in spiceinit("ngspice")
     assert "optran" in spiceinit("ngspice")
+
+
+# --- the PSpice rewrites ------------------------------------------------------------
+
+# TI's XNOR gate and current clamp (TPS63802), continuation lines included.
+XNOR = b"""E_ABMGATE  YINT 0 VALUE {{IF(V(A) > {VTHRESH}  ^  \r
++ V(B) > {VTHRESH},{VSS},{VDD})}}\r
+RINT YINT Y 1\r
+"""
+CLAMP = b"""G_U1 0 ICTRL VALUE { LIMIT(V(COMP) * 2,
++ -1, V(CL)) }
+"""
+
+
+def test_pspice_rewrite_turns_xor_into_a_comparison_of_truth_values():
+    assert pspice_rewrite(XNOR) == (
+        b"E_ABMGATE  YINT 0 VALUE {{IF( (((V(A) > {VTHRESH}) != 0) != "
+        b"((V(B) > {VTHRESH}) != 0)) ,{VSS},{VDD})}}\r\nRINT YINT Y 1\r\n"
+    )
+
+
+def test_pspice_rewrite_turns_limit_into_min_and_max():
+    assert pspice_rewrite(CLAMP) == (
+        b"G_U1 0 ICTRL VALUE { min(max(V(COMP) * 2, min(-1, V(CL))), max(-1, V(CL))) }\n"
+    )
+
+
+def test_pspice_rewrite_leaves_other_files_and_comments_alone():
+    plain = b"E1 a 0 VALUE {V(b) * 2}\n+ \xb5 kept\n"
+    assert pspice_rewrite(plain) is plain
+    comment = b"* 2^10 LIMIT(a, b, c)\nR1 a 0 1k\n"
+    assert pspice_rewrite(comment) == comment
+
+
+def test_convert_rewrites_pspice_only():
+    files = {"m.lib": CLAMP}
+    assert b"LIMIT" not in convert(files, "pspice")["m.lib"]
+    assert convert(files, "ltspice") is files
 
 
 # --- what isn't run ---------------------------------------------------------------
@@ -278,7 +319,7 @@ needs_ngspice = pytest.mark.skipif(shutil.which("ngspice") is None, reason="ngsp
 # Constructs from vendor models, each in a two-pin subcircuit ``M``. The
 # ones ngspice's compatibility modes don't read are kept as failures, so a
 # newer ngspice that reads them shows up here; a rewrite is added only when
-# a real model needs one (plan 004 step 5).
+# a real model needs one (plan 004 steps 5 and 6).
 LOADS = {
     "pspice VALUE": ("pspice", "E1 a 0 VALUE={ V(b)*2 + 1 }\nR1 b 0 1k"),
     "pspice PARAMS": ("pspice", "E1 a 0 VALUE={ V(b)*{G} }\nR1 b 0 1k", "PARAMS: G=2"),
@@ -332,3 +373,32 @@ async def test_real_ngspice_refuses_a_control_block(tmp_path):
     lib = f".subckt M a b\nR1 a b 1\n.ends\n.control\nshell touch {canary}\n.endc\n"
     [got] = await check([_kept(tmp_path, lib.encode(), "ngspice")], {}, Ngspice())
     assert got.loads is False and not canary.exists()
+
+
+# What the rewrites compute, read off an operating point: (a, b) -> volts.
+XNOR_TABLE = {(0, 0): 1, (0, 1): 0, (1, 0): 0, (1, 1): 1}
+XNOR_LIB = b""".subckt XN A B Y PARAMS: VDD=1 VSS=0 VTHRESH=0.5
+E_ABMGATE YINT 0 VALUE {{IF(V(A) > {VTHRESH}  ^
++ V(B) > {VTHRESH},{VSS},{VDD})}}
+RINT YINT Y 1
+.ends
+.subckt CL IN Y
+E1 Y 0 VALUE { LIMIT(V(IN), -1,
++ 0.5) }
+.ends
+"""
+
+
+@needs_ngspice
+@pytest.mark.parametrize(("a", "b"), list(XNOR_TABLE))
+async def test_real_ngspice_runs_the_rewritten_xnor_and_limit(a, b):
+    netlist = (
+        f'* rewrites\n.include "m.lib"\nVA a 0 DC {a}\nVB b 0 DC {b}\n'
+        "X1 a b y XN\nX2 a c CL\n.op\n.end\n"
+    )
+    files = {**convert({"m.lib": XNOR_LIB}, "pspice"), ".spiceinit": spiceinit("pspice").encode()}
+    log = await Ngspice().load(netlist, files)
+    assert log is not None
+    volts = dict(re.findall(r"^\s*(\w+)\s+(\S+)$", log.text, re.MULTILINE))
+    assert float(volts["y"]) == pytest.approx(XNOR_TABLE[(a, b)])
+    assert float(volts["c"]) == pytest.approx(min(a, 0.5))

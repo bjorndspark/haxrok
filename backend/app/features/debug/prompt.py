@@ -546,8 +546,12 @@ board's.
 maximum supply and pin voltages, the recommended operating supply range, \
 input logic thresholds, enable and undervoltage thresholds, reference or \
 feedback voltage, current limits, reset pulse width and start-up times, \
-internal pull-up and pull-down resistance. At most 30. Numbers and units as \
-printed; null where the table gives no min, typ or max.
+internal pull-up and pull-down resistance. For a regulator also its rated \
+(maximum continuous) output current, its output voltage accuracy (as a \
+percentage when printed so) and its dropout voltage, under those names \
+("output current", "output voltage accuracy", "dropout voltage") at the \
+start of parameter. At most 30. Numbers and units as printed; null where \
+the table gives no min, typ or max.
 - application: the parts of the typical application circuit (the \
 datasheet's reference schematic, or its component-selection text): each \
 external resistor, capacitor, inductor, diode or crystal, its value, and \

@@ -409,7 +409,8 @@ part's TI datasheet URL, as on a real run, kept in
 hand in `data/spice-corpus/manual/` (downloaded in a browser), which is
 how LTspice and the other vendors get covered.
 Decided (2026-11-07): no rewrite was needed. ngspice 44.2's modes load
-every corpus model. A parameter the model leaves to its schematic (TI's
+every corpus model. (Step 6 found two constructs that load but compute
+the wrong value, and rewrites them.) A parameter the model leaves to its schematic (TI's
 TPS7A02 divides by `V_out`, set on the schematic symbol) isn't a
 conversion failure: when ngspice names an undefined parameter the model
 uses as a value, the check sets it to 1 and runs again (up to three),
@@ -477,7 +478,7 @@ Bugs found:
   `Log(...)` call as a default argument (B008). The diff review added
   `Ngspice.load`'s own docstring.
 
-## 6. Circuits simulate with real models and their results become findings: proposed
+## 6. Circuits simulate with real models and their results become findings: in progress
 
 - The circuits around each modelled IC (regulator plus its passives and
   load, a supervisor against its rail, a reset RC) are cut out of the
@@ -499,8 +500,8 @@ Tried on 2026-11-07: TI's TPS63802 model, as orbit wires it (VIN 3.6 V,
 0.47 µH, 44 µF, 560k/100k, 3.3 Ω), simulates 1.5 ms of start-up in about
 150 s in the backend container (ngspice 44.2, PSpice mode, only `v(vout)`
 and `v(pg)` saved; saving every node ran out of memory). It overshot to
-4.3 V and then sat at 3.50 V with PG low, a deck or model detail for the
-build to explain. Only this IC has a model on the demo boards (step 4),
+4.3 V and then sat at 3.50 V with PG high, in pass-through: ngspice
+misread two PSpice constructs in the model (2026-11-08, below). Only this IC has a model on the demo boards (step 4),
 so the ESP32-EN-against-soft-start example can't be simulated.
 
 Decided (2026-11-07): simulations run alongside the review, as plan 003's
@@ -548,9 +549,51 @@ Decided (2026-11-07), defaults:
   a dropout voltage; a buck-boost like the TPS63802 has none.
 - This step is big (it adds an SSE payload and a form field; step 7 draws
   them), so it's built in its own session.
+Decided (2026-11-08): the datasheet facts prompt (`DATASHEET_FACTS`) also
+asks for a regulator's rated output current, output voltage accuracy and
+dropout voltage. It asked for neither, and TI's TPS63802 facts had no
+rated current, so orbit's only modelled IC would have been skipped. The
+prompt is in the cache key, so each datasheet is read again once.
+Decided (2026-11-08): the datasheet's typical input is an input-voltage
+limit's `typ`, else the most common `VIN = x V` in the facts' conditions
+(3.6 V for the TPS63802).
+Decided (2026-11-08): `spice_convert` rewrites two PSpice constructs
+ngspice 44.2 gets wrong, in every PSpice-classed file before a run:
+`LIMIT(x, a, b)`, which evaluates to 0, becomes
+`min(max(x, min(a, b)), max(a, b))`; and `^`, PSpice's XOR, which ngspice
+reads as a power, becomes `!=` on truth values (`&` binds tighter and `|`
+looser, as in C). Only `{…}` expressions on non-comment lines are touched,
+with `+` continuations joined. A top-level deck can't test them: ps mode
+reads only included files.
+
+Built on 2026-11-08, first part (the rewrites); the simulation build
+(`spice_circuits.py`, the SSE payload, the form field) is left for the
+next session. Found on the TPS63802 model:
+- `LIMIT` evaluated to 0, and `^` broke its XNOR gates (a=1, b=0 gave 1;
+  a=b=1 gave 0). The off-timer's two DFFs (U9/U12) count through an
+  XNOR, so the counter never advanced and the converter deadlocked in
+  pass-through: the 3.50 V of 2026-11-07.
+- With both rewritten, it regulates to 3.30 V (3.6 V in, DC), then
+  ngspice aborts with "timestep too small" at the zero-delay loops of the
+  model's `one_shot` subckt (`x_u_gmi_u831.ch`, `x_u_offtimer_u859.ch`)
+  and `u_offtimer_buck_50ns_off`. How far it gets depends on the max
+  step: 5 ns reaches 401 µs in 137 s, 2 ns reaches 808 µs in 539 s, 20 ns
+  and 100 ns fail near 300 µs. A ramped input fails the same way.
+- No solver option moved it (`method=gear`, `reltol`, `abstol`, `vntol`,
+  `itl4`, `maxord`, `gmin`, `rshunt`). A 1 Ω / 10 pF RC on the one_shot's
+  `ch` and `out` made every run hang past 600 s. The one_shot alone
+  simulates fine.
+- Open for the next session: get the start-up past these loops, and fit
+  it in the 4-minute timeout with two runs at once (2–9 min per 1 ms
+  now), before building the decks on it.
 
 **Checks:** a planted-fault eval case the simulation catches and a formula
 can't (`orbit-vout-cap-small`, above); no-fault cases stay quiet.
+First part (2026-11-08): `make test-backend` 249 passed, including real
+ngspice runs of a PSpice-mode XNOR (full truth table) and LIMIT clamp
+through the rewrite; ruff, ruff format, mypy, eslint, tsc and prettier
+clean (one existing eslint warning in `shared/ui/button.tsx`). No
+frontend change, so `make test-frontend` wasn't run.
 
 ## 7. The UI shows datasheets, models and simulated findings: proposed
 

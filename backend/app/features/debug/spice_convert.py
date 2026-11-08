@@ -3,10 +3,13 @@
 Conversion starts from ngspice's own compatibility modes, set in a
 ``.spiceinit`` beside the deck: ``ngbehavior=ps`` for a PSpice model (it
 already reads ``VALUE={…}``, ``TABLE``, ``IF()``, ``STP()``, ``.FUNC`` and
-``PARAMS:``) and ``lt`` for an LTspice one. A rewrite is added only for a
-construct a real vendor model fails on (plan 004 step 5); none has been
-needed yet. Converted text isn't kept: step 6 converts again from the
-model's ``path`` or the upload.
+``PARAMS:``) and ``lt`` for an LTspice one. ``ps`` mode reads only included
+files, so a deck always includes the model. A rewrite is added only for a
+construct a real vendor model gets wrong (plan 004 steps 5 and 6): in a
+PSpice expression, ``LIMIT(x, a, b)``, which ngspice 44 evaluates to 0, and
+the XOR operator ``^``, which ngspice reads as a power (TI's XNOR gates
+then give the wrong answer). Converted text isn't kept: each run converts
+again from the model's ``path`` or the upload.
 
 The load check instantiates the picked subcircuit with each pin to ground
 through 1 MΩ and runs ``.op``, with every model file of the model's folder
@@ -47,6 +50,11 @@ _MAX_PARAMS = 3
 _UNDEFINED = re.compile(r"Undefined parameter \[(\w+)\]")
 # A file name the deck's ``.include "<name>"`` can hold as is.
 _PLAIN_PATH = re.compile(r'[^"\x00-\x1f\x7f]+')
+
+# What ``pspice_rewrite`` changes: a LIMIT call or the XOR operator.
+_REWRITES = re.compile(r"\blimit\s*\(|\^", re.IGNORECASE)
+_LIMIT_CALL = re.compile(r"\blimit\s*$", re.IGNORECASE)
+_PAIRS = {"(": ")", "{": "}"}
 
 _CONTROL = re.compile(r"^[ \t]*\.(?:control|endc)\b", re.IGNORECASE | re.MULTILINE)
 _INCLUDE = re.compile(r"^[ \t]*\.(?:inc\w*|lib)[ \t]+(\S+)", re.IGNORECASE | re.MULTILINE)
@@ -107,6 +115,120 @@ def unsafe(files: dict[str, bytes]) -> str | None:
         for path in _includes(data):
             if path.startswith("~") or not _inside(path):
                 return f"{name} includes {path}, outside its folder; not run"
+    return None
+
+
+def convert(files: dict[str, bytes], status: str) -> dict[str, bytes]:
+    """The model files rewritten for ngspice: a PSpice model's ``LIMIT`` and
+    ``^`` (see the module docstring); others are returned as they are."""
+    if status != "pspice":
+        return files
+    return {name: pspice_rewrite(data) for name, data in files.items()}
+
+
+def pspice_rewrite(data: bytes) -> bytes:
+    """One PSpice file with ``LIMIT(x, a, b)`` turned into ``min``/``max``
+    and ``a ^ b`` into ``!=`` on truth values, inside each ``{…}``
+    expression. A line that needs it is joined with its ``+``
+    continuations; a file that needs none comes back unchanged."""
+    text = data.decode("latin-1")  # any byte round-trips
+    if not _REWRITES.search(text):
+        return data
+    lines = text.splitlines(keepends=True)
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        j = i + 1
+        while j < len(lines) and lines[j].lstrip().startswith("+"):
+            j += 1
+        group = lines[i:j]
+        i = j
+        if group[0].lstrip().startswith("*") or not _REWRITES.search("".join(group)):
+            out.extend(group)
+            continue
+        parts = [g.rstrip("\r\n") for g in group]
+        body = " ".join([parts[0], *(p.lstrip()[1:] for p in parts[1:])])
+        out.append(_braces(body) + group[-1][len(parts[-1]) :])
+    return "".join(out).encode("latin-1")
+
+
+def _braces(line: str) -> str:
+    """``line`` with each top-level ``{…}`` expression rewritten."""
+    out, i = [], 0
+    while (start := line.find("{", i)) != -1 and (end := _close(line, start)) is not None:
+        out += [line[i:start], "{", _expr(line[start + 1 : end]), "}"]
+        i = end + 1
+    return "".join(out) + line[i:]
+
+
+def _expr(s: str) -> str:
+    """One expression rewritten, innermost brackets first."""
+    out = ""
+    i = 0
+    while i < len(s):
+        if s[i] not in _PAIRS:
+            out += s[i]
+            i += 1
+            continue
+        end = _close(s, i)
+        if end is None:  # unbalanced: leave the rest as it is
+            return out + s[i:]
+        inner = _expr(s[i + 1 : end])
+        call = _LIMIT_CALL.search(out) if s[i] == "(" else None
+        args = _split(inner, ",")
+        if call and len(args) == 3:
+            x, a, b = (arg.strip() for arg in args)
+            out = out[: call.start()] + f"min(max({x}, min({a}, {b})), max({a}, {b}))"
+        else:
+            out += s[i] + inner + _PAIRS[s[i]]
+        i = end + 1
+    return _xor(out)
+
+
+def _xor(s: str) -> str:
+    """``s`` with each top-level ``a ^ b`` as ``((a) != 0) != ((b) != 0)``.
+    ``&`` binds tighter than ``^`` and ``|`` looser, as in C."""
+    if "^" not in s:
+        return s
+    args = []
+    for arg in _split(s, ","):
+        pieces = []
+        for piece in _split(arg, "|"):
+            terms = _split(piece, "^")
+            if len(terms) > 1:
+                acc = f"(({terms[0].strip()}) != 0)"
+                for term in terms[1:]:
+                    acc = f"({acc} != (({term.strip()}) != 0))"
+                piece = f" {acc} "
+            pieces.append(piece)
+        args.append("|".join(pieces))
+    return ",".join(args)
+
+
+def _split(s: str, sep: str) -> list[str]:
+    """``s`` split at each ``sep`` outside brackets."""
+    parts, depth, start = [], 0, 0
+    for i, c in enumerate(s):
+        if c in "({":
+            depth += 1
+        elif c in ")}":
+            depth -= 1
+        elif c == sep and depth == 0:
+            parts.append(s[start:i])
+            start = i + 1
+    return [*parts, s[start:]]
+
+
+def _close(s: str, start: int) -> int | None:
+    """The index of the bracket that closes the one at ``start``."""
+    depth = 0
+    for i in range(start, len(s)):
+        if s[i] in "({":
+            depth += 1
+        elif s[i] in ")}":
+            depth -= 1
+            if depth == 0:
+                return i
     return None
 
 
@@ -245,7 +367,7 @@ async def _one(
     if reason := unsafe(files):
         return False, reason
     models = files
-    files = {**files, ".spiceinit": spiceinit(s.status).encode()}
+    files = {**convert(files, s.status), ".spiceinit": spiceinit(s.status).encode()}
     params: list[str] = []
     while True:
         async with gate:
