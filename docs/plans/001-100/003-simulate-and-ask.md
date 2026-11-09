@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-04 | 2026-11-08 | In progress | — | `001-mvp-scope.md`, `002-verified-wiring-checks.md` |
+| 2026-11-04 | 2026-11-09 | In progress | — | `001-mvp-scope.md`, `002-verified-wiring-checks.md` |
 
 Until now, ngspice ran inside `service.prepare`, one deck at a time, before
 the stream opened. Its plot was only drawn under a finding that cited the
@@ -110,9 +110,42 @@ simulations on the page.
 but 2200 ns is still under the 10,000-unit limit, so ns is right (the
 backend picks the same way). The test now uses a 22 µs what-if.
 
-## 4. Circuits a formula can't answer: later
+## 4. Circuits a formula can't answer: in progress
 
 A single RC needs no simulator. ngspice is worth having for circuits a
 formula can't answer: the ESP32 EN RC against the regulator's soft-start
 ramp, a supervisor's release against the rail, a low-side FET's gate drive.
 Each is a new `plan` branch plus a deck builder.
+
+Decided (2026-11-09): step 4 drives plan 003's EN/reset RC deck from a rail
+that ramps up over the regulator's datasheet start-up time, instead of a
+step at t=0, and checks that EN crosses its threshold only after the rail
+is in band. It needs no vendor model, so it runs on boards whose regulator
+has none (rust-board's ESP32-C3, rp-micro). Plan 004 step 6 already covers
+the same check with a vendor model; a low-side FET's gate drive is left
+out, since no demo board has one to test against.
+Decided (2026-11-09): without a start-up time (no datasheet, or none in its
+facts), the EN/reset run stays plan 003's step at t=0 with no ramp check,
+and its caption says why. No assumed ramp, as plan 004 does for a missing
+rated current.
+Decided (2026-11-09): when the start-up time is known, the ramped run
+replaces the step run for that pin, so each EN/reset RC still has one
+plot. Step 3's what-if re-runs it with the same ramp.
+Decided (2026-11-09): the ramped run carries a `verdict` (`passed` or
+`flagged`), drawn as plan 004's vendor-model runs are, and its text gives
+the release time and when the rail reaches its band. The model's review
+doesn't see it, as in plans 003 and 004.
+Decided (2026-11-09), defaults:
+- EN/reset counts as released at 0.7 × the rail, and the rail's band is
+  the regulator's output accuracy (±5 % without one): plan 004's numbers,
+  so both kinds of run judge a reset the same way.
+- The rail rises linearly from 0 V to its nominal voltage over the start-up
+  time plan 004 already parses (`spice_circuits.py`), shared inside the
+  debug feature rather than parsed twice.
+- The regulator is the one whose output net is the RC's rail. A rail that
+  doesn't come from a regulator (USB, a battery) keeps the step run.
+- Checks: unit tests on the ramped deck, the verdict and the fallback; a
+  live run in the backend container on rust-board with the ESP32-C3's EN
+  capacitor made small so EN releases early. `make eval-app` can't run
+  simulations, so it isn't used.
+- The step touches backend and frontend, so it's built in its own session.
