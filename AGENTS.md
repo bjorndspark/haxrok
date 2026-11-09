@@ -167,7 +167,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `003-simulate-and-ask.md` step 3 (what-if re-runs on the RC runs),
-   decisions settled.
-2. `003-simulate-and-ask.md` step 4 (circuits a formula can't answer):
+1. `003-simulate-and-ask.md` step 4 (circuits a formula can't answer):
    ask first.

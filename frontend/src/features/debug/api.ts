@@ -9,6 +9,7 @@ import type {
   DatasheetFacts,
   DesignSummary,
   MeasurementInput,
+  RerunRequest,
   ResultAskRequest,
   Mode,
   ProgressEvent,
@@ -102,6 +103,12 @@ export async function* streamAnalysis(
 /** Ask about one simulation; the conversation so far goes with it. */
 export async function askSimulation(req: AskRequest): Promise<string> {
   return (await apiPost<AskAnswer>("/debug/ask", req)).answer
+}
+
+/** Re-run an RC simulation with the user's R and C; the server keeps
+ *  nothing, so the original goes with it. */
+export async function rerunSimulation(req: RerunRequest): Promise<Simulation> {
+  return apiPost<Simulation>("/debug/rerun", req)
 }
 
 /** Ask a follow-up about a finished run; its summary, result and the

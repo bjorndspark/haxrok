@@ -1,14 +1,22 @@
 import { useState } from "react"
 
-import { nearestPoint, simulationLayout } from "../present"
+import { useMessages } from "../messages"
+import { hoverReadout, simulationLayout } from "../present"
 import type { Simulation } from "../types"
 
 /** ngspice's waveform for an RC node: a flagged I²C line rising past the
  *  IC's supply + 0.3 V, or an enable pin rising through its RC delay.
- *  Hover reads off a sample. */
-export function SimulationPlot({ sim }: { sim: Simulation }) {
-  const layout = simulationLayout(sim)
-  const [hover, setHover] = useState<ReturnType<typeof nearestPoint>>(null)
+ *  A what-if re-run is drawn dashed over it. Hover reads off a sample. */
+export function SimulationPlot({
+  sim,
+  whatIf = null,
+}: {
+  sim: Simulation
+  whatIf?: Simulation | null
+}) {
+  const t = useMessages().simulations.whatIf
+  const layout = simulationLayout(sim, whatIf)
+  const [hover, setHover] = useState<ReturnType<typeof hoverReadout>>(null)
   const { plot } = layout
   return (
     <figure className="space-y-1.5">
@@ -20,7 +28,7 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
         onMouseMove={(e) => {
           const box = e.currentTarget.getBoundingClientRect()
           const x = ((e.clientX - box.left) / box.width) * layout.width
-          setHover(x >= plot.x0 && x <= plot.x1 ? nearestPoint(layout, x) : null)
+          setHover(x >= plot.x0 && x <= plot.x1 ? hoverReadout(layout, x) : null)
         }}
         onMouseLeave={() => {
           setHover(null)
@@ -46,7 +54,7 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
           </text>
         ))}
         <text x={plot.x1} y={plot.y0 + 31} textAnchor="end" className="fill-muted-foreground">
-          {sim.t_unit}
+          {layout.unit}
         </text>
         <text x={plot.x0 - 6} y={plot.y1 - 10} textAnchor="end" className="fill-muted-foreground">
           V
@@ -73,6 +81,16 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
           strokeLinejoin="round"
           className="stroke-info"
         />
+        {layout.whatIf && (
+          <path
+            d={layout.whatIf.path}
+            fill="none"
+            strokeWidth={2}
+            strokeDasharray="6 4"
+            strokeLinejoin="round"
+            className="stroke-warn"
+          />
+        )}
         {hover && (
           <g>
             <line
@@ -82,25 +100,36 @@ export function SimulationPlot({ sim }: { sim: Simulation }) {
               y2={plot.y0}
               className="stroke-muted-foreground"
             />
-            <circle
-              cx={hover.x}
-              cy={hover.y}
-              r={4}
-              strokeWidth={2}
-              className="fill-info stroke-background"
-            />
+            {hover.dots.map((d) => (
+              <circle
+                key={String(d.dashed)}
+                cx={hover.x}
+                cy={d.y}
+                r={4}
+                strokeWidth={2}
+                className={`${d.dashed ? "fill-warn" : "fill-info"} stroke-background`}
+              />
+            ))}
             <text
               x={hover.x > (plot.x0 + plot.x1) / 2 ? hover.x - 6 : hover.x + 6}
               y={plot.y1 - 10}
               textAnchor={hover.x > (plot.x0 + plot.x1) / 2 ? "end" : "start"}
               className="fill-value font-bold"
             >
-              {`${hover.v.toFixed(2)} V @ ${String(Number(hover.t.toPrecision(3)))} ${sim.t_unit}`}
+              {hover.label}
             </text>
           </g>
         )}
       </svg>
-      <figcaption className="text-xs leading-relaxed text-muted-foreground">{sim.text}</figcaption>
+      <figcaption className="space-y-1 text-xs leading-relaxed text-muted-foreground">
+        <p>{sim.text}</p>
+        {whatIf && (
+          <p>
+            <span className="mr-[1ch] text-warn">╌ {t.legend}</span>
+            {whatIf.text}
+          </p>
+        )}
+      </figcaption>
     </figure>
   )
 }

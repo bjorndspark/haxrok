@@ -578,6 +578,18 @@ async def test_a_flagged_i2c_line_gets_a_simulated_rise():
     # 30→70 % of an RC is ln(7/3)·RC = 0.847 × 141 ns.
     assert "Rise time 30→70% is 119 ns" in sim.text
     assert "3.3 V supply + 0.3 V" in sim.text
+    # What a what-if needs to rebuild the deck; the bus C is an estimate, no part.
+    assert sim.circuit is not None
+    assert sim.circuit.model_dump() == {
+        "kind": "i2c",
+        "net": "SDA",
+        "r_ohm": 4700,
+        "c_farad": pytest.approx(30e-12),
+        "v_rail": 5.0,
+        "v_supply": 3.3,
+        "r_ref": "R1",
+        "c_ref": None,
+    }
 
 
 def _rc_design() -> Design:
@@ -599,6 +611,9 @@ async def test_an_rc_delay_gets_a_simulated_rise_in_milliseconds():
     assert [lv.label for lv in sim.levels] == ["rail 3.3 V", "63% 2.09 V"]
     assert not any(lv.danger for lv in sim.levels)
     assert "after 10 ms" in sim.text and "R×C = 10 ms" in sim.text
+    assert sim.circuit is not None
+    assert (sim.circuit.kind, sim.circuit.r_ref, sim.circuit.c_ref) == ("rc_delay", "R1", "C1")
+    assert (sim.circuit.r_ohm, sim.circuit.c_farad, sim.circuit.v_rail) == (10_000, 1e-6, 3.3)
 
 
 async def test_no_simulation_when_ngspice_fails_or_answers_garbage():
@@ -1146,6 +1161,94 @@ async def test_ask_names_the_kind_and_takes_a_vendor_model_run_without_samples()
     assert "## Samples (time, voltage)\n(none)" in seen[0]
 
 
+async def test_a_what_if_rebuilds_the_rc_deck_and_compares_both_runs():
+    from app.features.debug.schemas import RerunRequest
+
+    sim = await _one_simulation()
+    fake = FakeSpice()
+    new = await service.rerun(RerunRequest(simulation=sim, r_ohm=4700, c_farad=1e-6), fake)
+    (deck,) = fake.decks
+    assert "Rpull rail pin 4700" in deck and "Cbus pin 0 1e-06 IC=0" in deck
+    assert (new.id, new.calc_id, new.deck) == (sim.id, sim.calc_id, deck)
+    assert new.title == "EN rising through its RC delay, what-if"
+    assert new.t_unit == "ms" and new.t[-1] == pytest.approx(23.5)
+    assert new.levels == sim.levels  # the rail can't change
+    assert new.text.startswith(
+        "What-if: R1 10 kΩ → 4.7 kΩ, C1 1 µF (unchanged). Time to 63%: 10 ms → 4.72 ms. ngspice:"
+    )
+    assert new.circuit is not None and new.circuit.r_ohm == 4700
+
+
+async def test_a_what_if_on_an_i2c_line_drops_the_estimate_once_c_is_typed():
+    from app.features.debug.schemas import RerunRequest
+
+    _, (sim,) = await _simulated(_vbus_i2c(), FakeSpice())
+    same_c = await service.rerun(
+        RerunRequest(simulation=sim, r_ohm=2200, c_farad=30e-12), FakeSpice()
+    )
+    assert same_c.text.startswith(
+        "What-if: R1 4.7 kΩ → 2.2 kΩ, bus C 30 pF (unchanged). Rise time 30→70%: 119 ns → 55.9 ns."
+    )
+    assert "estimated" in same_c.text
+    typed = await service.rerun(
+        RerunRequest(simulation=sim, r_ohm=4700, c_farad=100e-12), FakeSpice()
+    )
+    assert "bus C 30 pF → 100 pF" in typed.text and "estimated" not in typed.text
+    assert [lv.label for lv in typed.levels] == ["rail 5 V", "VDD+0.3 3.6 V"]
+
+
+async def test_a_what_if_refuses_values_out_of_bounds_and_runs_that_arent_rc():
+    from app.core.errors import AppError
+    from app.features.debug.schemas import RerunRequest
+
+    sim = await _one_simulation()
+    for r, c, field in [
+        (0.5, 1e-6, "r_ohm"),
+        (101e6, 1e-6, "r_ohm"),
+        (10e3, 0.05e-12, "c_farad"),
+        (10e3, 0.2, "c_farad"),
+        (float("nan"), 1e-6, "r_ohm"),
+    ]:
+        with pytest.raises(BadRequestError) as e:
+            await service.rerun(RerunRequest(simulation=sim, r_ohm=r, c_farad=c), FakeSpice())
+        assert e.value.field == field
+    # The bounds themselves are accepted.
+    await service.rerun(RerunRequest(simulation=sim, r_ohm=1, c_farad=0.1), FakeSpice())
+    await service.rerun(RerunRequest(simulation=sim, r_ohm=100e6, c_farad=0.1e-12), FakeSpice())
+
+    vendor = sim.model_copy(update={"circuit": None, "analysis": "startup"})
+    with pytest.raises(BadRequestError) as e:
+        await service.rerun(RerunRequest(simulation=vendor, r_ohm=1e3, c_farad=1e-6), FakeSpice())
+    assert e.value.field == "simulation"
+    with pytest.raises(AppError) as e:
+        await service.rerun(RerunRequest(simulation=sim, r_ohm=1e3, c_farad=1e-6), FakeSpice(None))
+    assert e.value.error_code == "SIMULATION_FAILED"
+
+
+async def test_ask_after_a_what_if_sends_both_runs():
+    from app.features.debug.schemas import AskRequest, RerunRequest
+
+    sim = await _one_simulation()
+    what_if = await service.rerun(
+        RerunRequest(simulation=sim, r_ohm=4700, c_farad=1e-6), FakeSpice()
+    )
+    seen: list[str] = []
+
+    async def answer(system: str, user: str) -> str:
+        seen.append(user)
+        return "Twice as fast."
+
+    req = AskRequest(simulation=sim, what_if=what_if, question="Better?")
+    assert await service.ask(req, answer) == "Twice as fast."
+    user = seen[0]
+    assert (
+        user.index("50 ms\t3.278 V") < user.index("## What-if re-run") < user.index("## Question")
+    )
+    assert "Time to 63%: 10 ms → 4.72 ms" in user and "Rpull rail pin 4700" in user
+    assert "23.5 ms\t3.278 V" in user  # the what-if's last sample
+    assert "What-if" not in prompt.build_ask_message(sim, [], "Better?")
+
+
 async def _finished_run() -> tuple[dict, dict]:
     """The design summary and checked result of a faked run, as the browser holds them."""
     prepared = await service.prepare(
@@ -1334,6 +1437,20 @@ async def test_ask_answers_in_the_envelope(client, monkeypatch):
 
     res = await client.post("/api/v1/debug/ask", json=body | {"question": ""})
     assert res.status_code == 422 and res.json()["success"] is False
+
+
+async def test_rerun_answers_in_the_envelope(client, monkeypatch):
+    monkeypatch.setattr(router, "Ngspice", FakeSpice)
+    sim = await _one_simulation()
+    body = {"simulation": sim.model_dump(), "r_ohm": 4700, "c_farad": 1e-6}
+    res = await client.post("/api/v1/debug/rerun", json=body)
+    assert res.status_code == 200 and res.json()["success"] is True
+    assert res.json()["data"]["title"] == "EN rising through its RC delay, what-if"
+
+    res = await client.post("/api/v1/debug/rerun", json=body | {"r_ohm": 0})
+    assert res.status_code == 400
+    assert res.json()["error"]["code"] == "BAD_REQUEST"
+    assert res.json()["error"]["field"] == "r_ohm"
 
 
 async def test_ask_result_answers_in_the_envelope(client, monkeypatch):

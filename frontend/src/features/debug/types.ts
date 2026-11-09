@@ -190,6 +190,21 @@ export type SimAnalysis = "startup" | "load_step" | "dropout"
  *  `skipped` has no samples and its text says why. */
 export type SimVerdict = "passed" | "flagged" | "timed_out" | "failed" | "skipped"
 
+/** An RC simulation's circuit, so the user can re-run it with their own
+ *  R and C (a what-if). The rail is fixed. */
+export interface SimCircuit {
+  kind: "i2c" | "rc_delay"
+  net: string
+  r_ohm: number
+  c_farad: number
+  v_rail: number
+  /** I²C: the lowest supply of an IC on the line. */
+  v_supply: number | null
+  /** The part, when the netlist has a single one; an I²C bus C has none. */
+  r_ref: string | null
+  c_ref: string | null
+}
+
 /** An ngspice transient, streamed as it finishes; the user can ask about
  *  it. Either an RC node rising from 0 V (a flagged I²C line, or an
  *  enable/reset pin's RC delay), with `calc_id`; or a regulator's circuit
@@ -213,6 +228,15 @@ export interface Simulation {
   v: number[]
   levels: SimLevel[]
   text: string
+  /** RC runs only: what a what-if re-run needs. */
+  circuit?: SimCircuit | null
+}
+
+/** Re-run an RC simulation with the user's R and C. */
+export interface RerunRequest {
+  simulation: Simulation
+  r_ohm: number
+  c_farad: number
 }
 
 /** A value the backend computed from the netlist with a datasheet formula
@@ -371,6 +395,8 @@ export interface Run {
   simulations: Simulation[]
   /** Questions asked about each simulation, by simulation id. */
   chats: Record<string, AskTurn[]>
+  /** Each simulation's latest what-if re-run, by simulation id. */
+  whatIfs: Record<string, Simulation>
   /** Follow-up questions asked about the finished run. */
   resultChat: AskTurn[]
 }
@@ -383,6 +409,8 @@ export interface AskTurn {
 
 export interface AskRequest {
   simulation: Simulation
+  /** The what-if drawn over it, if any; the model compares both. */
+  what_if?: Simulation | null
   question: string
   history: AskTurn[]
   /** The language the answer is written in. */

@@ -5,7 +5,7 @@ delay on an enable or reset pin.
 ``simulate`` runs them in parallel and yields each ``Simulation`` as it
 finishes, so ``service.stream`` can send them while the model is still
 working. The review doesn't see them; the user can ask about each one
-(``service.ask``).
+(``service.ask``) and re-run it with another R and C (``rerun``, a what-if).
 
 Each circuit is a resistor from an ideal rail and a capacitor to ground,
 rising from 0 V at t=0: for I²C the pull-up and the estimated bus
@@ -35,7 +35,13 @@ from app.features.debug.calc import (
     rc_line,
 )
 from app.features.debug.design import Design
-from app.features.debug.schemas import Calculation, SimLevel, Simulation, TimeUnit
+from app.features.debug.schemas import (
+    Calculation,
+    SimCircuit,
+    SimLevel,
+    Simulation,
+    TimeUnit,
+)
 
 logger = get_logger(__name__)
 
@@ -268,16 +274,21 @@ class Job:
     line: I2cLine | RcLine
 
 
-def simulation(job: Job, line: I2cLine, rows: list[tuple[float, float]]) -> Simulation:
-    """The I²C waveform and the caption the UI shows under it."""
+def simulation(
+    job: Job, line: I2cLine, rows: list[tuple[float, float]], estimated: bool = True
+) -> Simulation:
+    """The I²C waveform and the caption the UI shows under it. ``estimated``
+    is False once the user typed the bus capacitance (a what-if)."""
     rows = _thin(rows)
     unit, scale = time_unit(rows[-1][0])
     lo, hi = _crossing(rows, 0.3 * line.v_pull), _crossing(rows, 0.7 * line.v_pull)
     over = _crossing(rows, line.v_supply + 0.3)
-    text = (
-        f"ngspice: {format_ohms(line.r_ohm)} to {line.v_pull:g} V into "
-        f"~{format_farads(line.c_farad)} of bus (estimated: 10 pF per device pin + 10 pF trace)."
+    bus = (
+        f"~{format_farads(line.c_farad)} of bus (estimated: 10 pF per device pin + 10 pF trace)"
+        if estimated
+        else f"{format_farads(line.c_farad)} of bus"
     )
+    text = f"ngspice: {format_ohms(line.r_ohm)} to {line.v_pull:g} V into {bus}."
     if lo is not None and hi is not None:
         text += f" Rise time 30→70% is {(hi - lo) * scale:.3g} {unit}."
     if over is not None:
@@ -299,6 +310,7 @@ def simulation(job: Job, line: I2cLine, rows: list[tuple[float, float]]) -> Simu
             SimLevel(v=limit, label=f"VDD+0.3 {limit:g} V", danger=True),
         ],
         text=text,
+        circuit=circuit_of(line),
     )
 
 
@@ -331,7 +343,94 @@ def rc_simulation(job: Job, line: RcLine, rows: list[tuple[float, float]]) -> Si
             SimLevel(v=at_63, label=f"63% {at_63:g} V", danger=False),
         ],
         text=text,
+        circuit=circuit_of(line),
     )
+
+
+def circuit_of(line: I2cLine | RcLine) -> SimCircuit:
+    """What a what-if needs to rebuild ``line``'s deck, carried on the
+    simulation to the browser and back."""
+    if isinstance(line, I2cLine):
+        return SimCircuit(
+            kind="i2c",
+            net=line.net,
+            r_ohm=line.r_ohm,
+            c_farad=line.c_farad,
+            v_rail=line.v_pull,
+            v_supply=line.v_supply,
+            r_ref=line.r_ref,
+        )
+    return SimCircuit(
+        kind="rc_delay",
+        net=line.net,
+        r_ohm=line.r_ohm,
+        c_farad=line.c_farad,
+        v_rail=line.v_rail,
+        r_ref=line.r_ref,
+        c_ref=line.c_ref,
+    )
+
+
+def line_of(circuit: SimCircuit, r_ohm: float, c_farad: float) -> I2cLine | RcLine:
+    """``circuit`` with another R and C. The rail stays as it was."""
+    if circuit.kind == "i2c":
+        supply = circuit.v_supply if circuit.v_supply is not None else circuit.v_rail
+        return I2cLine(circuit.net, r_ohm, circuit.v_rail, supply, c_farad, circuit.r_ref)
+    return RcLine(circuit.net, r_ohm, circuit.v_rail, c_farad, circuit.r_ref, circuit.c_ref)
+
+
+def _metric(line: I2cLine | RcLine, rows: list[tuple[float, float]]) -> float | None:
+    """The number a what-if compares, in seconds: an I²C line's 30→70% rise
+    time, an RC delay's time to 63%."""
+    if isinstance(line, I2cLine):
+        lo, hi = _crossing(rows, 0.3 * line.v_pull), _crossing(rows, 0.7 * line.v_pull)
+        return None if lo is None or hi is None else hi - lo
+    return _crossing(rows, round(0.632 * line.v_rail, 2))
+
+
+def _seconds(seconds: float) -> str:
+    """A time in the unit that keeps it under 1,000: 119 ns, 4.7 ms."""
+    for name, scale in (("ns", 1e9), ("µs", 1e6), ("ms", 1e3)):
+        if seconds * scale < 1000:
+            return f"{seconds * scale:.3g} {name}"
+    return f"{seconds:.3g} s"
+
+
+def _change(ref: str, old: str, new: str) -> str:
+    return f"{ref} {old} → {new}" if old != new else f"{ref} {new} (unchanged)"
+
+
+async def rerun(
+    sim: Simulation, r_ohm: float, c_farad: float, runner: SpiceRunner
+) -> Simulation | None:
+    """``sim`` re-run with another R and C (a what-if): the new waveform,
+    with a caption that compares it to ``sim``. None if ``sim`` isn't an RC
+    run or ngspice failed."""
+    if sim.circuit is None or not sim.t:
+        return None
+    old = line_of(sim.circuit, sim.circuit.r_ohm, sim.circuit.c_farad)
+    line = line_of(sim.circuit, r_ohm, c_farad)
+    deck = netlist(line) if isinstance(line, I2cLine) else rc_netlist(line)
+    if not (rows := await _run(runner, deck, line.net)):
+        return None
+    job = Job(sim.id, sim.calc_id or "", f"{sim.title}, what-if", deck, line)
+    if isinstance(line, I2cLine):
+        new = simulation(job, line, rows, estimated=c_farad == sim.circuit.c_farad)
+        what, c_name = "Rise time 30→70%", "bus C"
+    else:
+        new = rc_simulation(job, line, rows)
+        what, c_name = "Time to 63%", sim.circuit.c_ref or "C"
+    changes = [
+        _change(sim.circuit.r_ref or "R", format_ohms(old.r_ohm), format_ohms(r_ohm)),
+        _change(c_name, format_farads(old.c_farad), format_farads(c_farad)),
+    ]
+    text = f"What-if: {', '.join(changes)}."
+    scale = dict(_UNITS)[sim.t_unit]
+    before = _metric(old, [(t / scale, v) for t, v in zip(sim.t, sim.v, strict=False)])
+    after = _metric(line, _thin(rows))
+    if before is not None and after is not None:
+        text += f" {what}: {_seconds(before)} → {_seconds(after)}."
+    return new.model_copy(update={"calc_id": sim.calc_id, "text": f"{text} {new.text}"})
 
 
 async def _run(runner: SpiceRunner, deck: str, net: str) -> list[tuple[float, float]] | None:

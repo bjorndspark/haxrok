@@ -17,7 +17,8 @@ Two phases, so failures land where the UI can show them:
 
 The model is called twice (see ``prompt``): a free-text diagnosis, then a
 conversion of it into the structured answer. ``ask`` answers a question
-about one simulation afterwards, ``ask_result`` a follow-up about the run.
+about one simulation afterwards, ``ask_result`` a follow-up about the run;
+``rerun`` re-runs an RC simulation with the user's R and C (a what-if).
 The kicad and ngspice runners, the datasheet finder and reader, and the
 model calls are passed in, so tests fake them.
 """
@@ -71,8 +72,10 @@ from app.features.debug.schemas import (
     Mode,
     ProgressEvent,
     ReferenceNote,
+    RerunRequest,
     ResultAskRequest,
     SimAnalysis,
+    Simulation,
     Symptom,
 )
 from app.features.debug.spice_models import SpiceModelFinder
@@ -461,16 +464,50 @@ async def ask(req: AskRequest, answer: Answerer) -> str:
     start = time.monotonic()
     text = await answer(
         prompt.in_language(prompt.ASK_SIMULATION, req.language),
-        prompt.build_ask_message(req.simulation, req.history, req.question),
+        prompt.build_ask_message(req.simulation, req.history, req.question, req.what_if),
     )
     logger.info(
-        "ask about %s (%s) in %.1fs: %r",
+        "ask about %s (%s%s) in %.1fs: %r",
         req.simulation.id,
         req.simulation.title,
+        ", with a what-if" if req.what_if else "",
         time.monotonic() - start,
         req.question,
     )
     return text.strip()
+
+
+# What a what-if accepts: anything outside is a typo, not a design.
+_R_OHM = (1.0, 100e6)
+_C_FARAD = (0.1e-12, 0.1)
+
+
+async def rerun(req: RerunRequest, runner: spice.SpiceRunner) -> Simulation:
+    """An RC simulation re-run with the user's R and C. Raises
+    BadRequestError for a run that isn't RC or a value out of bounds, and
+    AppError when ngspice can't run it."""
+    sim = req.simulation
+    if sim.circuit is None or not sim.t:
+        raise BadRequestError("Only an RC simulation can be re-run.", field="simulation")
+    if not _R_OHM[0] <= req.r_ohm <= _R_OHM[1]:
+        raise BadRequestError("R must be between 1 Ω and 100 MΩ.", field="r_ohm")
+    if not _C_FARAD[0] <= req.c_farad <= _C_FARAD[1]:
+        raise BadRequestError("C must be between 0.1 pF and 0.1 F.", field="c_farad")
+    start = time.monotonic()
+    new = await spice.rerun(sim, req.r_ohm, req.c_farad, runner)
+    if new is None:
+        raise AppError("ngspice couldn't run the what-if.", error_code="SIMULATION_FAILED")
+    logger.info(
+        "what-if on %s (%s): R %g → %g Ω, C %g → %g F in %.1fs",
+        sim.id,
+        sim.title,
+        sim.circuit.r_ohm,
+        req.r_ohm,
+        sim.circuit.c_farad,
+        req.c_farad,
+        time.monotonic() - start,
+    )
+    return new
 
 
 async def ask_result(req: ResultAskRequest, answer: Answerer) -> str:

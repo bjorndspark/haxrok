@@ -11,11 +11,15 @@ import {
   datasheetBadge,
   datasheetLines,
   diagramLayout,
+  formatSi,
+  hoverReadout,
   modelBadge,
   nearestPoint,
+  parseSi,
   simulationLayout,
   splitGlossary,
   toMarkdown,
+  whatIfLabels,
 } from "./present"
 import { fragmentLines, symptomHints, symptomLines } from "./symptoms"
 import type {
@@ -25,6 +29,7 @@ import type {
   DesignSummary,
   Hypothesis,
   Run,
+  SimCircuit,
   Simulation,
 } from "./types"
 
@@ -310,7 +315,99 @@ describe("simulationLayout", () => {
   it("finds the sample under the cursor", () => {
     const layout = simulationLayout(sim)
     const third = layout.points[2].x
-    expect(nearestPoint(layout, third + 1)?.v).toBe(3.8)
+    expect(nearestPoint(layout.points, third + 1)?.v).toBe(3.8)
+    expect(hoverReadout(layout, third + 1)?.label).toBe("3.80 V @ 200 ns")
+  })
+
+  it("draws a what-if on one time axis, long enough for the slower run", () => {
+    // A what-if slower (22 µs) than the original (700 ns): past 10,000 ns, so µs.
+    const whatIf: Simulation = { ...sim, t: [0, 1, 22], t_unit: "µs", v: [0, 4, 4.99] }
+    const layout = simulationLayout(sim, whatIf)
+    expect(layout.unit).toBe("µs")
+    expect(layout.points.map((p) => p.t)).toEqual([0, 0.1, 0.2, 0.4, 0.7])
+    const last = layout.whatIf?.points[2]
+    expect(last?.x).toBe(layout.plot.x1) // the slower run spans the axis
+    expect(layout.points[4].x).toBeCloseTo(
+      layout.plot.x0 + (0.7 / 22) * (layout.plot.x1 - layout.plot.x0),
+    )
+    expect(layout.whatIf?.path.startsWith("M")).toBe(true)
+    const hover = hoverReadout(layout, layout.points[4].x)
+    expect(hover?.dots.map((d) => d.dashed)).toEqual([false, true])
+    expect(hover?.label).toBe("4.97 V → 4.00 V @ 0.7 µs")
+    // A faster what-if keeps the original's unit and span.
+    const fast = simulationLayout(sim, { ...sim, t: [0, 300], v: [0, 4.9] })
+    expect(fast.unit).toBe("ns")
+    expect(fast.points[4].x).toBe(fast.plot.x1)
+    expect(simulationLayout(sim).whatIf).toBeNull()
+  })
+})
+
+describe("parseSi", () => {
+  it("reads the values a schematic writes", () => {
+    const cases: [string, number][] = [
+      ["4.7k", 4700],
+      ["4k7", 4700],
+      ["10K", 10_000],
+      ["1u", 1e-6],
+      ["1µ", 1e-6],
+      ["1μF", 1e-6],
+      ["100n", 100e-9],
+      ["30p", 30e-12],
+      ["2.2M", 2.2e6],
+      ["1meg", 1e6],
+      ["470m", 0.47],
+      ["4.7 kΩ", 4700],
+      ["220ohm", 220],
+      ["1e-6", 1e-6],
+      [" 47 ", 47],
+      [".5", 0.5],
+    ]
+    for (const [text, value] of cases) expect(parseSi(text), text).toBeCloseTo(value, 15)
+  })
+
+  it("refuses what isn't a positive value", () => {
+    for (const text of ["", "k", "abc", "-1k", "0", "4.7k7", "1x", "1f", "1e5k7"]) {
+      expect(parseSi(text), text).toBeNull()
+    }
+  })
+})
+
+describe("formatSi", () => {
+  it("writes a value with its prefix, three digits", () => {
+    expect([4700, 10_000, 30e-12, 1e-6, 100e-9, 2.2e6, 47, 0.47].map(formatSi)).toEqual([
+      "4.7k",
+      "10k",
+      "30p",
+      "1µ",
+      "100n",
+      "2.2M",
+      "47",
+      "470m",
+    ])
+    for (const v of [4700, 33e-12, 1e-6, 0.1]) expect(parseSi(formatSi(v))).toBeCloseTo(v, 15)
+  })
+})
+
+describe("whatIfLabels", () => {
+  const circuit: SimCircuit = {
+    kind: "rc_delay",
+    net: "EN",
+    r_ohm: 10_000,
+    c_farad: 1e-6,
+    v_rail: 3.3,
+    v_supply: null,
+    r_ref: "R5",
+    c_ref: "C5",
+  }
+
+  it("names the parts, or the bus C on an I²C line", () => {
+    const m = en
+    expect(whatIfLabels(circuit, m)).toEqual({ r: "R5", c: "C5" })
+    expect(whatIfLabels({ ...circuit, r_ref: null, c_ref: null }, m)).toEqual({ r: "R", c: "C" })
+    expect(whatIfLabels({ ...circuit, kind: "i2c", c_ref: null }, m)).toEqual({
+      r: "R5",
+      c: "bus C (estimated)",
+    })
   })
 })
 
@@ -368,6 +465,7 @@ describe("toMarkdown", () => {
       streaming: false,
       simulations: [sim],
       chats: { sim1: [{ question: "When does it pass 63%?", answer: "At 10 ms." }] },
+      whatIfs: { sim1: { ...sim, text: "What-if: R1 10 kΩ → 4.7 kΩ." } },
       resultChat: [{ question: "Which finding first?", answer: "None were found." }],
     }
     const summary = {
@@ -388,6 +486,7 @@ describe("toMarkdown", () => {
     expect(md).toContain("## Simulations\n\n### EN rising through its RC delay")
     expect(md).toContain("```spice\nRC on EN\nRpull rail pin 10000\n```")
     expect(md).toContain("**Q:** When does it pass 63%?\n\nAt 10 ms.")
+    expect(md).not.toContain("What-if") // the report leaves what-ifs out
     expect(md).toContain(
       "## Follow-up questions\n\n**Q:** Which finding first?\n\nNone were found.",
     )
@@ -574,6 +673,7 @@ describe("toMarkdown with datasheets and vendor models", () => {
     streaming: false,
     simulations: [vendor],
     chats: {},
+    whatIfs: {},
     resultChat: [],
   }
   const result = {

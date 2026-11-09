@@ -5,8 +5,8 @@ import { Title } from "@/shared/ui/title"
 
 import { useMessages } from "../messages"
 import { isVendorModel } from "../present"
-import type { Run, Simulation, SimVerdict } from "../types"
-import { formatElapsed, useElapsed, useSimulationChat } from "../useDebug"
+import type { Run, SimCircuit, Simulation, SimVerdict } from "../types"
+import { formatElapsed, useElapsed, useSimulationChat, useWhatIf, type WhatIf } from "../useDebug"
 import { ChatThread } from "./ChatThread"
 import { SimulationPlot } from "./SimulationPlot"
 
@@ -16,6 +16,88 @@ function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation
     <div className="border-t pt-3">
       <ChatThread chat={chat} text={useMessages().simulations} />
     </div>
+  )
+}
+
+/** One what-if field: the part's ref (or the quantity) before an
+ *  underlined value. */
+function ValueField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (text: string) => void
+}) {
+  return (
+    <label className="flex items-center gap-[1ch] text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value)
+        }}
+        maxLength={20}
+        spellCheck={false}
+        className="w-[9ch] border-b border-input bg-transparent py-0.5 font-mono text-sm caret-foreground focus:border-foreground focus:outline-none"
+      />
+    </label>
+  )
+}
+
+/** The R and C fields under an RC plot: re-run ngspice with the user's
+ *  values (the rail stays), or Reset to drop the what-if. */
+function WhatIfFields({ w }: { w: WhatIf }) {
+  const t = useMessages().simulations.whatIf
+  return (
+    <form
+      className="space-y-1.5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        w.rerun()
+      }}
+    >
+      <p className="text-xs text-muted-foreground">{t.hint}</p>
+      <div className="flex flex-wrap items-center gap-x-[2ch] gap-y-2">
+        <ValueField label={w.labels.r} value={w.r} onChange={w.setR} />
+        <ValueField label={w.labels.c} value={w.c} onChange={w.setC} />
+        <Button type="submit" size="sm" disabled={w.pending}>
+          {t.rerun}
+        </Button>
+        {w.whatIf && (
+          <Button type="button" variant="outline" size="sm" onClick={w.reset}>
+            {t.reset}
+          </Button>
+        )}
+      </div>
+      {w.pending && (
+        <p className="text-xs text-muted-foreground">
+          <span className="animate-pulse">●</span> {t.rerunning}
+        </p>
+      )}
+      {w.error && <p className="text-xs text-bad">{w.error}</p>}
+    </form>
+  )
+}
+
+/** An RC simulation's plot with its what-if fields; the what-if is drawn
+ *  over the original. */
+function RcSimulation({
+  runNumber,
+  sim,
+  circuit,
+}: {
+  runNumber: number
+  sim: Simulation
+  circuit: SimCircuit
+}) {
+  const w = useWhatIf(runNumber, sim, circuit)
+  return (
+    <>
+      <SimulationPlot sim={sim} whatIf={w.whatIf} />
+      <WhatIfFields w={w} />
+    </>
   )
 }
 
@@ -44,7 +126,11 @@ export function SimulationsCard({ run }: { run: Run }) {
         {sims.map((sim) => (
           <div key={sim.id} className="min-w-0 space-y-3 border p-3">
             <p className="text-sm font-bold">{sim.title}</p>
-            <SimulationPlot sim={sim} />
+            {sim.circuit ? (
+              <RcSimulation runNumber={run.number} sim={sim} circuit={sim.circuit} />
+            ) : (
+              <SimulationPlot sim={sim} />
+            )}
             <Netlist sim={sim} />
             <SimulationChat runNumber={run.number} sim={sim} />
           </div>

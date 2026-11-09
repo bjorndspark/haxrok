@@ -578,6 +578,7 @@ class I2cLine:
     v_pull: float
     v_supply: float  # the lowest supply of an IC on the line
     c_farad: float
+    r_ref: str | None = None  # the pull-up, when there is just one
 
 
 def i2c_line(design: Design, calc: Calculation) -> I2cLine | None:
@@ -597,7 +598,8 @@ def i2c_line(design: Design, calc: Calculation) -> I2cLine | None:
         return None
     devices = sum(1 for n in design.nets[net] if _head(n.ref) in {"U", "IC", "J", "P", "CN"})
     c = (devices * _PIN_PF + _TRACE_PF) * 1e-12
-    return I2cLine(net, calc.value, pull_v, min(supplies), c)
+    r_ref = ups[0].ref if len(ups) == 1 else None
+    return I2cLine(net, calc.value, pull_v, min(supplies), c, r_ref)
 
 
 _DELAY_PIN = re.compile(r"^~?\{?(EN|CHIP_EN|ENABLE|RUN|N?RST|RESET|N?RESET)\}?$", re.IGNORECASE)
@@ -704,6 +706,8 @@ class RcLine:
     r_ohm: float
     v_rail: float
     c_farad: float
+    r_ref: str | None = None
+    c_ref: str | None = None
 
 
 def rc_line(design: Design, calc: Calculation) -> RcLine | None:
@@ -718,7 +722,7 @@ def rc_line(design: Design, calc: Calculation) -> RcLine | None:
     caps = [c for c in _capacitors(design, net) if is_ground(c.other)]
     if len(ups) != 1 or len(caps) != 1 or (v := named_voltage(ups[0].other)) is None:
         return None
-    return RcLine(net, ups[0].value, v, caps[0].value)
+    return RcLine(net, ups[0].value, v, caps[0].value, ups[0].ref, caps[0].ref)
 
 
 def _divider(design: Design, net: str) -> Calculation | None:

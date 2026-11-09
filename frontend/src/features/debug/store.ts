@@ -1,6 +1,14 @@
 import { create } from "zustand"
 
-import type { AskTurn, MeasurementInput, Mode, ProjectFile, Run, SimAnalysis } from "./types"
+import type {
+  AskTurn,
+  MeasurementInput,
+  Mode,
+  ProjectFile,
+  Run,
+  SimAnalysis,
+  Simulation,
+} from "./types"
 
 /** Every vendor-model analysis, in the order the form lists them. */
 export const SIM_ANALYSES: SimAnalysis[] = ["startup", "load_step", "dropout"]
@@ -36,6 +44,10 @@ interface DebugState {
   updateRun: (number: number, patch: (run: Run) => Partial<Run>) => void
   /** Record an answered question about simulation `simId` of run `number`. */
   addAskTurn: (number: number, simId: string, turn: AskTurn) => void
+  /** Keep `whatIf` as simulation `simId`'s what-if, replacing the last. */
+  setWhatIf: (number: number, simId: string, whatIf: Simulation) => void
+  /** Drop simulation `simId`'s what-if (Reset). */
+  clearWhatIf: (number: number, simId: string) => void
   /** Record an answered follow-up question about run `number`. */
   addResultTurn: (number: number, turn: AskTurn) => void
   editInput: () => void
@@ -76,6 +88,7 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       streaming: true,
       simulations: [],
       chats: {},
+      whatIfs: {},
       resultChat: [],
     }
     set((s) => ({ view: "session", runs: [run, ...s.runs], controller, inputError: null }))
@@ -86,6 +99,14 @@ export const useDebugStore = create<DebugState>((set, get) => ({
   addAskTurn: (number, simId, turn) => {
     get().updateRun(number, (r) => ({
       chats: { ...r.chats, [simId]: [...(r.chats[simId] ?? []), turn] },
+    }))
+  },
+  setWhatIf: (number, simId, whatIf) => {
+    get().updateRun(number, (r) => ({ whatIfs: { ...r.whatIfs, [simId]: whatIf } }))
+  },
+  clearWhatIf: (number, simId) => {
+    get().updateRun(number, (r) => ({
+      whatIfs: Object.fromEntries(Object.entries(r.whatIfs).filter(([id]) => id !== simId)),
     }))
   },
   addResultTurn: (number, turn) => {

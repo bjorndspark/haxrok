@@ -44,7 +44,7 @@ work the same way.
 - UI: a question box under each plot, with the conversation kept in the
   component (TanStack Query mutation for the call).
 
-## 3. What-if re-runs: in progress
+## 3. What-if re-runs: done
 
 "Try C5 = 1 µF" would re-run ngspice with the changed value and draw the new
 curve over the old one.
@@ -88,6 +88,27 @@ Decided (2026-11-08), defaults:
 **Checks:** `make lint`, `make test`, with tests for the re-run deck and
 caption, the bounds, the value parser and the overlay layout; a re-run
 from the UI on an I²C line and an RC delay.
+
+**Checks (2026-11-08):** lint is clean (ruff, ruff format, mypy, ESLint,
+tsc, Prettier; ESLint keeps its old fast-refresh warning in
+`shared/ui/button.tsx`). Tests: backend 281 passed, frontend 44 passed.
+New backend tests cover the `circuit` on both RC kinds, the re-run deck and
+caption, the "estimated" wording dropped once C is typed, the bounds (both
+edges accepted, NaN refused), a vendor run refused, ngspice failing
+(`SIMULATION_FAILED`), the route's envelope and 400, and the ask message
+carrying both runs. Frontend tests cover `parseSi` (`4k7`, `1µ`, `1μF`,
+`1meg`, `470m`, `4.7 kΩ`, refusals), `formatSi` round trips, the field
+labels, the shared axis and hover readout, and the Markdown report leaving
+what-ifs out. Live against the running backend with real ngspice, an I²C
+line at 2.2 kΩ went from 119 ns to 55.9 ns (rise 30→70%); at 100 pF it went
+to 398 ns and lost the "estimated" wording. An RC delay at 4.7 kΩ went from
+10 ms to 4.72 ms to 63%, and at 4.7 µF to 47.2 ms. C = 1 F gave the 400. The
+re-run wasn't clicked in a browser: that needs a full model run to put
+simulations on the page.
+
+**Bugs found:** the overlay test expected a µs axis for a 2.2 µs what-if,
+but 2200 ns is still under the 10,000-unit limit, so ns is right (the
+backend picks the same way). The test now uses a 22 µs what-if.
 
 ## 4. Circuits a formula can't answer: later
 

@@ -14,6 +14,7 @@ import type {
   Hypothesis,
   Run,
   PinWarning,
+  SimCircuit,
   WiringFinding,
 } from "./types"
 
@@ -459,36 +460,76 @@ export function diagramLayout(d: Diagram, m: Messages): DiagramLayout {
 
 const PLOT = { width: 520, height: 200, left: 44, right: 128, top: 24, bottom: 36 }
 
+interface Point {
+  x: number
+  y: number
+  t: number
+  v: number
+}
+
 export interface SimulationLayout {
   width: number
   height: number
   /** The plot area: the waveform's box inside the axes. */
   plot: { x0: number; x1: number; y0: number; y1: number }
+  /** The time axis' unit; the original's own unless a what-if is drawn. */
+  unit: Simulation["t_unit"]
   path: string
-  points: { x: number; y: number; t: number; v: number }[]
+  points: Point[]
+  /** The what-if re-run, drawn dashed over the original. */
+  whatIf: { path: string; points: Point[] } | null
   /** Horizontal reference lines, labelled at the right edge. */
   levels: { y: number; label: string; danger: boolean }[]
   xTicks: { x: number; label: string }[]
   yTicks: { y: number; label: string }[]
 }
 
-/** Where a simulated waveform goes: volts up, time across in the
- *  simulation's own unit, with its reference lines (a flagged I²C line's
- *  rail and the IC's supply + 0.3 V; an RC delay's rail and 63% point). */
-export function simulationLayout(sim: Simulation): SimulationLayout {
+/** Per second, smallest first: the backend's time units. */
+const TIME_UNITS: [Simulation["t_unit"], number][] = [
+  ["ns", 1e9],
+  ["µs", 1e6],
+  ["ms", 1e3],
+]
+
+function unitScale(unit: Simulation["t_unit"]): number {
+  return TIME_UNITS.find(([u]) => u === unit)?.[1] ?? 1
+}
+
+/** The smallest unit that keeps `seconds` under 10,000 of it, as the
+ *  backend picks a simulation's own unit. */
+function timeUnit(seconds: number): [Simulation["t_unit"], number] {
+  return TIME_UNITS.find(([, scale]) => seconds * scale <= 10_000) ?? ["ms", 1e3]
+}
+
+/** Where a simulated waveform goes: volts up, time across, with its
+ *  reference lines (a flagged I²C line's rail and the IC's supply + 0.3 V;
+ *  an RC delay's rail and 63% point). A what-if re-run shares the axes,
+ *  which run long enough for the slower of the two. */
+export function simulationLayout(sim: Simulation, whatIf?: Simulation | null): SimulationLayout {
   const { width, height, left, right, top, bottom } = PLOT
   const plot = { x0: left, x1: width - right, y0: height - bottom, y1: top }
-  const tMax = Math.max(...sim.t, 1e-9)
-  const vMax = Math.ceil(Math.max(...sim.levels.map((l) => l.v), ...sim.v))
+  const runs = whatIf ? [sim, whatIf] : [sim]
+  // Each run's times in seconds, then in the shared unit.
+  const seconds = runs.map((r) => r.t.map((t) => t / unitScale(r.t_unit)))
+  const [unit, scale] = whatIf
+    ? timeUnit(Math.max(...seconds.flat()))
+    : [sim.t_unit, unitScale(sim.t_unit)]
+  const tMax = Math.max(...seconds.flat().map((t) => t * scale), 1e-9)
+  const vMax = Math.ceil(Math.max(...sim.levels.map((l) => l.v), ...runs.flatMap((r) => r.v)))
   const x = (t: number) => plot.x0 + (t / tMax) * (plot.x1 - plot.x0)
   const y = (v: number) => plot.y0 - (v / vMax) * (plot.y0 - plot.y1)
-  const points = sim.t.map((t, i) => {
-    const v = sim.v[i] ?? 0
-    return { x: x(t), y: y(v), t, v }
-  })
-  const path = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(" ")
+  const trace = (r: Simulation, ts: number[]) => {
+    const points = ts.map((sec, i) => {
+      const t = Number((sec * scale).toPrecision(6))
+      const v = r.v[i] ?? 0
+      return { x: x(t), y: y(v), t, v }
+    })
+    const path = points
+      .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+      .join(" ")
+    return { path, points }
+  }
+  const { path, points } = trace(sim, seconds[0] ?? [])
   const levels = sim.levels.map((l) => ({ y: y(l.v), label: l.label, danger: l.danger }))
   const step = niceStep(tMax / 4)
   const xTicks = []
@@ -497,19 +538,102 @@ export function simulationLayout(sim: Simulation): SimulationLayout {
   }
   const yTicks = []
   for (let v = 0; v <= vMax; v += 1) yTicks.push({ y: y(v), label: String(v) })
-  return { width, height, plot, path, points, levels, xTicks, yTicks }
+  return {
+    width,
+    height,
+    plot,
+    unit,
+    path,
+    points,
+    whatIf: whatIf ? trace(whatIf, seconds[1] ?? []) : null,
+    levels,
+    xTicks,
+    yTicks,
+  }
 }
 
 /** The sample nearest to ``x`` on the plot, for the hover readout. */
-export function nearestPoint(
-  layout: SimulationLayout,
-  x: number,
-): SimulationLayout["points"][0] | null {
-  let best: SimulationLayout["points"][0] | null = null
-  for (const p of layout.points) {
+export function nearestPoint(points: Point[], x: number): Point | null {
+  let best: Point | null = null
+  for (const p of points) {
     if (best === null || Math.abs(p.x - x) < Math.abs(best.x - x)) best = p
   }
   return best
+}
+
+/** The hover readout at ``x``: the original's sample, the what-if's when
+ *  one is drawn, and "1.20 V → 2.41 V @ 10 ms". */
+export function hoverReadout(
+  layout: SimulationLayout,
+  x: number,
+): { x: number; dots: { y: number; dashed: boolean }[]; label: string } | null {
+  const p = nearestPoint(layout.points, x)
+  if (!p) return null
+  const w = layout.whatIf ? nearestPoint(layout.whatIf.points, x) : null
+  const volts = w ? `${p.v.toFixed(2)} V → ${w.v.toFixed(2)} V` : `${p.v.toFixed(2)} V`
+  return {
+    x: p.x,
+    dots: [{ y: p.y, dashed: false }, ...(w ? [{ y: w.y, dashed: true }] : [])],
+    label: `${volts} @ ${String(Number(p.t.toPrecision(3)))} ${layout.unit}`,
+  }
+}
+
+const SI_PREFIX: Record<string, number> = {
+  p: 1e-12,
+  n: 1e-9,
+  u: 1e-6,
+  µ: 1e-6,
+  μ: 1e-6,
+  m: 1e-3,
+  k: 1e3,
+  K: 1e3,
+  M: 1e6,
+  meg: 1e6,
+  Meg: 1e6,
+  MEG: 1e6,
+}
+
+/** A part value as typed: `4.7k`, `4k7`, `1u`, `1µ`, `100n`, `2.2M`,
+ *  `1e-6`, with an optional `Ω`/`ohm`/`F`. `m` is milli and `M` mega, as
+ *  on a schematic. Null when it isn't a positive number. */
+export function parseSi(text: string): number | null {
+  const s = text.trim().replace(/\s*(Ω|[oO]hms?|F)$/, "")
+  // Every group always matches, possibly empty.
+  const m = /^(\d+(?:\.\d+)?|\.\d+)((?:e[+-]?\d+)?)\s*((?:meg|Meg|MEG|[pnuµμmkKM])?)(\d*)$/.exec(s)
+  if (!m) return null
+  const [, num, exp, prefix, tail] = m
+  // 4k7: the prefix stands for the decimal point.
+  if (tail && (!prefix || num.includes(".") || exp)) return null
+  const mantissa = tail ? `${num}.${tail}` : num
+  const value = Number(`${mantissa}${exp}`) * (prefix ? (SI_PREFIX[prefix] ?? 1) : 1)
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+
+/** A value with its SI prefix, three significant digits: 4700 → `4.7k`,
+ *  3e-11 → `30p`; what a what-if field starts with. */
+export function formatSi(value: number): string {
+  const prefixes: [string, number][] = [
+    ["M", 1e6],
+    ["k", 1e3],
+    ["", 1],
+    ["m", 1e-3],
+    ["µ", 1e-6],
+    ["n", 1e-9],
+    ["p", 1e-12],
+  ]
+  const [prefix, scale] = prefixes.find(([, sc]) => value >= sc * 0.9995) ?? ["p", 1e-12]
+  return `${String(Number((value / scale).toPrecision(3)))}${prefix}`
+}
+
+/** The what-if fields' labels: the part's ref where the netlist has a
+ *  single part (`R5`), else the quantity; an I²C line's C is the estimated
+ *  bus capacitance, never a part. */
+export function whatIfLabels(circuit: SimCircuit, m: Messages): { r: string; c: string } {
+  const t = m.simulations.whatIf
+  return {
+    r: circuit.r_ref ?? t.r,
+    c: circuit.kind === "i2c" ? t.busC : (circuit.c_ref ?? t.c),
+  }
 }
 
 function niceStep(raw: number): number {

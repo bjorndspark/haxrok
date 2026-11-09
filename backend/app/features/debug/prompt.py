@@ -412,9 +412,12 @@ you need to, and say that you did.
 - An RC simulation is an ideal model: an ideal rail switched on at t = 0, one \
 resistor, one capacitor. When the answer depends on something it leaves out \
 (an IC's threshold or leakage, the real rail's ramp, trace capacitance), say \
-so, name the datasheet value to look up, and don't make one up. When asked \
-what a different part value would do, work it out from R×C and say it's a \
-calculation, not a re-run.
+so, name the datasheet value to look up, and don't make one up.
+- The user can re-run an RC simulation with their own R and C (a what-if). \
+When one is included, it is drawn dashed over the original: compare the two \
+sets of samples, and quote both. Without one, when asked what a different \
+part value would do, work it out from R×C, say it's a calculation, and say \
+the R and C fields under the plot re-run it in ngspice.
 - A vendor-model simulation runs a regulator's SPICE model from its vendor \
 with the board's passives around it and a resistor (plus a current step in a \
 load step) standing in for the load. The backend checked the output against \
@@ -436,10 +439,14 @@ def _samples(sim: Simulation, rows: int = 25) -> str:
     return "\n".join(f"{sim.t[i]:g} {sim.t_unit}\t{sim.v[i]:.3f} V" for i in picked)
 
 
-def build_ask_message(sim: Simulation, history: list[AskTurn], question: str) -> str:
+def build_ask_message(
+    sim: Simulation, history: list[AskTurn], question: str, what_if: Simulation | None = None
+) -> str:
     """The user turn for a question about ``sim``: its kind (RC, or a
     vendor model with its verdict), the deck, the caption, the reference
-    lines, a sample table, the conversation so far, then the question."""
+    lines, a sample table, then the latest what-if re-run's deck, caption
+    and samples if there is one, the conversation so far, and the
+    question."""
     levels = "\n".join(
         f"- {lv.label}" + (" (a limit the waveform shouldn't cross)" if lv.danger else "")
         for lv in sim.levels
@@ -457,6 +464,13 @@ def build_ask_message(sim: Simulation, history: list[AskTurn], question: str) ->
         "## Reference lines\n" + (levels or "(none)"),
         f"## Samples (time, voltage)\n{_samples(sim)}",
     ]
+    if what_if is not None:
+        parts += [
+            "## What-if re-run (the user's values, drawn dashed over the original)\n"
+            + what_if.text,
+            "## What-if netlist\n" + what_if.deck.strip(),
+            f"## What-if samples (time, voltage)\n{_samples(what_if)}",
+        ]
     return _with_question(parts, history, question)
 
 

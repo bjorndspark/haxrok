@@ -1,6 +1,7 @@
 """Debug routes. Thin: read the multipart upload, hand it to the service,
 stream the result as SSE (exempt from the envelope, see app.core.responses);
-answer questions about a simulation or a finished run in the envelope."""
+answer questions about a simulation or a finished run, and re-run an RC
+simulation with other values, in the envelope."""
 
 import json
 from pathlib import Path
@@ -28,8 +29,10 @@ from app.features.debug.schemas import (
     Language,
     MeasurementInput,
     Mode,
+    RerunRequest,
     ResultAskRequest,
     SimAnalysis,
+    Simulation,
 )
 from app.features.debug.spice import Ngspice
 from app.features.debug.spice_models import SpiceModels, SpiceModelStore
@@ -166,9 +169,18 @@ async def analyze(
 @router.post("/ask")
 async def ask(req: AskRequest) -> SuccessResponse[AskAnswer]:
     """Answer a question about one simulation from an analysis stream. The
-    browser sends the simulation and the conversation so far each time;
-    nothing is stored."""
+    browser sends the simulation, its latest what-if and the conversation
+    so far each time; nothing is stored."""
     return ok(AskAnswer(answer=await service.ask(req, _answer)))
+
+
+@router.post("/rerun")
+async def rerun(req: RerunRequest) -> SuccessResponse[Simulation]:
+    """Re-run an RC simulation with another R and C (a what-if) and return
+    the new waveform; no model call. The browser sends the original
+    simulation back; nothing is stored. Values outside 1 Ω–100 MΩ or
+    0.1 pF–0.1 F are a 400."""
+    return ok(await service.rerun(req, Ngspice()))
 
 
 @router.post("/ask-result")

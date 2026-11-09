@@ -448,9 +448,28 @@ SimVerdict = Literal["passed", "flagged", "timed_out", "failed", "skipped"]
 them, stopped at the timeout, ngspice failed, or not run (the text says why)."""
 
 
+class SimCircuit(BaseModel):
+    """The RC behind an RC simulation, so a what-if can rebuild its deck
+    (``RerunRequest``): a resistor from an ideal rail, a capacitor to
+    ground. The refs are set where the netlist has a single part; an I²C
+    line's capacitance is an estimate and has none."""
+
+    kind: Literal["i2c", "rc_delay"]
+    net: str = Field(max_length=200)
+    r_ohm: float
+    c_farad: float
+    v_rail: float
+    v_supply: float | None = Field(
+        default=None, description="I²C: the lowest supply of an IC on the line."
+    )
+    r_ref: str | None = Field(default=None, max_length=40)
+    c_ref: str | None = Field(default=None, max_length=40)
+
+
 class Simulation(BaseModel):
     """An ngspice transient, streamed as its own ``simulation`` event. The
-    review never sees it, but the user can ask about it (``AskRequest``).
+    review never sees it, but the user can ask about it (``AskRequest``)
+    and, for an RC run, re-run it with other values (``RerunRequest``).
 
     Two kinds: an RC node rising from 0 V (``spice.py``: a flagged I²C line
     through its pull-up and estimated bus capacitance, or an enable/reset
@@ -474,6 +493,9 @@ class Simulation(BaseModel):
     v: list[float] = Field(max_length=500)
     levels: list[SimLevel] = Field(max_length=10)
     text: str = Field(max_length=2000)
+    circuit: SimCircuit | None = Field(
+        default=None, description="RC runs only: what a what-if re-run rebuilds."
+    )
 
 
 class Calculation(BaseModel):
@@ -640,12 +662,24 @@ class AskTurn(BaseModel):
 
 class AskRequest(BaseModel):
     """A question about one simulation. Runs live in the browser, so the
-    simulation and the conversation so far come with every question."""
+    simulation, its latest what-if re-run if any, and the conversation so
+    far come with every question."""
 
     simulation: Simulation
+    what_if: Simulation | None = None
     question: str = Field(min_length=1, max_length=1000)
     history: list[AskTurn] = Field(default_factory=list, max_length=10)
     language: Language = "en"
+
+
+class RerunRequest(BaseModel):
+    """A what-if: an RC simulation re-run with another R and C. Stateless
+    like ``AskRequest``: the browser sends the original simulation back,
+    and its ``circuit`` rebuilds the deck."""
+
+    simulation: Simulation
+    r_ohm: float
+    c_farad: float
 
 
 class ResultAskRequest(BaseModel):

@@ -9,10 +9,10 @@ import { useCallback, useEffect, useState } from "react"
 import { useLanguage, type Language } from "@/shared/lib/language"
 import { errorMessage } from "@/shared/lib/utils"
 
-import { askResult, askSimulation, streamAnalysis } from "./api"
+import { askResult, askSimulation, rerunSimulation, streamAnalysis } from "./api"
 import { fromDataTransfer, fromFileList } from "./files"
 import { currentMessages, useMessages } from "./messages"
-import { toMarkdown } from "./present"
+import { formatSi, parseSi, toMarkdown, whatIfLabels } from "./present"
 import { useDebugStore } from "./store"
 import type {
   AnalysisEvent,
@@ -21,6 +21,7 @@ import type {
   ConfirmStep,
   DesignSummary,
   Run,
+  SimCircuit,
   Simulation,
 } from "./types"
 
@@ -195,13 +196,78 @@ function useChat(
 
 const NO_TURNS: AskTurn[] = []
 
+/** An RC simulation's what-if: the R and C fields, the re-run in flight
+ *  and the latest re-run, kept in the run like the questions. */
+export interface WhatIf {
+  labels: { r: string; c: string }
+  r: string
+  c: string
+  setR: (text: string) => void
+  setC: (text: string) => void
+  /** Parse the fields and re-run ngspice with them. */
+  rerun: () => void
+  /** Drop the what-if and put the fields back to the original values. */
+  reset: () => void
+  whatIf: Simulation | null
+  pending: boolean
+  error: string | null
+}
+
+/** The what-if controls for `sim` of run `runNumber`; `circuit` is its
+ *  RC circuit (`sim.circuit`). Each re-run replaces the last. */
+export function useWhatIf(runNumber: number, sim: Simulation, circuit: SimCircuit): WhatIf {
+  const m = useMessages()
+  const labels = whatIfLabels(circuit, m)
+  const whatIf = useDebugStore((s) => s.runs.find((r) => r.number === runNumber)?.whatIfs[sim.id])
+  const [r, setR] = useState(() => formatSi(circuit.r_ohm))
+  const [c, setC] = useState(() => formatSi(circuit.c_farad))
+  const [badValue, setBadValue] = useState<string | null>(null)
+  const mutation = useMutation({
+    mutationFn: (values: { r_ohm: number; c_farad: number }) =>
+      rerunSimulation({ simulation: sim, ...values }),
+    onSuccess: (result) => {
+      useDebugStore.getState().setWhatIf(runNumber, sim.id, result)
+    },
+  })
+  return {
+    labels,
+    r,
+    c,
+    setR,
+    setC,
+    rerun: () => {
+      const rOhm = parseSi(r)
+      const cFarad = parseSi(c)
+      const bad = rOhm === null ? labels.r : cFarad === null ? labels.c : null
+      setBadValue(bad === null ? null : m.simulations.whatIf.badValue(bad))
+      if (rOhm !== null && cFarad !== null && !mutation.isPending) {
+        mutation.mutate({ r_ohm: rOhm, c_farad: cFarad })
+      }
+    },
+    reset: () => {
+      setR(formatSi(circuit.r_ohm))
+      setC(formatSi(circuit.c_farad))
+      setBadValue(null)
+      mutation.reset()
+      useDebugStore.getState().clearWhatIf(runNumber, sim.id)
+    },
+    whatIf: whatIf ?? null,
+    pending: mutation.isPending,
+    error:
+      badValue ??
+      (mutation.isError ? errorMessage(mutation.error, m.simulations.whatIf.failed) : null),
+  }
+}
+
 /** Questions about one simulation of run `runNumber`. */
 export function useSimulationChat(runNumber: number, sim: Simulation): Chat {
-  const turns = useDebugStore((s) => s.runs.find((r) => r.number === runNumber)?.chats[sim.id])
+  const run = useDebugStore((s) => s.runs.find((r) => r.number === runNumber))
+  const whatIf = run?.whatIfs[sim.id] ?? null
   return useChat(
-    turns ?? NO_TURNS,
+    run?.chats[sim.id] ?? NO_TURNS,
+    // The what-if drawn over the plot goes too, so the answer compares both.
     (question, history, language) =>
-      askSimulation({ simulation: sim, question, history, language }),
+      askSimulation({ simulation: sim, what_if: whatIf, question, history, language }),
     (turn) => {
       useDebugStore.getState().addAskTurn(runNumber, sim.id, turn)
     },
