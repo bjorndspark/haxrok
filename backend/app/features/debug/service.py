@@ -207,8 +207,10 @@ async def stream(
 ) -> AsyncIterator[SseEvent]:
     """The SSE body for one analysis run: the review (with ``facts``, after
     reading the found datasheets), and with ``ngspice`` the simulations
-    ``spice.plan`` picks, run alongside it. The terminal event (result or
-    error) waits for those. With ``models``, the vendor-model simulations
+    ``spice.plan`` picks, run alongside it (an enable/reset RC fed by a
+    regulator once the datasheets are read: its start-up time ramps the
+    rail). The terminal event (result or error) waits for those. With
+    ``models``, the vendor-model simulations
     (``spice_circuits``) start once the datasheets are read; they take
     minutes, so they come after the terminal event, each as it finishes.
     Closing the stream cancels whatever still runs."""
@@ -222,9 +224,12 @@ async def stream(
     )
     try:
         sources = [_review(prepared, model, facts, reading)]
-        jobs = spice.plan(prepared.calculations, prepared.design) if ngspice else []
-        if ngspice and jobs:
-            sources.append(_simulations(jobs, ngspice))
+        if ngspice is not None:
+            now, fed = _by_rail(spice.plan(prepared.calculations, prepared.design), prepared)
+            if now:
+                sources.append(_simulations(now, ngspice))
+            if fed:
+                sources.append(_ramped_simulations(fed, reading, ngspice))
         terminal: SseEvent | None = None
         async for ev in _merge(sources):
             if ev["event"] in ("result", "error"):
@@ -288,6 +293,41 @@ async def _simulations(
         n += 1
         yield _event("simulation", sim.model_dump_json())
     logger.info("ngspice: %d of %d simulations in %.2fs", n, len(jobs), time.monotonic() - start)
+
+
+def _by_rail(
+    jobs: list[spice.Job], prepared: Prepared
+) -> tuple[list[spice.Job], list[tuple[spice.Job, str]]]:
+    """``jobs`` split into those that run now and the enable/reset RCs whose
+    rail a regulator feeds, with that regulator's ref."""
+    now: list[spice.Job] = []
+    fed: list[tuple[spice.Job, str]] = []
+    for job in jobs:
+        rail = job.line.rail if isinstance(job.line, calc.RcLine) else None
+        ref = spice_circuits.regulator_of(prepared.design, rail) if rail else None
+        if ref is None:
+            now.append(job)
+        else:
+            fed.append((job, ref))
+    return now, fed
+
+
+async def _ramped_simulations(
+    fed: list[tuple[spice.Job, str]],
+    reading: Awaitable[DatasheetReading],
+    ngspice: spice.SpiceRunner,
+) -> AsyncIterator[SseEvent]:
+    """The regulator-fed RC runs: each rail ramps over its regulator's
+    start-up time from the datasheet reading, or stays a step without one
+    (a failed reading counts as none)."""
+    try:
+        got = await reading
+    except Exception:
+        logger.warning("datasheet reading failed; RC rails stay steps", exc_info=True)
+        got = DatasheetReading()
+    jobs = [spice.with_ramp(job, spice_circuits.ramp(ref, got)) for job, ref in fed]
+    async for ev in _simulations(jobs, ngspice):
+        yield ev
 
 
 _DONE: SseEvent = {}

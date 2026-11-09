@@ -445,14 +445,31 @@ SimAnalysis = Literal["startup", "load_step", "dropout"]
 
 SimVerdict = Literal["passed", "flagged", "timed_out", "failed", "skipped"]
 """A vendor-model simulation's outcome: within the datasheet limits, outside
-them, stopped at the timeout, ngspice failed, or not run (the text says why)."""
+them, stopped at the timeout, ngspice failed, or not run (the text says why).
+A ramped RC run is only ever ``passed`` or ``flagged``."""
+
+
+class SimRamp(BaseModel):
+    """The regulator an enable/reset RC's rail comes from (plan 003 step
+    4). With its datasheet start-up time the rail ramps up over it and the
+    run checks that the pin releases only once the rail is in band; without
+    one (``t_s`` None) the rail is a step at t = 0 and the caption says
+    why."""
+
+    regulator: str = Field(max_length=40)
+    t_s: float | None = Field(
+        default=None, gt=0, le=1.0, description="Start-up time from its datasheet facts."
+    )
+    accuracy: float = Field(gt=0, lt=0.5, description="Output accuracy, as a fraction.")
+    accuracy_cited: bool = Field(description="False: ±5 % assumed, no datasheet value.")
 
 
 class SimCircuit(BaseModel):
     """The RC behind an RC simulation, so a what-if can rebuild its deck
     (``RerunRequest``): a resistor from an ideal rail, a capacitor to
     ground. The refs are set where the netlist has a single part; an I²C
-    line's capacitance is an estimate and has none."""
+    line's capacitance is an estimate and has none. An enable/reset RC fed
+    by a regulator carries its ``ramp``, so a what-if ramps the same way."""
 
     kind: Literal["i2c", "rc_delay"]
     net: str = Field(max_length=200)
@@ -464,6 +481,7 @@ class SimCircuit(BaseModel):
     )
     r_ref: str | None = Field(default=None, max_length=40)
     c_ref: str | None = Field(default=None, max_length=40)
+    ramp: SimRamp | None = None
 
 
 class Simulation(BaseModel):
@@ -477,7 +495,9 @@ class Simulation(BaseModel):
     circuit run with its vendor model (``spice_circuits.py``), with ``ref``,
     ``analysis`` and ``verdict`` set, the backend's own finding checked
     against the datasheet limits. ``skipped`` says why a regulator whose
-    model loads wasn't simulated (``text``); it has no samples."""
+    model loads wasn't simulated (``text``); it has no samples. An RC run
+    whose rail ramps up (``circuit.ramp.t_s``) has a ``verdict`` too:
+    whether the pin releases after the rail is in band."""
 
     id: str = Field(max_length=20, description="sim1, … (RC); vm1, … (vendor model).")
     calc_id: str | None = Field(

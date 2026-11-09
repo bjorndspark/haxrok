@@ -49,15 +49,17 @@ from app.features.debug.calc import (
 )
 from app.features.debug.design import Design
 from app.features.debug.facts import DatasheetReading
+from app.features.debug.pins import is_inductor
 from app.features.debug.schemas import (
     LimitFact,
     SimAnalysis,
     SimLevel,
+    SimRamp,
     Simulation,
     SimVerdict,
     SpiceModelStatus,
 )
-from app.features.debug.spice import ModelRunner, Run, one_line, time_unit
+from app.features.debug.spice import RESET_RELEASE, ModelRunner, Run, one_line, time_unit
 from app.features.debug.spice_convert import MODES, ModelFiles, model_files, ngspice_error
 
 logger = get_logger(__name__)
@@ -74,12 +76,12 @@ _POINTS = 240  # samples sent to the UI (a min/max envelope)
 _DECK_CHARS = 4000  # Simulation.deck's limit
 _DEFAULT_ACCURACY = 0.05
 _DEFAULT_SUPPLY = 0.10  # downstream supply range without facts: nominal ±10 %
-_RESET_RELEASE = 0.7  # a reset input reads high above 0.7 × its supply
 _DROPOUT_HEADROOM = 0.10  # flagged when regulation is lost this close to nominal
 
 # Pin names, normalized to uppercase letters and digits.
 _IN_PIN = re.compile(r"P?V?IN\d*|VI")
 _OUT_PIN = re.compile(r"V?OUT\d*|VO")
+_SW_PIN = re.compile(r"LX\d*|SW\d*")
 _ENABLE_PIN = re.compile(r"(EN|CE|SHDN|ON|ENABLE)\d*")
 _GROUND_PIN = re.compile(r"(A|D|P|S)?GND\d*|VSS\d*|EP|E?PAD|THERMALPAD")
 _IC_REF = re.compile(r"(U|IC)\d+", re.IGNORECASE)
@@ -222,6 +224,46 @@ def ratings(limits: Sequence[LimitFact]) -> Ratings:
         dropout=dropout,
         startup=startup if timed else None,
         vin=vin,
+    )
+
+
+def regulator_of(design: Design, net: str) -> str | None:
+    """The regulator feeding ``net``: an IC with an input pin and either an
+    output pin (by its symbol's pin name) on ``net`` (an LDO) or a switch
+    pin that reaches ``net`` through an inductor (a buck). None for a rail
+    from USB, a battery or a connector."""
+    nodes = design.nets.get(net, [])
+    outputs = [n for n in nodes if _is_ic(n.ref) and _OUT_PIN.fullmatch(_norm(n.function))]
+    # A buck's output is the inductor's far end: LX/SW -> L -> the rail.
+    for coil in (n for n in nodes if is_inductor(design, n.ref)):
+        for _, sw_net in _pins_of(design, coil.ref):
+            outputs += [
+                n
+                for n in design.nets.get(sw_net, [])
+                if sw_net != net and _is_ic(n.ref) and _SW_PIN.fullmatch(_norm(n.function))
+            ]
+    for node in outputs:
+        names = (
+            _norm(design.pin_name(f"{node.ref}.{pin}")) for pin, _ in _pins_of(design, node.ref)
+        )
+        if any(_IN_PIN.fullmatch(n) for n in names):
+            return node.ref
+    return None
+
+
+def ramp(ref: str, reading: DatasheetReading) -> SimRamp:
+    """How regulator ``ref``'s rail comes up, for plan 003's enable/reset
+    RC run: its start-up time and output accuracy from the same datasheet
+    facts the vendor-model run reads. No start-up time (or an implausible
+    one, over 1 s) leaves ``t_s`` None and the run a step."""
+    rate = ratings(reading.limits.get(ref, []))
+    t_s = rate.startup if rate.startup is not None and 0 < rate.startup <= 1.0 else None
+    cited = rate.accuracy_cited and rate.accuracy < 0.5
+    return SimRamp(
+        regulator=ref[:40],
+        t_s=t_s,
+        accuracy=rate.accuracy if cited else _DEFAULT_ACCURACY,
+        accuracy_cited=cited,
     )
 
 
@@ -620,7 +662,7 @@ def verdict(analysis: SimAnalysis, lim: Limits, rows: Rows) -> tuple[SimVerdict,
         if peak > lim.over:
             wrong.append(f"peaks at {_v(peak)}, above {_v(lim.over)} ({lim.over_label})")
         if lim.reset and len(rows[0]) > 3:
-            t_rst = _crossing(rows, 3, _RESET_RELEASE * lim.vout)
+            t_rst = _crossing(rows, 3, RESET_RELEASE * lim.vout)
             if t_rst is not None and (t_band is None or t_rst < t_band):
                 when = f"before the rail reaches {_v(lim.lo)}" + (
                     f" at {_t(t_band)}" if t_band is not None else ""

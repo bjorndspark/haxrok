@@ -409,10 +409,14 @@ caption, the reference lines and a table of samples.
 - Answer from those numbers. Quote times and voltages from the table or the \
 caption, with units, and say which you used. Interpolate between samples when \
 you need to, and say that you did.
-- An RC simulation is an ideal model: an ideal rail switched on at t = 0, one \
-resistor, one capacitor. When the answer depends on something it leaves out \
-(an IC's threshold or leakage, the real rail's ramp, trace capacitance), say \
-so, name the datasheet value to look up, and don't make one up.
+- An RC simulation is an ideal model: an ideal rail, one resistor, one \
+capacitor. The rail switches on at t = 0, or, when a regulator feeds it, \
+rises linearly over the regulator's datasheet start-up time; the caption says \
+which. A ramped one has a verdict: flagged when the pin passes 0.7 × the rail \
+before the rail is inside the regulator's output accuracy. When the answer \
+depends on something it leaves out (an IC's threshold or leakage, the real \
+rail's ramp shape, trace capacitance), say so, name the datasheet value to \
+look up, and don't make one up.
 - The user can re-run an RC simulation with their own R and C (a what-if). \
 When one is included, it is drawn dashed over the original: compare the two \
 sets of samples, and quote both. Without one, when asked what a different \
@@ -442,20 +446,23 @@ def _samples(sim: Simulation, rows: int = 25) -> str:
 def build_ask_message(
     sim: Simulation, history: list[AskTurn], question: str, what_if: Simulation | None = None
 ) -> str:
-    """The user turn for a question about ``sim``: its kind (RC, or a
-    vendor model with its verdict), the deck, the caption, the reference
-    lines, a sample table, then the latest what-if re-run's deck, caption
-    and samples if there is one, the conversation so far, and the
-    question."""
+    """The user turn for a question about ``sim``: its kind (RC, ramped with
+    its verdict or not, or a vendor model with its verdict), the deck, the
+    caption, the reference lines, a sample table, then the latest what-if
+    re-run's deck, caption and samples if there is one, the conversation so
+    far, and the question."""
     levels = "\n".join(
         f"- {lv.label}" + (" (a limit the waveform shouldn't cross)" if lv.danger else "")
         for lv in sim.levels
     )
-    if sim.verdict is None:
+    verdict = (sim.verdict or "none").replace("_", " ")
+    if sim.circuit is not None:
         kind = "RC (an ideal model)"
+        if (ramp := sim.circuit.ramp) is not None and sim.verdict is not None:
+            kind += f", rail ramped over {ramp.regulator}'s start-up time, verdict {verdict}"
     else:
         what = sim.analysis.replace("_", " ") if sim.analysis else "not run"
-        kind = f"vendor model of {sim.ref}: {what}, verdict {sim.verdict.replace('_', ' ')}"
+        kind = f"vendor model of {sim.ref}: {what}, verdict {verdict}"
     parts = [
         f"## Simulation: {sim.title}",
         f"## Kind\n{kind}",

@@ -9,7 +9,11 @@ working. The review doesn't see them; the user can ask about each one
 
 Each circuit is a resistor from an ideal rail and a capacitor to ground,
 rising from 0 V at t=0: for I²C the pull-up and the estimated bus
-capacitance, for an RC delay the pull-up and the pin's capacitor.
+capacitance, for an RC delay the pull-up and the pin's capacitor. An RC
+delay whose rail comes from a regulator with a datasheet start-up time
+(``SimRamp``, built by ``spice_circuits.ramp``) instead ramps the rail up
+over that time, and its run gets a verdict: does the pin release only once
+the rail is in band?
 Any failure (ngspice missing, a non-zero exit, a timeout, unreadable output)
 drops that simulation; it never fails the request.
 
@@ -20,7 +24,7 @@ This is the feature's I/O edge for ngspice. The service takes a
 import asyncio
 import tempfile
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -39,7 +43,9 @@ from app.features.debug.schemas import (
     Calculation,
     SimCircuit,
     SimLevel,
+    SimRamp,
     Simulation,
+    SimVerdict,
     TimeUnit,
 )
 
@@ -49,6 +55,7 @@ _TAUS = 5  # simulate to 5 RC: the line is within 1% of the rail
 _STEPS = 200
 _POINTS = 120  # what the UI draws
 _PARALLEL = 4  # ngspice processes at once, per request
+RESET_RELEASE = 0.7  # an enable/reset input reads high above 0.7 × its rail (plans 003, 004)
 
 
 class SpiceRunner(Protocol):
@@ -183,14 +190,17 @@ def _write(work: Path, files: dict[str, bytes]) -> None:
         path.write_bytes(data)
 
 
-def _deck(title: str, v: float, r: float, c: float, node: str) -> str:
+def _deck(title: str, v: float, r: float, c: float, node: str, ramp_s: float | None = None) -> str:
     """The transient deck: rail → resistor → node, capacitor to ground,
-    starting at 0 V and run to 5 RC."""
-    stop = _TAUS * r * c
+    starting at 0 V and run to 5 RC. With ``ramp_s`` the rail rises
+    linearly from 0 V over that time instead of switching on at t = 0, and
+    the run lasts that much longer."""
+    stop = (ramp_s or 0.0) + _TAUS * r * c
+    source = f"PWL(0 0 {ramp_s:g} {v:g})" if ramp_s else f"DC {v:g}"
     return "\n".join(
         [
             one_line(title),
-            f"Vpull rail 0 DC {v:g}",
+            f"Vpull rail 0 {source}",
             f"Rpull rail {node} {r:g}",
             f"Cbus {node} 0 {c:g} IC=0",
             ".control",
@@ -217,9 +227,17 @@ def netlist(line: I2cLine) -> str:
     return _deck(f"I2C {line.net} released from low", line.v_pull, line.r_ohm, line.c_farad, "sda")
 
 
-def rc_netlist(line: RcLine) -> str:
-    """An enable or reset pin rising from 0 V as its rail comes up."""
-    return _deck(f"RC on {line.net}", line.v_rail, line.r_ohm, line.c_farad, "pin")
+def _ramp_s(ramp: SimRamp | None) -> float | None:
+    return ramp.t_s if ramp is not None else None
+
+
+def rc_netlist(line: RcLine, ramp: SimRamp | None = None) -> str:
+    """An enable or reset pin rising from 0 V as its rail comes up: a step
+    at t = 0, or a linear ramp over the regulator's start-up time."""
+    title = f"RC on {line.net}"
+    if (t := _ramp_s(ramp)) is not None:
+        title += f", rail ramping up over {_seconds(t)}"
+    return _deck(title, line.v_rail, line.r_ohm, line.c_farad, "pin", t)
 
 
 def parse(text: str) -> list[tuple[float, float]]:
@@ -272,6 +290,18 @@ class Job:
     title: str
     deck: str
     line: I2cLine | RcLine
+    ramp: SimRamp | None = None
+
+
+def with_ramp(job: Job, ramp: SimRamp) -> Job:
+    """``job`` (an RC delay) driven from its regulator's rail: the deck
+    ramps when ``ramp`` has a start-up time, else it stays a step."""
+    if not isinstance(job.line, RcLine):
+        return job
+    title = job.title
+    if ramp.t_s is not None:
+        title = f"{job.line.net} rising as {ramp.regulator}'s rail ramps up"
+    return replace(job, title=title, deck=rc_netlist(job.line, ramp), ramp=ramp)
 
 
 def simulation(
@@ -314,17 +344,27 @@ def simulation(
     )
 
 
-def rc_simulation(job: Job, line: RcLine, rows: list[tuple[float, float]]) -> Simulation:
-    """The enable/reset pin's rise, with the 63% point at one time constant."""
-    rows = _thin(rows)
-    unit, scale = time_unit(rows[-1][0])
+def rc_simulation(
+    job: Job, line: RcLine, rows: list[tuple[float, float]], ramp: SimRamp | None = None
+) -> Simulation:
+    """The enable/reset pin's rise: with the 63% point at one time constant
+    after a step, or checked against the rail's ramp (``_ramped``)."""
+    if (t_ramp := _ramp_s(ramp)) is not None and ramp is not None:
+        return _ramped(job, line, rows, ramp, t_ramp)
+    thin = _thin(rows)
+    unit, scale = time_unit(thin[-1][0])
     tau = line.r_ohm * line.c_farad
     at_63 = round(0.632 * line.v_rail, 2)
-    reached = _crossing(rows, at_63)
+    reached = _crossing(thin, at_63)
     text = (
         f"ngspice: {format_ohms(line.r_ohm)} from {line.v_rail:g} V into "
         f"{format_farads(line.c_farad)}, the rail switched on at t = 0."
     )
+    if ramp is not None:
+        text += (
+            f" {ramp.regulator}'s datasheet facts give no start-up time, so the rail isn't "
+            "ramped and the pin isn't checked against it."
+        )
     if reached is not None:
         text += (
             f" The pin reaches 63% ({at_63:g} V) after {reached * scale:.3g} {unit} "
@@ -335,21 +375,80 @@ def rc_simulation(job: Job, line: RcLine, rows: list[tuple[float, float]]) -> Si
         calc_id=job.calc_id,
         title=job.title,
         deck=job.deck,
-        t=_times(rows, scale),
+        t=_times(thin, scale),
         t_unit=unit,
-        v=[round(v, 4) for _, v in rows],
+        v=[round(v, 4) for _, v in thin],
         levels=[
             SimLevel(v=line.v_rail, label=f"rail {line.v_rail:g} V", danger=False),
             SimLevel(v=at_63, label=f"63% {at_63:g} V", danger=False),
         ],
         text=text,
-        circuit=circuit_of(line),
+        circuit=circuit_of(line, ramp),
     )
 
 
-def circuit_of(line: I2cLine | RcLine) -> SimCircuit:
-    """What a what-if needs to rebuild ``line``'s deck, carried on the
-    simulation to the browser and back."""
+def _accuracy(ramp: SimRamp) -> str:
+    pct = f"±{ramp.accuracy * 100:g} %"
+    return pct if ramp.accuracy_cited else f"{pct}, not cited: assumed"
+
+
+def _ramped(
+    job: Job, line: RcLine, rows: list[tuple[float, float]], ramp: SimRamp, t_ramp: float
+) -> Simulation:
+    """The pin against a rail that rises linearly over ``t_ramp``: flagged
+    when it releases (``RESET_RELEASE`` × the rail) before the rail is in
+    its band. The rail is an ideal ramp, so it reaches the band's low edge
+    at (1 − accuracy) × ``t_ramp`` exactly."""
+    released = _crossing(rows, RESET_RELEASE * line.v_rail)
+    band_lo = (1 - ramp.accuracy) * line.v_rail
+    in_band = (1 - ramp.accuracy) * t_ramp
+    early = released is not None and released < in_band
+    verdict: SimVerdict = "flagged" if early else "passed"
+    thin = _thin(rows)
+    unit, scale = time_unit(thin[-1][0])
+    text = (
+        f"ngspice: {format_ohms(line.r_ohm)} into {format_farads(line.c_farad)} from a rail "
+        f"that ramps from 0 to {line.v_rail:g} V over {_seconds(t_ramp)} "
+        f"({ramp.regulator}'s start-up time)."
+    )
+    release = f"{RESET_RELEASE:g} × {line.v_rail:g} = {RESET_RELEASE * line.v_rail:.3g} V"
+    band = f"≥ {band_lo:.3g} V, {_accuracy(ramp)}"
+    if released is None:
+        text += f" The pin doesn't reach its release level ({release}) in the run."
+    else:
+        text += f" The pin releases ({release}) at {_seconds(released)}"
+        text += f"; the rail is in band ({band}) at {_seconds(in_band)}."
+        text += (
+            " The pin releases before the rail is in band: the IC may start on a low supply."
+            if early
+            else " The pin releases after the rail is in band."
+        )
+    return Simulation(
+        id=job.id,
+        calc_id=job.calc_id,
+        verdict=verdict,
+        title=job.title,
+        deck=job.deck,
+        t=_times(thin, scale),
+        t_unit=unit,
+        v=[round(v, 4) for _, v in thin],
+        levels=[
+            SimLevel(v=line.v_rail, label=f"rail {line.v_rail:g} V", danger=False),
+            SimLevel(v=round(band_lo, 3), label=f"band {band_lo:.3g} V", danger=False),
+            SimLevel(
+                v=round(RESET_RELEASE * line.v_rail, 3),
+                label=f"release {RESET_RELEASE * line.v_rail:.3g} V",
+                danger=False,
+            ),
+        ],
+        text=text,
+        circuit=circuit_of(line, ramp),
+    )
+
+
+def circuit_of(line: I2cLine | RcLine, ramp: SimRamp | None = None) -> SimCircuit:
+    """What a what-if needs to rebuild ``line``'s deck (and ``ramp``, an RC
+    delay's rail), carried on the simulation to the browser and back."""
     if isinstance(line, I2cLine):
         return SimCircuit(
             kind="i2c",
@@ -368,6 +467,7 @@ def circuit_of(line: I2cLine | RcLine) -> SimCircuit:
         v_rail=line.v_rail,
         r_ref=line.r_ref,
         c_ref=line.c_ref,
+        ramp=ramp,
     )
 
 
@@ -379,12 +479,16 @@ def line_of(circuit: SimCircuit, r_ohm: float, c_farad: float) -> I2cLine | RcLi
     return RcLine(circuit.net, r_ohm, circuit.v_rail, c_farad, circuit.r_ref, circuit.c_ref)
 
 
-def _metric(line: I2cLine | RcLine, rows: list[tuple[float, float]]) -> float | None:
+def _metric(
+    line: I2cLine | RcLine, rows: list[tuple[float, float]], ramp: SimRamp | None = None
+) -> float | None:
     """The number a what-if compares, in seconds: an I²C line's 30→70% rise
-    time, an RC delay's time to 63%."""
+    time, an RC delay's time to 63%, or its release time on a ramped rail."""
     if isinstance(line, I2cLine):
         lo, hi = _crossing(rows, 0.3 * line.v_pull), _crossing(rows, 0.7 * line.v_pull)
         return None if lo is None or hi is None else hi - lo
+    if _ramp_s(ramp) is not None:
+        return _crossing(rows, RESET_RELEASE * line.v_rail)
     return _crossing(rows, round(0.632 * line.v_rail, 2))
 
 
@@ -408,26 +512,28 @@ async def rerun(
     run or ngspice failed."""
     if sim.circuit is None or not sim.t:
         return None
+    ramp = sim.circuit.ramp
     old = line_of(sim.circuit, sim.circuit.r_ohm, sim.circuit.c_farad)
     line = line_of(sim.circuit, r_ohm, c_farad)
-    deck = netlist(line) if isinstance(line, I2cLine) else rc_netlist(line)
+    deck = netlist(line) if isinstance(line, I2cLine) else rc_netlist(line, ramp)
     if not (rows := await _run(runner, deck, line.net)):
         return None
-    job = Job(sim.id, sim.calc_id or "", f"{sim.title}, what-if", deck, line)
+    job = Job(sim.id, sim.calc_id or "", f"{sim.title}, what-if", deck, line, ramp)
     if isinstance(line, I2cLine):
         new = simulation(job, line, rows, estimated=c_farad == sim.circuit.c_farad)
         what, c_name = "Rise time 30→70%", "bus C"
     else:
-        new = rc_simulation(job, line, rows)
-        what, c_name = "Time to 63%", sim.circuit.c_ref or "C"
+        new = rc_simulation(job, line, rows, ramp)
+        what = "Release" if _ramp_s(ramp) is not None else "Time to 63%"
+        c_name = sim.circuit.c_ref or "C"
     changes = [
         _change(sim.circuit.r_ref or "R", format_ohms(old.r_ohm), format_ohms(r_ohm)),
         _change(c_name, format_farads(old.c_farad), format_farads(c_farad)),
     ]
     text = f"What-if: {', '.join(changes)}."
     scale = dict(_UNITS)[sim.t_unit]
-    before = _metric(old, [(t / scale, v) for t, v in zip(sim.t, sim.v, strict=False)])
-    after = _metric(line, _thin(rows))
+    before = _metric(old, [(t / scale, v) for t, v in zip(sim.t, sim.v, strict=False)], ramp)
+    after = _metric(line, _thin(rows), ramp)
     if before is not None and after is not None:
         text += f" {what}: {_seconds(before)} → {_seconds(after)}."
     return new.model_copy(update={"calc_id": sim.calc_id, "text": f"{text} {new.text}"})
@@ -466,7 +572,7 @@ async def _one(runner: SpiceRunner, job: Job, gate: asyncio.Semaphore) -> Simula
         return None
     if isinstance(job.line, I2cLine):
         return simulation(job, job.line, rows)
-    return rc_simulation(job, job.line, rows)
+    return rc_simulation(job, job.line, rows, job.ramp)
 
 
 async def simulate(jobs: list[Job], runner: SpiceRunner) -> AsyncIterator[Simulation]:

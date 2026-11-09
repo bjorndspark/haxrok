@@ -700,7 +700,8 @@ def _overvoltage(design: Design, net: str) -> Calculation | None:
 
 @dataclass(frozen=True)
 class RcLine:
-    """The RC an enable or reset pin rises through, for ``spice.py``."""
+    """The RC an enable or reset pin rises through, for ``spice.py``.
+    ``rail`` is the pull-up's net, where a regulator may feed it."""
 
     net: str
     r_ohm: float
@@ -708,6 +709,7 @@ class RcLine:
     c_farad: float
     r_ref: str | None = None
     c_ref: str | None = None
+    rail: str | None = None
 
 
 def rc_line(design: Design, calc: Calculation) -> RcLine | None:
@@ -722,7 +724,7 @@ def rc_line(design: Design, calc: Calculation) -> RcLine | None:
     caps = [c for c in _capacitors(design, net) if is_ground(c.other)]
     if len(ups) != 1 or len(caps) != 1 or (v := named_voltage(ups[0].other)) is None:
         return None
-    return RcLine(net, ups[0].value, v, caps[0].value, ups[0].ref, caps[0].ref)
+    return RcLine(net, ups[0].value, v, caps[0].value, ups[0].ref, caps[0].ref, ups[0].other)
 
 
 def _divider(design: Design, net: str) -> Calculation | None:

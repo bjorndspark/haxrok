@@ -10,6 +10,23 @@ import { formatElapsed, useElapsed, useSimulationChat, useWhatIf, type WhatIf } 
 import { ChatThread } from "./ChatThread"
 import { SimulationPlot } from "./SimulationPlot"
 
+const VERDICT_TONE = {
+  flagged: "warn",
+  passed: "ok",
+  timed_out: "neutral",
+  failed: "neutral",
+  skipped: "neutral",
+} as const satisfies Record<SimVerdict, "warn" | "ok" | "neutral">
+
+function VerdictBadge({ verdict, className }: { verdict: SimVerdict; className?: string }) {
+  const t = useMessages().simulations
+  return (
+    <Badge tone={VERDICT_TONE[verdict]} bracket className={className}>
+      {t.verdict[verdict]}
+    </Badge>
+  )
+}
+
 function SimulationChat({ runNumber, sim }: { runNumber: number; sim: Simulation }) {
   const chat = useSimulationChat(runNumber, sim)
   return (
@@ -70,6 +87,12 @@ function WhatIfFields({ w }: { w: WhatIf }) {
             {t.reset}
           </Button>
         )}
+        {w.whatIf?.verdict && (
+          <span className="flex items-baseline gap-[1ch] text-xs">
+            <span className="text-muted-foreground">{t.verdict}</span>
+            <VerdictBadge verdict={w.whatIf.verdict} />
+          </span>
+        )}
       </div>
       {w.pending && (
         <p className="text-xs text-muted-foreground">
@@ -125,7 +148,10 @@ export function SimulationsCard({ run }: { run: Run }) {
       <div className="space-y-4">
         {sims.map((sim) => (
           <div key={sim.id} className="min-w-0 space-y-3 border p-3">
-            <p className="text-sm font-bold">{sim.title}</p>
+            <p className="flex flex-wrap items-baseline gap-[1ch] text-sm">
+              <span className="font-bold">{sim.title}</span>
+              {sim.verdict && <VerdictBadge verdict={sim.verdict} className="ml-auto" />}
+            </p>
             {sim.circuit ? (
               <RcSimulation runNumber={run.number} sim={sim} circuit={sim.circuit} />
             ) : (
@@ -139,14 +165,6 @@ export function SimulationsCard({ run }: { run: Run }) {
     </Card>
   )
 }
-
-const VERDICT_TONE = {
-  flagged: "warn",
-  passed: "ok",
-  timed_out: "neutral",
-  failed: "neutral",
-  skipped: "neutral",
-} as const satisfies Record<SimVerdict, "warn" | "ok" | "neutral">
 
 /** "Still running · mm:ss" with a stop button, ticking from the run's start. */
 function StillRunning({ run, onStop }: { run: Run; onStop: () => void }) {
@@ -183,11 +201,7 @@ export function VendorSimulationsCard({ run, onStop }: { run: Run; onStop: () =>
             <p className="flex flex-wrap items-baseline gap-[1ch] text-sm">
               <span className="font-bold text-info">{sim.ref}</span>
               {sim.analysis && <span>· {t.analysis[sim.analysis]}</span>}
-              {sim.verdict && (
-                <Badge tone={VERDICT_TONE[sim.verdict]} bracket className="ml-auto">
-                  {t.verdict[sim.verdict]}
-                </Badge>
-              )}
+              {sim.verdict && <VerdictBadge verdict={sim.verdict} className="ml-auto" />}
             </p>
             {sim.t.length > 0 ? (
               <>

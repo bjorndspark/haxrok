@@ -289,6 +289,7 @@ Used outdoors, so it may see -10 °C.`,
       badValue: (label: string) => `${label}: not a value; write it like 4.7k, 100n or 1µ`,
       failed: "The what-if didn't run.",
       legend: "dashed: what-if",
+      verdict: "what-if",
     },
   },
   resultChat: {
@@ -651,6 +652,7 @@ USB 5 V では動く: マイコンが起動する。
         `${label}: 値として読めません。4.7k、100n、1µ のように書いてください`,
       failed: "変更後のシミュレーションを実行できませんでした。",
       legend: "破線: 変更後",
+      verdict: "変更後",
     },
   },
   resultChat: {

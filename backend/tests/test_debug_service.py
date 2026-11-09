@@ -15,7 +15,7 @@ from app.features.debug import diagram, pins, prompt, router, service
 from app.features.debug.calc import lookup as calc_lookup
 from app.features.debug.design import Design, Label, Node, Part, parse_labels, parse_netlist
 from app.features.debug.evidence import EvidenceContext
-from app.features.debug.facts import FactReader
+from app.features.debug.facts import DatasheetReading, FactReader
 from app.features.debug.kicad import KicadOutput
 from app.features.debug.pdf import Page
 from app.features.debug.project import Project, load_project, missing_sheets, normalize_paths
@@ -501,19 +501,30 @@ def test_pin_warnings_reach_the_model_as_unverified():
 
 
 def _rc_wrdata(netlist: str) -> str:
-    """What ngspice's wrdata writes for the deck: the node of an ideal RC."""
+    """What ngspice's wrdata writes for the deck: the node of an ideal RC,
+    from a rail that steps on at t = 0 (``DC v``) or ramps linearly from
+    0 V (``PWL(0 0 T v)``)."""
     import math
 
-    values = {}
+    values: dict[str, float] = {}
+    ramp = 0.0
     for row in netlist.splitlines():
         cols = row.split()
-        if cols and cols[0] in {"Vpull", "Rpull", "Cbus"}:
+        if cols and cols[0] == "Vpull" and cols[3].startswith("PWL("):
+            ramp, values["Vpull"] = float(cols[5]), float(cols[6].rstrip(")"))
+        elif cols and cols[0] in {"Vpull", "Rpull", "Cbus"}:
             values[cols[0]] = float(cols[3] if cols[0] != "Vpull" else cols[4])
-    tau = values["Rpull"] * values["Cbus"]
-    return "\n".join(
-        f" {t:.6e}  {values['Vpull'] * (1 - math.exp(-t / tau)):.6e}"
-        for t in (i * 5 * tau / 200 for i in range(201))
-    )
+    v, tau = values["Vpull"], values["Rpull"] * values["Cbus"]
+
+    def node(t: float) -> float:
+        if not ramp:
+            return v * (1 - math.exp(-t / tau))
+        # A ramp at slope v/T lags by tau; after T the node settles from there.
+        lagging = (v / ramp) * (min(t, ramp) - tau * (1 - math.exp(-min(t, ramp) / tau)))
+        return v - (v - lagging) * math.exp(-max(0.0, t - ramp) / tau)
+
+    stop = ramp + 5 * tau
+    return "\n".join(f" {t:.6e}  {node(t):.6e}" for t in (i * stop / 200 for i in range(201)))
 
 
 class FakeSpice:
@@ -589,6 +600,7 @@ async def test_a_flagged_i2c_line_gets_a_simulated_rise():
         "v_supply": 3.3,
         "r_ref": "R1",
         "c_ref": None,
+        "ramp": None,
     }
 
 
@@ -614,6 +626,177 @@ async def test_an_rc_delay_gets_a_simulated_rise_in_milliseconds():
     assert sim.circuit is not None
     assert (sim.circuit.kind, sim.circuit.r_ref, sim.circuit.c_ref) == ("rc_delay", "R1", "C1")
     assert (sim.circuit.r_ohm, sim.circuit.c_farad, sim.circuit.v_rail) == (10_000, 1e-6, 3.3)
+
+
+def _regulated_rc_design(c: str = "1u") -> Design:
+    """The ESP32-C3's EN RC on +3V3, which an LDO (U2) makes from +5V."""
+    return _design(
+        {
+            "U1": ("ESP32-C3-MINI-1", "x:y"),
+            "U2": ("AP2112K-3.3", "x:y"),
+            "R1": ("10k", "Device:R"),
+            "C1": (c, "Device:C"),
+        },
+        {
+            "+5V": ["U2.1(VIN)", "U2.3(EN)"],
+            "+3V3": ["U2.5(VOUT)", "R1.1", "U1.1(VDD)"],
+            "EN": ["R1.2", "C1.1", "U1.8(EN)"],
+            "GND": ["C1.2", "U2.2(GND)"],
+        },
+    )
+
+
+def _ldo_reading(startup_us: float | None = 1000) -> DatasheetReading:
+    limits = [
+        LimitFact(
+            parameter="Output voltage accuracy",
+            min=-2,
+            typ=None,
+            max=2,
+            unit="%",
+            conditions="",
+            page=3,
+        )
+    ]
+    if startup_us is not None:
+        limits.append(
+            LimitFact(
+                parameter="Start-up time",
+                min=None,
+                typ=startup_us,
+                max=None,
+                unit="µs",
+                conditions="",
+                page=4,
+            )
+        )
+    return DatasheetReading(limits={"U2": limits})
+
+
+async def _ramped(design: Design, reading: DatasheetReading, fake: FakeSpice):
+    """``design``'s one RC delay, simulated as the stream does once the
+    datasheets are read."""
+    from app.features.debug import calc, spice, spice_circuits
+
+    (job,) = spice.plan(calc.lookup(design), design)
+    assert isinstance(job.line, calc.RcLine) and job.line.rail == "+3V3"
+    ref = spice_circuits.regulator_of(design, job.line.rail)
+    assert ref == "U2"
+    (sim,) = [
+        s
+        async for s in spice.simulate(
+            [spice.with_ramp(job, spice_circuits.ramp(ref, reading))], fake
+        )
+    ]
+    return sim
+
+
+def test_only_a_regulator_output_feeds_a_rail():
+    from app.features.debug.spice_circuits import regulator_of
+
+    assert regulator_of(_regulated_rc_design(), "+3V3") == "U2"
+    # The ESP32's VDD pin is on +3V3 too, but it's no output; +5V has no regulator.
+    assert regulator_of(_rc_design(), "+3V3") is None
+    assert regulator_of(_regulated_rc_design(), "+5V") is None
+    assert regulator_of(_regulated_rc_design(), "nowhere") is None
+    # A buck's rail is past its inductor: LX -> L1 -> +3V3 (rust-board's SY8088).
+    buck = _design(
+        {"U2": ("SY8088", "x:y"), "L1": ("2.2u", "Device:L"), "R1": ("10k", "Device:R")},
+        {
+            "+5V": ["U2.4(IN)", "U2.1(EN)"],
+            "SW": ["U2.3(LX)", "L1.1"],
+            "+3V3": ["L1.2", "R1.1"],
+            "GND": ["U2.2(GND)"],
+        },
+    )
+    assert regulator_of(buck, "+3V3") == "U2"
+    assert regulator_of(buck, "SW") is None
+
+
+async def test_a_regulated_en_rc_ramps_its_rail_and_passes_when_it_releases_late():
+    fake = FakeSpice()
+    sim = await _ramped(_regulated_rc_design(), _ldo_reading(1000), fake)
+    (deck,) = fake.decks
+    # The rail rises linearly from 0 V over the 1 ms start-up time; the run
+    # lasts the ramp plus 5 RC.
+    assert "Vpull rail 0 PWL(0 0 0.001 3.3)" in deck and "DC" not in deck
+    assert "rail ramping up over 1 ms" in deck.splitlines()[0]
+    assert sim.title == "EN rising as U2's rail ramps up"
+    assert sim.t_unit == "ms" and sim.t[-1] == pytest.approx(51)
+    assert sim.verdict == "passed"
+    assert [lv.label for lv in sim.levels] == ["rail 3.3 V", "band 3.23 V", "release 2.31 V"]
+    assert "ramps from 0 to 3.3 V over 1 ms (U2's start-up time)" in sim.text
+    # R×C = 10 ms, ten times the ramp: EN lags the rail by far.
+    assert "releases (0.7 × 3.3 = 2.31 V) at 12" in sim.text
+    assert "the rail is in band (≥ 3.23 V, ±2 %) at 980 µs" in sim.text
+    assert sim.text.endswith("The pin releases after the rail is in band.")
+    assert sim.circuit is not None and sim.circuit.ramp is not None
+    assert sim.circuit.ramp.model_dump() == {
+        "regulator": "U2",
+        "t_s": pytest.approx(1e-3),
+        "accuracy": pytest.approx(0.02),
+        "accuracy_cited": True,
+    }
+
+
+async def test_a_small_en_capacitor_releases_before_the_rail_is_in_band():
+    sim = await _ramped(_regulated_rc_design("1n"), _ldo_reading(1000), FakeSpice())
+    # R×C = 10 µs: EN follows the ramp and passes 2.31 V at about 0.71 ms,
+    # while the rail is in band only at 0.98 ms.
+    assert sim.verdict == "flagged"
+    assert "releases (0.7 × 3.3 = 2.31 V) at 710 µs" in sim.text
+    assert "before the rail is in band: the IC may start on a low supply" in sim.text
+
+
+async def test_without_a_start_up_time_the_rail_stays_a_step_and_the_caption_says_why():
+    fake = FakeSpice()
+    sim = await _ramped(_regulated_rc_design(), _ldo_reading(None), fake)
+    (deck,) = fake.decks
+    assert "Vpull rail 0 DC 3.3" in deck and "PWL" not in deck
+    assert sim.title == "EN rising through its RC delay" and sim.verdict is None
+    assert "U2's datasheet facts give no start-up time" in sim.text
+    assert [lv.label for lv in sim.levels] == ["rail 3.3 V", "63% 2.09 V"]
+    assert sim.circuit is not None and sim.circuit.ramp is not None
+    assert sim.circuit.ramp.t_s is None
+
+
+def test_an_uncited_accuracy_is_assumed_and_an_absurd_start_up_time_dropped():
+    from app.features.debug.spice_circuits import ramp
+
+    assert ramp("U2", DatasheetReading()).model_dump() == {
+        "regulator": "U2",
+        "t_s": None,
+        "accuracy": 0.05,
+        "accuracy_cited": False,
+    }
+    slow = LimitFact(
+        parameter="Soft-start time", min=None, typ=3, max=None, unit="s", conditions="", page=1
+    )
+    assert ramp("U2", DatasheetReading(limits={"U2": [slow]})).t_s is None
+
+
+async def test_a_what_if_on_a_ramped_rc_keeps_the_ramp_and_judges_again():
+    from app.features.debug.schemas import RerunRequest
+
+    sim = await _ramped(_regulated_rc_design(), _ldo_reading(1000), FakeSpice())
+    fake = FakeSpice()
+    new = await service.rerun(RerunRequest(simulation=sim, r_ohm=10_000, c_farad=1e-9), fake)
+    (deck,) = fake.decks
+    assert "Vpull rail 0 PWL(0 0 0.001 3.3)" in deck and "Cbus pin 0 1e-09 IC=0" in deck
+    assert new.verdict == "flagged"
+    assert new.circuit is not None and sim.circuit is not None
+    assert new.circuit.ramp == sim.circuit.ramp
+    head = new.text.split(" ngspice:")[0]
+    assert head.startswith("What-if: R1 10 kΩ (unchanged), C1 1 µF → 1 nF. Release: 12")
+    assert head.endswith("→ 710 µs.")
+
+
+async def test_ask_names_a_ramped_rc_run_and_its_verdict():
+    sim = await _ramped(_regulated_rc_design("1n"), _ldo_reading(1000), FakeSpice())
+    user = prompt.build_ask_message(sim, [], "Is EN safe?")
+    assert (
+        "## Kind\nRC (an ideal model), rail ramped over U2's start-up time, verdict flagged" in user
+    )
 
 
 async def test_no_simulation_when_ngspice_fails_or_answers_garbage():
@@ -1001,6 +1184,41 @@ async def test_simulations_stream_alongside_the_model_and_the_result_comes_last(
     assert names.index("simulation") < structuring
     sim = events[names.index("simulation")][1]
     assert sim["id"] == "sim1" and "Rpull rail pin 10000" in sim["deck"]
+    # +3V3 comes from no regulator on this board: a plain step, no verdict.
+    assert "Vpull rail 0 DC 3.3" in sim["deck"] and sim["verdict"] is None
+
+
+async def test_a_regulator_fed_rc_runs_once_the_datasheets_are_read():
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
+    found = DatasheetStatus(
+        ref="U2", value="AP2112K-3.3", status="found", url="https://example.com/ap2112.pdf"
+    )
+    design = _regulated_rc_design("1n")
+    prepared = dataclasses.replace(
+        prepared, design=design, calculations=calc_lookup(design), datasheets=[found]
+    )
+
+    class Reader:
+        async def read(self, design: Design, datasheets: Sequence[DatasheetStatus]):
+            return _ldo_reading(1000)
+
+    fake = FakeSpice()
+    events = [
+        (e["event"], json.loads(e["data"]))
+        async for e in service.stream(
+            prepared,
+            service.Model(_diagnose, _structure),
+            fake,
+            Reader(),
+        )
+    ]
+    names = [n for n, _ in events]
+    assert names.count("simulation") == 1 and names[-1] == "result"
+    sim = events[names.index("simulation")][1]
+    assert sim["verdict"] == "flagged" and sim["circuit"]["ramp"]["regulator"] == "U2"
+    assert "PWL(0 0 0.001 3.3)" in sim["deck"]
 
 
 async def test_a_failed_model_still_ends_with_the_error_after_simulations():

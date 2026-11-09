@@ -167,5 +167,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `003-simulate-and-ask.md` step 4 (EN/reset RC against the rail's ramp),
-   decisions settled.
+None: every plan is done or dropped. A new topic starts with
+`/step new: <topic>`.

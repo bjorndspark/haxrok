@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-04 | 2026-11-09 | In progress | — | `001-mvp-scope.md`, `002-verified-wiring-checks.md` |
+| 2026-11-04 | 2026-11-09 | Done | — | `001-mvp-scope.md`, `002-verified-wiring-checks.md` |
 
 Until now, ngspice ran inside `service.prepare`, one deck at a time, before
 the stream opened. Its plot was only drawn under a finding that cited the
@@ -110,7 +110,7 @@ simulations on the page.
 but 2200 ns is still under the 10,000-unit limit, so ns is right (the
 backend picks the same way). The test now uses a 22 µs what-if.
 
-## 4. Circuits a formula can't answer: in progress
+## 4. An EN/reset RC checked against its rail's ramp: done
 
 A single RC needs no simulator. ngspice is worth having for circuits a
 formula can't answer: the ESP32 EN RC against the regulator's soft-start
@@ -149,3 +149,39 @@ Decided (2026-11-09), defaults:
   capacitor made small so EN releases early. `make eval-app` can't run
   simulations, so it isn't used.
 - The step touches backend and frontend, so it's built in its own session.
+- Found in the build: the regulator also counts when its switch pin
+  (LX/SW) reaches the rail through an inductor (a buck). rust-board's +3V3
+  comes from an SY8088 buck through L1, so without this the step's own
+  target board got only the plain step run (see **Bugs found**).
+
+**Checks (2026-11-09):** lint is clean (ruff, ruff format, mypy, ESLint,
+tsc, Prettier; ESLint keeps its old fast-refresh warning in
+`shared/ui/button.tsx`). Tests: backend 289 passed, frontend 44 passed.
+The ngspice fake now solves a linear ramp into an RC analytically. New
+backend tests cover `regulator_of` (an LDO, a buck through its inductor,
+a rail with none), `ramp` from the facts (±2 % cited; no facts gives no
+start-up time and ±5 % assumed; a 3 s soft-start is dropped), the ramped
+deck and caption (10 kΩ/1 µF on a 1 ms ramp: released at 12 ms, in band
+at 980 µs, passed), a 1 nF capacitor flagged (released at 710 µs), the
+step fallback with no start-up time and its caption, a what-if that keeps
+the ramp ("Release: 12.x ms → 710 µs", flagged), the stream holding a
+regulator-fed RC until the reading arrives (flagged, PWL deck), a rail
+with no regulator still streaming a step with no verdict, and the ask
+message naming the ramped run and its verdict. Live in the backend
+container on rust-board (exported through `kicad-cli`, real datasheet
+reader and ngspice): `regulator_of` found U5 (SY8088) for CHIP_PU's
++3V3. Its facts gave a 700 µs soft-start and no output accuracy (±5 %
+assumed; in band at 665 µs). As built, R8 10 kΩ / C10 1 µF releases at
+12.4 ms: passed. With C10 at 10 nF it releases at 590 µs and at 1 nF at
+500 µs, both flagged. A what-if from the as-built run to 10 nF gave
+"Release: 12.4 ms → 590 µs", flagged, with the ramp kept. The cards
+weren't checked in a browser: that needs a full model run to put
+simulations on the page.
+
+**Bugs found:** on rust-board, `regulator_of` first found no regulator:
+the SY8088's output is its LX pin through L1, not a VOUT pin, so the
+board got the step run. It now also follows a switch pin through an
+inductor, with a test. mypy caught `build_ask_message` calling
+`.replace` on a verdict that can now be None on an RC run. A local
+`DatasheetReading` import in the tests broke ruff's name check; it's
+imported at the top now.

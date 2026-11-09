@@ -203,13 +203,27 @@ export interface SimCircuit {
   /** The part, when the netlist has a single one; an I²C bus C has none. */
   r_ref: string | null
   c_ref: string | null
+  /** An enable/reset RC fed by a regulator: how its rail comes up. */
+  ramp?: SimRamp | null
+}
+
+/** The regulator an enable/reset RC's rail comes from. With a start-up
+ *  time the rail ramps over it and the run gets a verdict; without one
+ *  (`t_s` null) the rail is a step at t = 0. */
+export interface SimRamp {
+  regulator: string
+  t_s: number | null
+  /** Output accuracy, as a fraction. */
+  accuracy: number
+  /** False: ±5 % assumed, no datasheet value. */
+  accuracy_cited: boolean
 }
 
 /** An ngspice transient, streamed as it finishes; the user can ask about
  *  it. Either an RC node rising from 0 V (a flagged I²C line, or an
- *  enable/reset pin's RC delay), with `calc_id`; or a regulator's circuit
- *  run with its vendor model, with `ref`, `analysis` and `verdict`, which
- *  arrives after the result. */
+ *  enable/reset pin's RC delay, with a `verdict` when its rail ramps), with
+ *  `calc_id`; or a regulator's circuit run with its vendor model, with
+ *  `ref`, `analysis` and `verdict`, which arrives after the result. */
 export interface Simulation {
   /** sim1, … (RC); vm1, … (vendor model). */
   id: string
