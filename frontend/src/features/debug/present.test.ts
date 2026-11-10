@@ -13,6 +13,7 @@ import {
   diagramLayout,
   formatSi,
   hoverReadout,
+  isVendorModel,
   modelBadge,
   nearestPoint,
   parseSi,
@@ -702,6 +703,12 @@ describe("toMarkdown with datasheets and vendor models", () => {
         "  - dv1 · [p.44](https://x.test/u2.pdf#page=44) VDDA has no 1 µF capacitor\n" +
         "  - ds3 · [p.44](https://x.test/u2.pdf#page=44) VDDA filter: 1 µF\n",
     )
+  })
+
+  it("counts a skipped regulator, which has no analysis, as a vendor model", () => {
+    const skipped = { ...vendor, analysis: null, verdict: "skipped" as const }
+    expect(isVendorModel(skipped)).toBe(true)
+    expect(isVendorModel({ ...vendor, ref: null, analysis: null, calc_id: "cf1" })).toBe(false)
   })
 
   it("writes vendor-model runs under their own heading with the verdict", () => {

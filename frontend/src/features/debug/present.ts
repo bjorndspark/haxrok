@@ -166,9 +166,10 @@ export function pageUrl(url: string | null | undefined, page: number): string | 
 }
 
 /** A regulator run with its vendor model (plan 004), as opposed to an RC
- *  node's transient (plan 003). */
+ *  node's transient (plan 003). Keyed on the modelled IC: a skipped
+ *  regulator has no analysis. */
 export function isVendorModel(sim: Simulation): boolean {
-  return sim.analysis != null
+  return sim.ref != null
 }
 
 export type StatusTone = "ok" | "warn" | "neutral"
