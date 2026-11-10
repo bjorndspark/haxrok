@@ -164,6 +164,8 @@ Settings for the `/step` workflow (one plan step per session).
   `Plan NNN step N: …`.
 - **Push:** push the branch the commit is on (`git push origin HEAD`), as
   the Git section says.
+- **Loop start:** `claude --permission-mode auto '/step-loop next'`, so a
+  permission prompt doesn't stall an unwatched loop window.
 
 ### Current work
 
