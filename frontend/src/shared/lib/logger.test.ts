@@ -33,15 +33,17 @@ describe("initRemoteLogging", () => {
     expect(init.keepalive).toBe(true)
   })
 
-  it("does nothing without VITE_API_URL", () => {
+  it("posts to the page's own origin without VITE_API_URL", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }))
     vi.stubGlobal("fetch", fetchMock)
     vi.stubEnv("VITE_API_URL", "")
 
     initRemoteLogging()
-    console.warn("ignored")
+    console.warn("proxied")
     flushRemoteLogs()
 
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe("/api/v1/logs/frontend")
   })
 })

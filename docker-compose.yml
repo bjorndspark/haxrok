@@ -55,7 +55,11 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      VITE_API_URL: http://localhost:${BACKEND_HOST_PORT:-8000}
+      # The browser stays same-origin; vite proxies /api to the backend
+      # (vite.config.ts). Empty overrides a cross-origin VITE_API_URL that an
+      # older .env may still carry.
+      VITE_API_URL: ""
+      API_PROXY_TARGET: http://backend:8000
       # PROJECT_NAME is the single display-name knob; vite needs the VITE_
       # prefix to expose it to the client (browser tab title).
       VITE_APP_NAME: ${PROJECT_NAME:-App}

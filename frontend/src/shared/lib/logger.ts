@@ -4,9 +4,10 @@
  * /api/v1/logs/frontend, where the backend appends them to
  * logs/frontend/app.log — one place to read both sides during development.
  *
- * initRemoteLogging() runs once from app/main.tsx and only when VITE_API_URL
- * is set. Sending is best-effort: failures are dropped silently so logging
- * can never break the app.
+ * initRemoteLogging() runs once from app/main.tsx; the endpoint is on
+ * VITE_API_URL when set, else on the page's own origin. Sending is
+ * best-effort: failures are dropped silently so logging can never break the
+ * app.
  */
 
 type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR"
@@ -59,13 +60,12 @@ function enqueueRemote(level: LogLevel, source: string, args: unknown[]): void {
 /** POST one batch. `keepalive` lets it outlive the page, so the same path
  *  serves the pagehide flush — sendBeacon can't: Chrome rejects a
  *  cross-origin beacon whose Blob type (application/json) isn't
- *  CORS-safelisted, and the API is cross-origin (VITE_API_URL). */
+ *  CORS-safelisted, and the API may be cross-origin (VITE_API_URL). */
 export function flushRemoteLogs(): void {
-  const base = import.meta.env.VITE_API_URL
-  if (!base || pendingRemote.length === 0) return
+  if (pendingRemote.length === 0) return
   const entries = pendingRemote.splice(0, REMOTE_BATCH_MAX)
   const body = JSON.stringify({ session_id: getSessionId(), entries })
-  const url = `${base}/api/v1/logs/frontend`
+  const url = `${import.meta.env.VITE_API_URL ?? ""}/api/v1/logs/frontend`
   fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -76,7 +76,6 @@ export function flushRemoteLogs(): void {
 
 export function initRemoteLogging(): void {
   if (remoteInitialised) return
-  if (!import.meta.env.VITE_API_URL) return
   remoteInitialised = true
 
   type ConsoleMethod = "debug" | "log" | "info" | "warn" | "error"

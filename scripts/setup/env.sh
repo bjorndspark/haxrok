@@ -148,7 +148,6 @@ set_env_var "PROJECT_NAME"        "$APP_NAME"       "$ENV_FILE"
 set_env_var "BACKEND_HOST_PORT"   "$BACKEND_PORT"   "$ENV_FILE"
 set_env_var "FRONTEND_HOST_PORT"  "$FRONTEND_PORT"  "$ENV_FILE"
 set_env_var "DOCS_HOST_PORT"      "$DOCS_PORT"      "$ENV_FILE"
-set_env_var "VITE_API_URL"        "http://localhost:$BACKEND_PORT" "$ENV_FILE"
 set_env_var "BACKEND_CORS_ORIGINS" "http://localhost:$FRONTEND_PORT" "$ENV_FILE"
 
 echo "==> Done. Start the app with: make dev"

@@ -577,3 +577,24 @@ claims to be).
 is refused even when it's harmless. Vendor ZIPs' test benches do that,
 which is why only what the picked file reaches is checked.
 
+
+## The dev server proxies the API
+
+**Decision:** the browser calls `/api` on the page's own origin, and the
+Vite dev server forwards it to the backend (`server.proxy` in
+`vite.config.ts`; compose sets `API_PROXY_TARGET=http://backend:8000`).
+`VITE_API_URL` is unset by default and stays only as an override for an
+API served elsewhere.
+
+**Why:** the frontend was built to call `http://localhost:<backend port>`.
+Opened from another machine on the LAN, that `localhost` is the viewer's
+own machine, so every request failed with "Failed to fetch" before it left
+the browser. Same-origin works from any host name or IP without config.
+
+**Alternatives rejected:** writing the Mac's LAN IP into `VITE_API_URL`
+and `BACKEND_CORS_ORIGINS` (breaks whenever the IP changes, and needs
+both edited together).
+
+**Consequence:** CORS only matters when `VITE_API_URL` is set. HMR follows
+the page's host instead of a fixed `localhost`. The production image
+(nginx) still needs `VITE_API_URL` or its own `/api` proxy.

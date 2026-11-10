@@ -93,8 +93,10 @@ routes. Other docs: trade-offs go in `DECISIONS.md`, runbooks here in
 ## When something's broken
 
 1. `make logs` and `logs/backend/app.log` / `logs/frontend/app.log`.
-2. "No CORS origins configured" or browser 403s → check
-   `BACKEND_CORS_ORIGINS` / `FRONTEND_HOST_PORT` in `.env`.
+2. "Failed to fetch" right away → the browser can't reach `/api`. The
+   dev server proxies it to the backend (`API_PROXY_TARGET`,
+   `vite.config.ts`); check `make logs` for the backend. CORS errors only
+   happen when `VITE_API_URL` is set: then check `BACKEND_CORS_ORIGINS`.
 3. Weird import errors after pulling → `make install` (stale venv).
 4. Root-owned files in `logs/`/`data/` blocking cleanup →
    `docker compose run --rm backend rm -rf /app/logs /app/data`.

@@ -14,6 +14,11 @@ export default defineConfig(({ mode }) => {
   // filter).
   const env = loadEnv(mode, envDir, "")
   const appName = env.VITE_APP_NAME || env.PROJECT_NAME || "App"
+  // The browser calls /api on the page's own origin and the dev server
+  // forwards it, so the app works from any host on the LAN (see
+  // DECISIONS.md, "The dev server proxies the API"). Compose points this at
+  // the backend service; host-side `pnpm dev` reaches the published port.
+  const apiTarget = env.API_PROXY_TARGET || `http://localhost:${env.BACKEND_HOST_PORT || "8000"}`
 
   return {
     envDir,
@@ -34,7 +39,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: 5173,
-      hmr: { host: "localhost" },
+      proxy: { "/api": { target: apiTarget } },
       // Host-side edits on the bind mount don't reliably emit inotify
       // events into the container — poll so hot updates never go stale.
       watch: { usePolling: true, interval: 300 },
