@@ -97,7 +97,7 @@ is the one recorded. `make lint` and `make test` pass (run as their
 sub-targets, make 3.81).
 Effort: 1–2 h.
 
-## 2. A power tree: sources, rails, and which part feeds which: proposed
+## 2. A power tree: sources, rails, and which part feeds which: done
 
 - From the netlist and the datasheet facts: each rail, its nominal
   voltage (named, or from `calc.py`'s feedback/fixed-output calculations),
@@ -114,9 +114,43 @@ charger's datasheet facts, the net name, a chemistry default such as
 Li-ion 3.0–4.2 V) and shown as inferred; a field on the review form
 overrides it, for a board like this one whose 4.8 V is written nowhere.
 The field makes this step big (backend and frontend).
+Decided (2026-11-11, default taken in loop): the tree is `debug/power.py`
+(`power.build`), on `DesignSummary.power`. Edges are ICs with a powered
+input pin and an output pin, or a switch pin through its inductor (a
+regulator; a mux when there are several inputs and one output), chargers
+(a BAT pin plus a charge-control pin), and pass parts: diodes, fuses,
+ferrites, 0 Ω links, and slide/toggle switches. Push buttons are never a
+power path. A mux lists its inputs in pin-name order (IN1 before IN2).
+Decided (2026-11-11, default taken in loop): a battery's range comes from
+the form's field first, then the charger's datasheet charge voltage, then
+a voltage in the net name, then Li-ion 3.0–4.2 V. The field (`battery`,
+"3.7" or "3.0-4.2", 0–60 V; anything else is a 400 on `battery`) is shown
+and sent in review mode only. Debug runs get the inferred tree too.
+Decided (2026-11-11, default taken in loop): the tree is built at upload
+from the netlist and `calc.py`, then rebuilt once the datasheets are read
+(output and charge voltages); the `datasheet_facts` event carries the
+rebuilt tree, which replaces the summary's, so the follow-up questions get
+it too. The downloaded report leaves it out, as it does the calculations.
 
-**Checks:** unit tests on small designs (LDO chain, mux with two sources,
-buck-boost); orbit and the private board's trees checked by hand.
+**Checks:** 29 unit tests in `test_debug_power.py`: an LDO chain through a
+fuse and a diode, the private board's shape (TPS2121 with VBUS and VBAT
+into VDD, VDD 3.0–5.0 V from upstream and inferred, then the TPS63070
+onto +3V3, with L2 on +3V3 adding no edge), a charger board (a slide
+switch passes, a push button doesn't, a buck at its calculated 1.8 V),
+voltages from datasheets, the user's battery, the prompt section and the
+battery parser. Two route/stream tests cover the field (400 on a bad
+value; the override reaches the summary and the review prompt), and one
+frontend test covers the card's rows. orbit-l2-shorted's tree by hand:
+the battery through PWR1 and the charger U1 onto +BATT (3–4.2 V,
+inferred), then U15 onto +3.3V; rust-board's (D6 → VBUS → D4 → +5V → U5
+→ +3V3, U6 charging +BATT) and rp-micro's too. The private board's own
+project isn't on this machine, so its tree is checked only through the
+unit test that mirrors it; checking it by hand is left for the review.
+`make eval-app case=orbit-l2-shorted mode=review`: the L2 fault is still #1
+(will fail), 311 s, against 217 s at the baseline. #2 is L1's value
+against its part number, and #3 a CP2102 back-drive (may fail).
+`make lint` and `make test` pass (run as their sub-targets, make 3.81):
+323 backend tests, 46 frontend.
 Effort: 3–5 h.
 
 ## 3. Pins the datasheet keeps apart, joined on the board (verified): proposed

@@ -84,6 +84,8 @@ export function useDebugActions(): DebugActions {
         useDebugStore.getState().measurements,
         store.mode,
         store.analyses,
+        // The field is on the review form only.
+        store.mode === "review" ? store.battery : "",
         useLanguage.getState().language,
         controller.signal,
       )) {

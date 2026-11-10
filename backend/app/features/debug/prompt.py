@@ -16,6 +16,7 @@ before the board is built: no symptoms, look for design mistakes.
 user's language; the diagnosis stays English, since it is internal reasoning.
 """
 
+from app.features.debug.power import format_power
 from app.features.debug.schemas import (
     AskTurn,
     CheckedAnalysis,
@@ -37,8 +38,11 @@ each with its page), deviations from those typical applications (dv1, ...), \
 verified findings (wf1, ...) the backend computed from \
 the netlist and pin table, reference notes (rd1, ...) copied from \
 manufacturers' reference designs and datasheets, values the backend \
-calculated from the netlist with datasheet formulas (cf1, ...), and \
-sometimes bench measurements the user entered (m1, ...)."""
+calculated from the netlist with datasheet formulas (cf1, ...), the power \
+tree the backend built from the netlist (each rail, its voltage, the part \
+that makes it and what it supplies; a voltage marked inferred is a guess to \
+check, not a fact), and sometimes bench measurements the user entered \
+(m1, ...)."""
 
 # The unverified-facts rule: the model recalls part specs from memory, and in
 # the no-fault eval it called a correct part an error and told the user to
@@ -230,8 +234,11 @@ from the ICs' datasheets (ds1, ...: limits and typical application parts, \
 each with its page), deviations from those typical applications (dv1, ...), \
 verified findings (wf1, ...) the backend computed from \
 the netlist and pin table, reference notes (rd1, ...) copied from \
-manufacturers' reference designs and datasheets, and values the backend \
-calculated from the netlist with datasheet formulas (cf1, ...)."""
+manufacturers' reference designs and datasheets, values the backend \
+calculated from the netlist with datasheet formulas (cf1, ...), and the \
+power tree the backend built from the netlist (each rail, its voltage, the \
+part that makes it and what it supplies; a voltage marked inferred is a \
+guess to check, not a fact)."""
 
 REVIEW_DIAGNOSE = f"""\
 You are an expert hardware engineer reviewing a hobbyist's KiCad schematic \
@@ -348,11 +355,12 @@ def build_user_message(
     calculations: str = "",
     datasheet_facts: str = "",
     deviations: str = "",
+    power: str = "",
 ) -> str:
     """The user turn: symptoms (review: the designer's notes), measurements,
     netlist, ERC, pin table, datasheet facts, deviations from their typical
     applications, verified findings, unverified pin warnings, reference
-    notes, calculated values."""
+    notes, calculated values, the power tree."""
     parts = []
     if mode == "debug":
         parts.append("## Symptoms\n" + "\n".join(f"{s.id}: {s.text}" for s in symptoms))
@@ -392,6 +400,8 @@ def build_user_message(
         parts.append("## Reference notes (copied from the manufacturers' documents)\n" + references)
     if calculations:
         parts.append("## Calculated from the netlist (verified arithmetic)\n" + calculations)
+    if power:
+        parts.append("## Power tree (built from the netlist; inferred voltages marked)\n" + power)
     return "\n\n".join(parts)
 
 
@@ -543,6 +553,8 @@ def build_result_ask_message(
             *(f"- {d.id} deviation: {d.text}" for d in summary.deviations),
         ]
         parts.append("## Read from the datasheets\n" + "\n".join(read))
+    if summary.power is not None and summary.power.rails:
+        parts.append("## Power tree (built from the netlist)\n" + format_power(summary.power))
     findings = []
     for h in result.hypotheses:
         lines = [

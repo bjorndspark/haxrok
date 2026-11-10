@@ -14,6 +14,7 @@ import type {
   Hypothesis,
   Run,
   PinWarning,
+  PowerTree,
   SimCircuit,
   WiringFinding,
 } from "./types"
@@ -252,6 +253,53 @@ export function citedLines(claim: CheckedClaim, summary: DesignSummary | null): 
   return ids.flatMap((id) => {
     const line = lines.find((l) => l.id === id)
     return line ? [linkPage(line, summary)] : []
+  })
+}
+
+/** A rail of the power tree, worded for the summary card. */
+export interface PowerRow {
+  net: string
+  /** "USB", "battery", "input"; null when not a root. */
+  source: string | null
+  /** "3.3 V", "3–4.2 V", or "voltage unknown". */
+  voltage: string
+  inferred: boolean
+  /** Where the voltage comes from: "calculated, U5 feedback (cf1)". */
+  basis: string
+  /** One per part that makes it: "U3 TPS2121 (mux/switch) ← VBUS, VBAT". */
+  from: string[]
+  loads: string[]
+}
+
+/** Volts with at most three significant digits, so 3.2999 reads 3.3. */
+function volt(v: number): string {
+  return String(Number(v.toPrecision(3)))
+}
+
+/** The power tree as rows, roots first (the backend's order). */
+export function powerRows(tree: PowerTree, m: Messages): PowerRow[] {
+  const t = m.summary
+  const parts = new Map(tree.parts.map((p) => [p.ref, p]))
+  return tree.rails.map((r) => {
+    const voltage =
+      r.min === null || r.max === null
+        ? t.voltageUnknown
+        : r.min === r.max
+          ? `${volt(r.min)} V`
+          : `${volt(r.min)}–${volt(r.max)} V`
+    const from = r.fed_by.map((ref) => {
+      const p = parts.get(ref)
+      return p ? `${ref} ${p.value} (${t.partKind[p.kind]}) ← ${p.inputs.join(", ")}` : ref
+    })
+    return {
+      net: r.net,
+      source: r.source && t.source[r.source],
+      voltage,
+      inferred: r.inferred,
+      basis: r.note ? `${t.basis[r.basis]}, ${r.note}` : t.basis[r.basis],
+      from,
+      loads: r.loads,
+    }
   })
 }
 

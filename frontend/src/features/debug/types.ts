@@ -340,11 +340,64 @@ export interface DatasheetReadFailure {
   reason: string
 }
 
+/** A part on a power path: a regulator, mux/load switch, charger, or a
+ *  pass part (fuse, ferrite, 0 Ω link, diode, slide switch). */
+export interface PowerPart {
+  ref: string
+  value: string
+  kind: "regulator" | "switch" | "charger" | "pass"
+  /** Its input rails; a mux has more than one. */
+  inputs: string[]
+  output: string
+}
+
+/** Where a rail's voltage came from. */
+export type VoltageBasis =
+  | "named"
+  | "calculated"
+  | "fixed"
+  | "datasheet"
+  | "upstream"
+  | "usb"
+  | "charger"
+  | "default"
+  | "user"
+  | "unknown"
+
+/** A rail of the power tree (power.build). */
+export interface PowerRail {
+  net: string
+  /** Set at a root: USB, a battery, or another input connector. */
+  source: "usb" | "battery" | "input" | null
+  /** Volts; both null when unknown, equal when nominal. */
+  min: number | null
+  max: number | null
+  basis: VoltageBasis
+  /** A guess to check, not a fact. */
+  inferred: boolean
+  /** Where the voltage comes from, e.g. "U5 feedback (cf1)". */
+  note: string
+  /** Refs of the parts that make it, and of the parts that draw from it. */
+  fed_by: string[]
+  loads: string[]
+}
+
+/** Each rail, the part that makes it and what it supplies, built from the
+ *  netlist by the backend before the model runs. */
+export interface PowerTree {
+  rails: PowerRail[]
+  parts: PowerPart[]
+  /** The battery's range came from the review form, not inferred. */
+  battery_override: boolean
+}
+
 /** The datasheet_facts event: merged into the run's summary. */
 export interface DatasheetFacts {
   datasheet_facts: DatasheetLine[]
   deviations: DatasheetLine[]
   datasheet_failures: DatasheetReadFailure[]
+  /** Rebuilt with the datasheets' output voltages. Absent in older runs. */
+  power?: PowerTree | null
 }
 
 export interface DesignSummary {
@@ -369,6 +422,8 @@ export interface DesignSummary {
   datasheet_facts?: DatasheetLine[]
   deviations?: DatasheetLine[]
   datasheet_failures?: DatasheetReadFailure[]
+  /** Absent in runs recorded before it existed. */
+  power?: PowerTree | null
 }
 
 export type ProgressStage = "pin_lookup" | "reasoning" | "structuring" | "checking"

@@ -17,6 +17,7 @@ import {
   modelBadge,
   nearestPoint,
   parseSi,
+  powerRows,
   simulationLayout,
   splitGlossary,
   toMarkdown,
@@ -29,6 +30,7 @@ import type {
   CheckedClaim,
   DesignSummary,
   Hypothesis,
+  PowerTree,
   Run,
   SimCircuit,
   Simulation,
@@ -755,5 +757,79 @@ describe("findingTokens", () => {
       ref: ["Q1.1", "Q1"],
       net: [],
     })
+  })
+})
+
+describe("powerRows", () => {
+  // The private board's shape: a mux picks VBUS or the battery for VDD,
+  // and a buck-boost makes +3V3 from it.
+  const tree: PowerTree = {
+    battery_override: false,
+    parts: [
+      { ref: "U3", value: "TPS2121", kind: "switch", inputs: ["VBUS", "VBAT"], output: "VDD" },
+      { ref: "U5", value: "TPS63070", kind: "regulator", inputs: ["VDD"], output: "+3V3" },
+    ],
+    rails: [
+      {
+        net: "VBAT",
+        source: "battery",
+        min: 3,
+        max: 4.2,
+        basis: "default",
+        inferred: true,
+        note: "Li-ion",
+        fed_by: [],
+        loads: [],
+      },
+      {
+        net: "VDD",
+        source: null,
+        min: 3,
+        max: 5,
+        basis: "upstream",
+        inferred: true,
+        note: "",
+        fed_by: ["U3"],
+        loads: ["U5"],
+      },
+      {
+        net: "+3V3",
+        source: null,
+        min: 3.2999999,
+        max: 3.2999999,
+        basis: "calculated",
+        inferred: false,
+        note: "U5 feedback (cf1)",
+        fed_by: ["U5"],
+        loads: ["U1"],
+      },
+      {
+        net: "VCORE",
+        source: null,
+        min: null,
+        max: null,
+        basis: "unknown",
+        inferred: false,
+        note: "",
+        fed_by: ["U9"],
+        loads: [],
+      },
+    ],
+  }
+
+  it("words each rail's source, voltage and where it comes from", () => {
+    const [bat, vdd, v33, core] = powerRows(tree, en)
+    expect(bat).toMatchObject({
+      source: "battery",
+      voltage: "3–4.2 V",
+      inferred: true,
+      basis: "chemistry default, Li-ion",
+    })
+    expect(vdd).toMatchObject({ source: null, voltage: "3–5 V", basis: "from upstream" })
+    expect(vdd.from).toEqual(["U3 TPS2121 (mux/switch) ← VBUS, VBAT"])
+    expect(vdd.loads).toEqual(["U5"])
+    expect(v33).toMatchObject({ voltage: "3.3 V", basis: "calculated, U5 feedback (cf1)" })
+    // A part missing from the list still shows by its ref.
+    expect(core).toMatchObject({ voltage: "voltage unknown", from: ["U9"] })
   })
 })

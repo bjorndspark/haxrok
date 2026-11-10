@@ -586,6 +586,65 @@ class DatasheetReadFailure(BaseModel):
     reason: str
 
 
+PowerSourceKind = Literal["usb", "battery", "input"]
+PowerPartKind = Literal["regulator", "switch", "charger", "pass"]
+# Where a rail's voltage comes from: its net's name, a feedback-divider
+# calculation, the part's value (AMS1117-3.3), the datasheet's output
+# voltage, the parts feeding it, USB's 5 V, a chemistry default, the user's
+# value on the review form, or nothing found.
+VoltageBasis = Literal[
+    "named",
+    "calculated",
+    "fixed",
+    "datasheet",
+    "upstream",
+    "usb",
+    "charger",
+    "default",
+    "user",
+    "unknown",
+]
+
+
+class PowerPart(BaseModel):
+    """A part that makes a rail from other rails: a regulator, a power mux
+    or load switch (more than one input), a battery charger, or a pass
+    part (fuse, ferrite, 0 Ω, diode, slide switch)."""
+
+    ref: str
+    value: str
+    kind: PowerPartKind
+    inputs: list[str] = Field(description="The rails it takes power from.")
+    output: str
+
+
+class PowerRail(BaseModel):
+    """A power net, its voltage range and where that comes from, the parts
+    that make it and the ICs it supplies. A source (``source`` set) is a
+    root: USB VBUS, a battery, or an input nothing on the board makes."""
+
+    net: str
+    source: PowerSourceKind | None = None
+    min: float | None = Field(description="Volts; equal to max for a fixed rail.")
+    max: float | None
+    basis: VoltageBasis
+    inferred: bool = Field(description="A guess the user should check, not a fact.")
+    note: str = Field(description='Where the voltage comes from, e.g. "U5 feedback (cf1)".')
+    fed_by: list[str] = Field(description="Refs of the parts that make it.")
+    loads: list[str] = Field(description="ICs with a supply pin on it.")
+
+
+class PowerTree(BaseModel):
+    """The board's power tree, built from the netlist (``power.build``):
+    rails roots first, and the parts between them."""
+
+    rails: list[PowerRail]
+    parts: list[PowerPart]
+    battery_override: bool = Field(
+        default=False, description="The battery's range is the user's, from the review form."
+    )
+
+
 class DesignSummary(BaseModel):
     """Parsed input, shown before the model call: lets the user check the
     parse, and shows which ICs have pin data."""
@@ -618,6 +677,9 @@ class DesignSummary(BaseModel):
     datasheet_facts: list[DatasheetLine] = Field(default_factory=list)
     deviations: list[DatasheetLine] = Field(default_factory=list)
     datasheet_failures: list[DatasheetReadFailure] = Field(default_factory=list)
+    # Built from the netlist; rebuilt with the datasheet facts and sent in
+    # the datasheet_facts event. None in runs from before it existed.
+    power: PowerTree | None = None
 
 
 # --- input ----------------------------------------------------------------------
@@ -668,6 +730,9 @@ class DatasheetFactsEvent(BaseModel):
     datasheet_facts: list[DatasheetLine]
     deviations: list[DatasheetLine]
     datasheet_failures: list[DatasheetReadFailure]
+    power: PowerTree | None = Field(
+        default=None, description="The power tree again, with the datasheets' voltages."
+    )
 
 
 # --- ask --------------------------------------------------------------------------------

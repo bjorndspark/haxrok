@@ -35,6 +35,7 @@ from app.features.debug import (
     calc,
     diagram,
     pins,
+    power,
     prompt,
     reference,
     spice,
@@ -70,6 +71,7 @@ from app.features.debug.schemas import (
     Measurement,
     MeasurementInput,
     Mode,
+    PowerTree,
     ProgressEvent,
     ReferenceNote,
     RerunRequest,
@@ -120,6 +122,7 @@ class Prepared:
     language: Language = "en"
     upload: dict[str, bytes] = field(default_factory=dict, repr=False)  # the model files
     analyses: tuple[SimAnalysis, ...] = ("startup",)  # the vendor-model simulations
+    battery: power.Range | None = None  # the review form's battery range, if given
 
 
 async def prepare(
@@ -134,6 +137,7 @@ async def prepare(
     *,
     ngspice: spice.SpiceLoader | None = None,
     analyses: Sequence[SimAnalysis] = ("startup",),
+    battery: power.Range | None = None,
 ) -> Prepared:
     """Validate the upload, run kicad-cli and parse its output, then look
     up each IC's datasheet and SPICE model, and with ``ngspice`` check that
@@ -141,7 +145,8 @@ async def prepare(
     ``AppError`` subclasses with messages the user can act on. In review
     mode the symptoms are optional notes on what the board is for.
     ``language`` is the one the structured answer is written in;
-    ``analyses`` the vendor-model simulations ``stream`` runs."""
+    ``analyses`` the vendor-model simulations ``stream`` runs; ``battery``
+    the user's (min, max) for the board's battery, over the inferred one."""
     symptoms = prompt.number_symptoms(symptoms_text)
     if mode == "debug" and not symptoms:
         raise BadRequestError("Describe what you see on the bench first.", field="symptoms")
@@ -180,6 +185,7 @@ async def prepare(
         calculations=calcs,
         symptoms=symptoms,
         measurements=numbered,
+        power=power.build(design, calcs, battery=battery),
     )
     return Prepared(
         mode,
@@ -195,6 +201,7 @@ async def prepare(
         language,
         upload=project.files,
         analyses=tuple(analyses),
+        battery=battery,
     )
 
 
@@ -414,8 +421,14 @@ async def _review(
         read += (
             f" {n_dev} deviation{'s' if n_dev > 1 else ''} from a datasheet's typical application."
         )
+    # Rebuilt with the datasheets' output and charge voltages, now they're read.
+    tree = power.build(
+        prepared.design, prepared.calculations, reading.limits, battery=prepared.battery
+    )
     if facts is not None and found_sheets:
-        yield _event("datasheet_facts", _datasheet_facts(reading, deviations).model_dump_json())
+        yield _event(
+            "datasheet_facts", _datasheet_facts(reading, deviations, tree).model_dump_json()
+        )
     yield _progress(
         "pin_lookup",
         f"Pin data for {with_data} of {len(table.ics)} ICs.{read}{found}{notes}{calcs}",
@@ -440,6 +453,7 @@ async def _review(
         calculations=calc.format_calculations(prepared.calculations),
         datasheet_facts=reading.text,
         deviations=application.format_deviations(deviations) if reading.application else "",
+        power=power.format_power(tree),
     )
     start = time.monotonic()
     try:
@@ -577,10 +591,12 @@ def _progress(stage: str, message: str) -> SseEvent:
 
 
 def _datasheet_facts(
-    reading: DatasheetReading, deviations: list[application.Deviation]
+    reading: DatasheetReading, deviations: list[application.Deviation], tree: PowerTree
 ) -> DatasheetFactsEvent:
-    """The datasheet_facts event: what claims can cite, for the browser."""
+    """The datasheet_facts event: what claims can cite, and the power tree
+    rebuilt with the datasheets' voltages, for the browser."""
     return DatasheetFactsEvent(
+        power=tree,
         datasheet_facts=[
             DatasheetLine(id=f.id, ref=f.ref, page=f.page, text=f.body) for f in reading.facts
         ],

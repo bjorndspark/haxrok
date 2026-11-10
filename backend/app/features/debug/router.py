@@ -16,7 +16,7 @@ from app.core.ai.structured import complete_structured
 from app.core.config import settings
 from app.core.errors import BadRequestError
 from app.core.responses import SuccessResponse, ok
-from app.features.debug import service
+from app.features.debug import power, service
 from app.features.debug.datasheet import Datasheets, DatasheetStore, HttpFetcher
 from app.features.debug.facts import FactReader, RedisFactsCache
 from app.features.debug.kicad import KicadCli
@@ -109,6 +109,13 @@ async def analyze(
             "dropout; empty for none"
         ),
     ] = "startup",
+    battery: Annotated[
+        str,
+        Form(
+            max_length=40,
+            description='The battery\'s voltage, "3.7" or a range "3.0-4.2"; empty to infer it',
+        ),
+    ] = "",
 ) -> EventSourceResponse:
     """Analyze a KiCad project against bench symptoms, or (``mode=review``)
     review it for design mistakes before the board is ordered.
@@ -125,6 +132,13 @@ async def analyze(
     except (json.JSONDecodeError, ValidationError) as e:
         raise BadRequestError("measurements must be a JSON list.", field="measurements") from e
     picked = parse_analyses(analyses)
+    try:
+        cell = power.parse_battery(battery)
+    except ValueError as e:
+        raise BadRequestError(
+            'battery must be a voltage, "3.7", or a range, "3.0-4.2", within 0-60 V.',
+            field="battery",
+        ) from e
     if len(files) > settings.DEBUG_MAX_FILES:
         raise BadRequestError(f"Too many files; at most {settings.DEBUG_MAX_FILES}.")
 
@@ -154,6 +168,7 @@ async def analyze(
         language,
         ngspice=ngspice,
         analyses=picked,
+        battery=cell,
     )
     return EventSourceResponse(
         service.stream(

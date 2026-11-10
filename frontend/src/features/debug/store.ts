@@ -24,6 +24,8 @@ interface DebugState {
   mode: Mode
   /** The vendor-model simulations to run; not kept across reloads. */
   analyses: SimAnalysis[]
+  /** The battery's voltage, "3.7" or "3.0-4.2"; empty to infer it. */
+  battery: string
   files: ProjectFile[]
   symptoms: string
   /** Every measurement entered so far; each re-run sends all of them. */
@@ -36,6 +38,7 @@ interface DebugState {
   setMode: (mode: Mode) => void
   /** Tick or untick one analysis; the list keeps SIM_ANALYSES' order. */
   toggleAnalysis: (analysis: SimAnalysis) => void
+  setBattery: (text: string) => void
   setFiles: (files: ProjectFile[]) => void
   setSymptoms: (text: string) => void
   setInputError: (message: string | null) => void
@@ -59,6 +62,7 @@ export const useDebugStore = create<DebugState>((set, get) => ({
   view: "input",
   mode: "review",
   analyses: ["startup"],
+  battery: "",
   files: [],
   symptoms: "",
   measurements: [],
@@ -70,6 +74,7 @@ export const useDebugStore = create<DebugState>((set, get) => ({
     set((s) => ({
       analyses: SIM_ANALYSES.filter((a) => (a === analysis) !== s.analyses.includes(a)),
     })),
+  setBattery: (battery) => set({ battery, inputError: null }),
   setFiles: (files) => set({ files, inputError: null }),
   setSymptoms: (symptoms) => set({ symptoms }),
   setInputError: (inputError) => set({ inputError }),

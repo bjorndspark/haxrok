@@ -11,6 +11,7 @@ import {
   datasheetLines,
   findingTokens,
   modelBadge,
+  powerRows,
   type StatusBadge,
 } from "../present"
 import type { DesignSummary } from "../types"
@@ -57,6 +58,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
   const refParts = new Set(summary.references.map((n) => n.part))
   const m = useMessages()
   const t = m.summary
+  const power = summary.power ? powerRows(summary.power, m) : []
   return (
     <Card className="space-y-5 p-4 sm:p-5">
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
@@ -149,6 +151,38 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
               <p className="min-w-0 flex-1 leading-relaxed">{c.text}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {power.length > 0 && (
+        <div className="space-y-2 text-xs">
+          <Rule>{t.powerTree(power.length)}</Rule>
+          <ul className="space-y-1.5">
+            {power.map((r) => (
+              <li key={r.net} className="space-y-0.5">
+                <div className="flex flex-wrap items-baseline gap-x-[2ch]">
+                  <span className="font-bold text-info">{r.net}</span>
+                  {r.source && <Badge bracket>{r.source}</Badge>}
+                  <span className="text-value">{r.voltage}</span>
+                  {r.inferred && <Badge tone="warn">{t.inferred}</Badge>}
+                  <span className="min-w-0 text-muted-foreground">{r.basis}</span>
+                </div>
+                {(r.from.length > 0 || r.loads.length > 0) && (
+                  <div className="space-y-0.5 pl-[2ch] text-muted-foreground">
+                    {r.from.map((line) => (
+                      <p key={line}>{line}</p>
+                    ))}
+                    {r.loads.length > 0 && (
+                      <p>
+                        {t.supplies} {r.loads.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">{t.powerNote}</p>
         </div>
       )}
 

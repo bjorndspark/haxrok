@@ -53,6 +53,34 @@ function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => 
   )
 }
 
+/** The battery's voltage, overriding the inferred one in the power tree. */
+function BatteryField() {
+  const t = useMessages().input
+  const battery = useDebugStore((s) => s.battery)
+  const setBattery = useDebugStore((s) => s.setBattery)
+  return (
+    <div className="space-y-1.5 text-xs">
+      <label
+        htmlFor="battery"
+        className="block font-bold tracking-wider text-muted-foreground uppercase"
+      >
+        {t.batteryTitle}
+      </label>
+      <input
+        id="battery"
+        type="text"
+        inputMode="decimal"
+        maxLength={40}
+        value={battery}
+        onChange={(e) => setBattery(e.target.value)}
+        placeholder={t.batteryPlaceholder}
+        className="w-full border border-input bg-transparent px-[1ch] py-1 font-mono caret-foreground placeholder:text-muted-foreground focus-visible:border-foreground focus-visible:outline-none sm:w-[24ch]"
+      />
+      <p className="text-muted-foreground">{t.batteryNote}</p>
+    </div>
+  )
+}
+
 /** A checkbox per vendor-model analysis (start-up ticked by default). */
 function AnalysisPicker() {
   const m = useMessages()
@@ -271,6 +299,8 @@ export function InputView({ actions }: { actions: DebugActions }) {
             {fragments.length > 0 && <span className="text-warn">{t.shortLines(fragments)}</span>}
           </div>
         )}
+
+        {review && <BatteryField />}
 
         <AnalysisPicker />
 

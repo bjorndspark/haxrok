@@ -57,12 +57,14 @@ export async function* streamAnalysis(
   measurements: MeasurementInput[],
   mode: Mode,
   analyses: SimAnalysis[],
+  battery: string,
   language: Language,
   signal: AbortSignal,
 ): AsyncGenerator<AnalysisEvent> {
   const form = new FormData()
   form.append("mode", mode)
   form.append("analyses", analyses.join(","))
+  form.append("battery", battery.trim())
   form.append("language", language)
   for (const f of files) form.append("files", f.file, f.path)
   form.append("symptoms", symptoms)

@@ -1131,6 +1131,7 @@ async def test_datasheet_facts_names_a_datasheet_that_couldnt_be_read():
         "datasheet_facts": [],
         "deviations": [],
         "datasheet_failures": [{"ref": "U2", "reason": "the PDF has no text (a scan?)"}],
+        "power": {"rails": [], "parts": [], "battery_override": False},
     }
 
 
@@ -2155,3 +2156,39 @@ def test_ch340_notes_are_found():
     design = _design({"U1": ("CH340C", "Interface_USB:CH340C")}, {"+5V": ["U1.16(VCC)"]})
     notes = reference.lookup(design)
     assert len(notes) >= 4 and any("no series" in n.text for n in notes)
+
+
+async def test_analyze_rejects_a_bad_battery(client, fake_backends):
+    files = [("files", (name, data)) for name, data in _files()]
+    res = await client.post(
+        "/api/v1/debug/analyze", files=files, data={"symptoms": "x", "battery": "abc"}
+    )
+    assert res.status_code == 400
+    assert res.json()["error"]["field"] == "battery"
+
+
+async def test_review_lists_the_power_tree_with_the_users_battery():
+    prepared = await service.prepare(
+        _files(),
+        "",
+        [],
+        FakeKicad(),
+        FakeDatasheets(),
+        FakeSpiceModels(),
+        "review",
+        battery=(3.2, 3.6),
+    )
+    tree = prepared.summary.power
+    assert tree is not None and tree.battery_override
+    users: list[str] = []
+
+    async def diagnose(system: str, user: str) -> str:
+        users.append(user)
+        return "No issues found."
+
+    async def structure(system: str, user: str) -> Analysis[Claim]:
+        return Analysis[Claim](hypotheses=[], open_questions=[], glossary=[])
+
+    events = await _collect(prepared, service.Model(diagnose=diagnose, structure=structure))
+    assert events[0][1]["power"]["battery_override"] is True
+    assert "## Power tree (built from the netlist; inferred voltages marked)" in users[0]

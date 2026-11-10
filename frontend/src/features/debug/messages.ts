@@ -14,8 +14,11 @@ import type {
   ProgressStage,
   Severity,
   SimAnalysis,
+  PowerPart,
+  PowerRail,
   SimVerdict,
   SpiceModelStatus,
+  VoltageBasis,
 } from "./types"
 
 type StepKey = "upload" | ProgressStage
@@ -84,6 +87,10 @@ const en = {
     submit: { review: "Review schematic", debug: "Analyze schematic" },
     analysesTitle: "Simulate regulators with their vendor models",
     analysesNote: "Only for ICs whose SPICE model loads in ngspice; each takes a few minutes.",
+    batteryTitle: "Battery voltage",
+    batteryPlaceholder: "e.g. 3.7 or 3.0-4.2",
+    batteryNote:
+      "Optional. Left empty, it's inferred from the charger's datasheet, the net name, or Li-ion's 3.0–4.2 V.",
   },
   symptoms: {
     hints: {
@@ -255,6 +262,33 @@ Used outdoors, so it may see -10 °C.`,
     doesntLoad: "doesn't load",
     datasheetFacts: (n: number) => `Datasheet facts (${String(n)})`,
     deviations: (n: number) => `Deviations from the typical application (${String(n)})`,
+    powerTree: (n: number) => `Power tree (${String(n)} rails)`,
+    powerNote: "Built from the netlist. An inferred voltage is a guess to check.",
+    source: { usb: "USB", battery: "battery", input: "input" } satisfies Record<
+      NonNullable<PowerRail["source"]>,
+      string
+    >,
+    basis: {
+      named: "from its name",
+      calculated: "calculated",
+      fixed: "fixed output",
+      datasheet: "datasheet",
+      upstream: "from upstream",
+      usb: "USB",
+      charger: "charger's datasheet",
+      default: "chemistry default",
+      user: "your value",
+      unknown: "unknown",
+    } satisfies Record<VoltageBasis, string>,
+    partKind: {
+      regulator: "regulator",
+      switch: "mux/switch",
+      charger: "charger",
+      pass: "pass",
+    } satisfies Record<PowerPart["kind"], string>,
+    inferred: "inferred",
+    voltageUnknown: "voltage unknown",
+    supplies: "supplies",
   },
   simulations: {
     title: (n: number) => `Simulations (${String(n)})`,
@@ -449,6 +483,10 @@ const ja: Messages = {
     submit: { review: "回路図をレビュー", debug: "回路図を解析" },
     analysesTitle: "レギュレータをメーカーのモデルでシミュレーション",
     analysesNote: "SPICE モデルが ngspice で読み込める IC だけが対象で、1 つに数分かかります。",
+    batteryTitle: "電池の電圧",
+    batteryPlaceholder: "例: 3.7 または 3.0-4.2",
+    batteryNote:
+      "任意です。空欄なら、充電 IC のデータシート、ネット名、Li-ion の 3.0–4.2 V の順に推定します。",
   },
   symptoms: {
     hints: {
@@ -617,6 +655,30 @@ USB 5 V では動く: マイコンが起動する。
     doesntLoad: "読み込み不可",
     datasheetFacts: (n: number) => `データシートの事実 (${String(n)})`,
     deviations: (n: number) => `標準アプリケーションとの違い (${String(n)})`,
+    powerTree: (n: number) => `電源ツリー (レール ${String(n)} 本)`,
+    powerNote: "ネットリストから組み立てたものです。「推定」の電圧は確認が必要です。",
+    source: { usb: "USB", battery: "電池", input: "入力" },
+    basis: {
+      named: "ネット名から",
+      calculated: "計算値",
+      fixed: "固定出力",
+      datasheet: "データシート",
+      upstream: "上流から",
+      usb: "USB",
+      charger: "充電 IC のデータシート",
+      default: "電池の標準値",
+      user: "入力値",
+      unknown: "不明",
+    },
+    partKind: {
+      regulator: "レギュレータ",
+      switch: "電源切替/スイッチ",
+      charger: "充電 IC",
+      pass: "直列部品",
+    },
+    inferred: "推定",
+    voltageUnknown: "電圧不明",
+    supplies: "供給先",
   },
   simulations: {
     title: (n: number) => `シミュレーション (${String(n)})`,
