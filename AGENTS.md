@@ -167,5 +167,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-None: every plan is done or dropped. A new topic starts with
-`/step new: <topic>`.
+1. `005-whole-board-static-review.md` step 1 (an eval case with a
+   switching regulator's L2 pin on its output), then its steps in order.
