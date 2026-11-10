@@ -20,6 +20,7 @@ cases/<name>/
 | `rust-board-i2c-vbus` | I²C pull-ups on VBUS instead of +3V3, so the bus fails on battery | Planted (esp-rs/esp-rust-board) |
 | `orbit-uart-swapped` | STM32 USART1 wired TX-to-TX / RX-to-RX with the CP2102 | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `orbit-boot0-high` | BOOT0 pull-down returned to +3.3V, so it always boots the ROM bootloader | Planted (Battery-Powered-STM32-Board-With-USB) |
+| `orbit-l2-shorted` | TPS63802 L2 pin (and the inductor's L2 end) on its own output, +3.3V, so start-up needs 0.8–1.2 A from a bench supply | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `rp-micro-ldo-en` | RT9013 LDO enable tied to its own output, so it never starts | Planted (siderakb/rp-micro) |
 | `rp-micro-cc-shared` | USB-C CC1 and CC2 tied together on one 5.1 kΩ pull-down, so e-marked USB-C cables get no VBUS | Planted (siderakb/rp-micro) |
 | `rp-micro-no-fault` | None; the cause is a charge-only USB cable. Pass = no schematic fault claimed at any rank | Unmodified board (siderakb/rp-micro) |
@@ -39,6 +40,11 @@ python3 -I evals/compact_netlist.py board.net > evals/cases/<name>/netlist.txt
 ```
 
 Then write `symptom.md` from bench notes only, and `expected.md`.
+
+Export with KiCad 9, as the backend container has (`docker compose exec
+backend kicad-cli …`): KiCad 10.0.8 wrote orbit's pin functions with the
+pin number appended (`L2_7` for `L2`), so the pin names no longer match
+the other cases or the pin rules.
 
 ## Go/no-go
 

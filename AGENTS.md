@@ -169,5 +169,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `005-whole-board-static-review.md` step 1 (an eval case with a
-   switching regulator's L2 pin on its output), then its steps in order.
+1. `005-whole-board-static-review.md` step 2 (a power tree: sources,
+   rails, and which part feeds which), then its steps in order.

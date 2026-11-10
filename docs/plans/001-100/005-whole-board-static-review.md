@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-11 | 2026-11-11 | Proposed | — | `002-verified-wiring-checks.md`, `004-datasheets-and-simulation.md`, `DECISIONS.md` ("Evidence labels are checked references, not verified conclusions") |
+| 2026-11-11 | 2026-11-11 | In progress | — | `002-verified-wiring-checks.md`, `004-datasheets-and-simulation.md`, `DECISIONS.md` ("Evidence labels are checked references, not verified conclusions") |
 
 A private board (an ESP32-S3 with a TPS2121 power mux feeding a TPS63070
 buck-boost) was built with the TPS63070's L2 pin wired to its own output,
@@ -51,7 +51,7 @@ static checks; plan 006 holds the simulation and is written once steps 2
 and 5 land, since its chain and load model build on them.
 Decided (2026-11-11): work on `dev`, as plan 004 did.
 
-## 1. An eval case where a switching regulator's inductor pin is wired to its output: proposed
+## 1. An eval case where a switching regulator's inductor pin is wired to its output: done
 
 - Plant the fault on an open-source board, as the other cases do, so the
   private board stays out of the repo. Orbit's TPS63802 (U15) is a
@@ -65,8 +65,36 @@ Decided (2026-11-11): work on `dev`, as plan 004 did.
 
 Decided (2026-11-11): plant it on orbit, committed like the other cases;
 the private board is checked by hand only.
+Decided (2026-11-11, default taken in loop): the edit is one `+3.3V`
+power symbol (#PWR060) on the inductor's L2 end, so the whole L2 net
+(L1.2, U15.7) joins +3.3V, as on the private board.
+Decided (2026-11-11, default taken in loop): `erc.txt` is the backend
+container's KiCad 9.0.2 report, as the app would produce. It carries
+library-configuration warnings the older orbit cases lack. `netlist.txt`
+is the KiCad 10.0.8 export with the `_<pin>` suffix stripped from pin
+functions (`L2_7` → `L2`), which makes it identical to the container's
+export; `evals/README.md` now says to export with KiCad 9. Step 3's
+pin-name fallback should expect that suffix from KiCad 10 boards.
+Decided (2026-11-11, default taken in loop): the symptom keeps only the
+private board's bench fact (start needs 0.8–1.2 A), at orbit's 1S 4.0 V.
+"Keeps running at 0.5 A" and 3.30 V come from the ngspice study;
+`expected.md` says so.
 
-**Checks:** ERC before/after; baseline runs recorded here.
+**Checks:** ERC before/after: 215 → 216 messages; the only new one is the
+'power' library warning for #PWR060, so ERC doesn't see the fault. The
+netlist diff from the unmodified board is exactly the L2 net merging
+into +3.3V. Baseline (`meta/muse-spark-1.3-contributor`, one run each):
+
+| Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|
+| debug | #2 (possible miswire, unverified) | 292 s | #1 is "normal start-up inrush vs the 0.5 A limit, bench artifact"; #2 recalls that L2 must not be on VOUT and gates any rework on the datasheet's pin table. No verified finding. The printed auto-check rank (#1) is a false match on #1's claims |
+| review | #1 (won't work) | 217 s | "U15 L2 shorted to VOUT - verify before any rework", from recall. #2 (may fail) is L1's 0.47 µH vs `DFE201612E-2R2M`; #3 an NRST pull-up false alarm (the STM32 has one inside) |
+
+Both find it only by recall, unverified; the debug run ranks it below a
+bench explanation. Step 3 is what makes it verified. The first review
+run failed on a gateway 503 ("PII detector is unavailable"); the re-run
+is the one recorded. `make lint` and `make test` pass (run as their
+sub-targets, make 3.81).
 Effort: 1–2 h.
 
 ## 2. A power tree: sources, rails, and which part feeds which: proposed
