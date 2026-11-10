@@ -145,6 +145,11 @@ def test_ratings_fall_back_without_facts():
     assert sc.ratings([_fact("Input voltage", 2.5, 3.3, 5.5)]).vin == pytest.approx(3.3)
 
 
+def test_ratings_take_a_rated_current_given_only_as_a_minimum():
+    # TPS63070: "output current: min 2 A (VIN >= 4.5 V ...)"
+    assert sc.ratings([_fact("output current", 2, None, None, "A")]).current == 2
+
+
 def test_supply_range_is_the_widest_that_holds_the_rail():
     facts = [
         _fact("Supply voltage VDD", 1.7, None, 3.6),
@@ -254,6 +259,32 @@ def test_regulators_that_cant_be_set_up_are_skipped_with_the_reason():
 def test_a_model_without_input_and_output_pins_isnt_a_regulator():
     files = _files(["A", "B", "GND"])
     assert sc.plan(_orbit(), _status(), files, _reading(), ["startup"]) is None
+
+
+def test_numbered_model_pins_meet_the_boards_repeated_pin_names():
+    # TPS63070's model has VIN_0, VIN_1, VOUT_0, VOUT_1; its symbol says VIN, VOUT.
+    pins = [*TPS_PINS[:-2], "VIN_0", "VIN_1", "VOUT_0", "VOUT_1"]
+    got = sc.plan(_orbit(), _status(), _files(pins), _reading(), ["startup"])
+    assert isinstance(got, list)
+    assert "XU15 0 vin n1 0 n2 n3 0 n4 vin vin out out TPS63802" in got[0].deck.splitlines()
+
+
+def test_a_driver_with_inputs_on_several_nets_isnt_a_regulator():
+    # DRV8837's IN1/IN2 and OUT1/OUT2 match the regulator pin names.
+    design = _design(
+        {"U7": "DRV8837", "U1": "ESP32"},
+        {
+            "+3V3": ["U7.1(VM)", "U7.8(VCC)", "U1.2(3V3)"],
+            "/IN1": ["U7.6(IN1)", "U1.10(IO1)"],
+            "/IN2": ["U7.5(IN2)", "U1.11(IO2)"],
+            "/Motor/J_MOTOR_OUT_P": ["U7.2(OUT1)"],
+            "/Motor/J_MOTOR_OUT_N": ["U7.3(OUT2)"],
+            "GND": ["U7.4(GND)", "U1.1(GND)"],
+        },
+    )
+    files = _files(["IN1", "IN2", "VCC", "VM", "GND", "OUT1", "OUT2"])
+    status = _status("U7", "DRV8837", value="DRV8837")
+    assert sc.plan(design, status, files, _reading(), ["startup"]) is None
 
 
 # --- verdicts ----------------------------------------------------------------

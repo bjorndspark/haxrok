@@ -202,7 +202,9 @@ def ratings(limits: Sequence[LimitFact]) -> Ratings:
         for m in _VIN_CONDITION.finditer(lim.conditions):
             conditions[float(m.group(1))] += 1
         if current is None and _CURRENT.search(p) and not _NOT_RATED.search(p):
-            current = _scaled(lim.max if lim.max is not None else lim.typ, lim.unit, "A")
+            # a rating may be only a guaranteed minimum ("min 2 A")
+            rated = next((b for b in (lim.max, lim.typ, lim.min) if b is not None), None)
+            current = _scaled(rated, lim.unit, "A")
         elif accuracy is None and _ACCURACY.search(p) and lim.unit.strip() == "%":
             bounds = [abs(b) for b in (lim.min, lim.max) if b is not None]
             accuracy = max(bounds) / 100 if bounds else None
@@ -321,19 +323,44 @@ def _value(letter: str, value: str) -> float | None:
     return None
 
 
+def _model_pin(board: dict[str, str], pin: str) -> str:
+    """A model pin's normalized name as the board names it: vendor models
+    number a function's repeated pins ("VIN_0", "VIN_1") where the symbol
+    repeats "VIN"."""
+    name = _norm(pin)
+    if name not in board and (m := re.fullmatch(r"(.+?)_\d+", pin)):
+        base = _norm(m.group(1))
+        if base in board:
+            return base
+    return name
+
+
+def _nets_of(board: dict[str, str], names: Sequence[str], pattern: re.Pattern[str]) -> set[str]:
+    """The board nets of the model pins whose names match ``pattern``."""
+    return {board[p] for p in names if pattern.fullmatch(p) and p in board}
+
+
 def _cut(
     design: Design, ref: str, m: ModelFiles, status: SpiceModelStatus, rate: Ratings
 ) -> _Cut | str | None:
     """The regulator's circuit, or why it can't be simulated; None when the
-    model has no input and output pin (not a regulator)."""
+    model isn't a single-rail regulator's: no input and output pin, or input
+    or output pins on more than one net (a driver's IN1/IN2, OUT1/OUT2)."""
     board: dict[str, str] = {}
     for pin, on in _pins_of(design, ref):
         board.setdefault(_norm(design.pin_name(f"{ref}.{pin}")), on)
-    names = [_norm(p) for p in m.pins]
+    names = [_model_pin(board, p) for p in m.pins]
     pin_in = next((p for p in names if _IN_PIN.fullmatch(p)), None)
     pin_out = next((p for p in names if _OUT_PIN.fullmatch(p)), None)
     if pin_in is None or pin_out is None or pin_in not in board or pin_out not in board:
         logger.info("spice circuits: %s's model %s has no input and output pin", ref, m.subckt)
+        return None
+    if len(_nets_of(board, names, _IN_PIN)) > 1 or len(_nets_of(board, names, _OUT_PIN)) > 1:
+        logger.info(
+            "spice circuits: %s's model %s has inputs or outputs on several nets; not a regulator",
+            ref,
+            m.subckt,
+        )
         return None
     net_in, net_out = board[pin_in], board[pin_out]
     vout = named_voltage(net_out)
