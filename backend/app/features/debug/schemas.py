@@ -192,12 +192,27 @@ class Analysis[C: Claim](_Strict):
 # --- datasheet facts (model output, one call per datasheet) -----------------------
 
 
+PinRole = Literal[
+    "supply_in", "supply_out", "ground", "switch", "feedback", "enable", "signal", "other"
+]
+"""What a pin is for, as ``roles`` checks it: power in or out, ground, a
+switch node (connects only to the power inductor), the feedback input that
+senses the output, an enable input, any other signal, or none of these."""
+
+
 class PinFact(_Strict):
     """What one pin of the board's package does, per the datasheet."""
 
     pin: str = Field(description="The pin number on the board's package, as listed to you.")
     name: str = Field(description='The datasheet\'s name for the pin, e.g. "BOOT0".')
     function: str = Field(description="What the pin does, in one short sentence.")
+    role: PinRole = Field(
+        description="supply_in: power into the IC. supply_out: the power it puts out. "
+        "ground. switch: a switch node, which the datasheet connects only to the power "
+        "inductor (SW, LX, L1, L2, PH). feedback: the input that senses the output for "
+        "regulation (FB), not a second divider pin. enable: an on/off input. signal: any "
+        "other input or output. other: none of these (NC, a capacitor-only pin)."
+    )
     page: int = Field(description="The page the pin is described on (=== Page N ===).")
 
 
@@ -392,10 +407,10 @@ class ErcEntry(BaseModel):
 
 
 class WiringFinding(BaseModel):
-    """A pin wired against its pin-table function, found by
-    ``pins.check_wiring`` before the model runs. Verified: it follows from the
-    netlist and the pin table alone. ``id`` (wf1, …) is how the model's input
-    names it."""
+    """A pin wired against its role, found by ``roles.check`` (or
+    ``pins.check_pinout``) before the model runs. Verified: it follows from
+    the netlist and the pins' roles (datasheet, pin table or pin name)
+    alone. ``id`` (wf1, …) is how the model's input names it."""
 
     id: str
     pin: str = Field(description="REF.PIN, e.g. U2.9.")
@@ -732,6 +747,10 @@ class DatasheetFactsEvent(BaseModel):
     datasheet_failures: list[DatasheetReadFailure]
     power: PowerTree | None = Field(
         default=None, description="The power tree again, with the datasheets' voltages."
+    )
+    wiring: list[WiringFinding] = Field(
+        description="The verified wiring findings again, rechecked with the datasheets' "
+        "pin roles and typical-application parts; they replace the summary's."
     )
 
 

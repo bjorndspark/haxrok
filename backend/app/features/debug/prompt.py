@@ -36,7 +36,7 @@ part, then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
 from the ICs' datasheets (ds1, ...: limits and typical application parts, \
 each with its page), deviations from those typical applications (dv1, ...), \
 verified findings (wf1, ...) the backend computed from \
-the netlist and pin table, reference notes (rd1, ...) copied from \
+the netlist and the pins' roles, reference notes (rd1, ...) copied from \
 manufacturers' reference designs and datasheets, values the backend \
 calculated from the netlist with datasheet formulas (cf1, ...), the power \
 tree the backend built from the netlist (each rail, its voltage, the part \
@@ -85,9 +85,12 @@ not recalled ones. Report each with its consequence and rank it on that; a \
 deviation that explains a symptom is a strong candidate.
 
 The verified findings are such faults, found by a deterministic check of the \
-netlist against the pin table (e.g. an inductor pin that shares a net with \
-anything but its inductor, or a transistor whose symbol numbers its pins \
-differently from the part, which puts its nets on the wrong pads). They are \
+netlist against each pin's role (from its datasheet, the pin table or its \
+name): a switch pin that shares a net with a rail or another IC's pin, a \
+feedback pin on ground or on a rail that isn't its IC's output, a \
+typical-application part whose two IC pins are joined on one net, or a \
+transistor whose symbol numbers its pins differently from the part, which \
+puts its nets on the wrong pads. They are \
 design errors, not hypotheses: never call one unverified or recalled. Work \
 out which symptoms each explains, including only under some conditions \
 (input voltage, load, mode), and rank it on that. A finding that explains \
@@ -233,7 +236,7 @@ then one per net: 'NET: REF.PIN(PIN_NAME) ...'), KiCad's ERC entries \
 from the ICs' datasheets (ds1, ...: limits and typical application parts, \
 each with its page), deviations from those typical applications (dv1, ...), \
 verified findings (wf1, ...) the backend computed from \
-the netlist and pin table, reference notes (rd1, ...) copied from \
+the netlist and the pins' roles, reference notes (rd1, ...) copied from \
 manufacturers' reference designs and datasheets, values the backend \
 calculated from the netlist with datasheet formulas (cf1, ...), and the \
 power tree the backend built from the netlist (each rail, its voltage, the \
@@ -389,7 +392,7 @@ def build_user_message(
             "against them, verified)\n" + deviations
         )
     parts += [
-        "## Verified findings (netlist checked against the pin table)\n" + findings,
+        "## Verified findings (netlist checked against the pins' roles)\n" + findings,
     ]
     if warnings:
         parts.append(
@@ -603,9 +606,11 @@ If the text doesn't say, leave the fact out.
 matches the footprint and pin count. pin is the board's pin number as \
 listed; name is the datasheet's name for it; function says what the pin \
 does in one short sentence, with the level or connection it needs (e.g. \
-"Boot mode select: low boots from main flash, high from system memory"). A \
-pin table covering several packages has one column per package: read the \
-board's.
+"Boot mode select: low boots from main flash, high from system memory"). \
+role is what the pin is for, from the pin description and the typical \
+application: a switch node goes only to the power inductor; feedback is the \
+input that senses the output for regulation. A pin table covering several \
+packages has one column per package: read the board's.
 - limits: the thresholds and limits a schematic depends on: absolute \
 maximum supply and pin voltages, the recommended operating supply range, \
 input logic thresholds, enable and undervoltage thresholds, reference or \

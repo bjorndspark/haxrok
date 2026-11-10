@@ -32,7 +32,13 @@ from app.core.errors import AppError
 from app.core.logging import get_logger
 from app.features.debug import pdf, pins, prompt
 from app.features.debug.design import Design, Part
-from app.features.debug.schemas import AppPart, DatasheetFacts, DatasheetStatus, LimitFact
+from app.features.debug.schemas import (
+    AppPart,
+    DatasheetFacts,
+    DatasheetStatus,
+    LimitFact,
+    PinRole,
+)
 
 logger = get_logger(__name__)
 
@@ -84,6 +90,8 @@ class DatasheetReading:
 
     # ref -> pin number -> (datasheet name, "function (p.N)"), for pins.lookup
     pins: dict[str, dict[str, tuple[str, str]]] = field(default_factory=dict)
+    # ref -> pin number -> its role, for the wiring rules (roles.check)
+    roles: dict[str, dict[str, PinRole]] = field(default_factory=dict)
     facts: list[Fact] = field(default_factory=list)
     # ref -> its typical application circuit, for application.check
     application: dict[str, list[AppPart]] = field(default_factory=dict)
@@ -154,6 +162,7 @@ class FactReader:
                 reading.pins[sheet.ref] = {
                     p.pin: (p.name, f"{p.function} (p.{p.page})") for p in got.pins
                 }
+                reading.roles[sheet.ref] = {p.pin: p.role for p in got.pins}
             if got.application:
                 reading.application[sheet.ref] = got.application
             if got.limits:

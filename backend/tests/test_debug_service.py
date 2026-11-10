@@ -995,7 +995,11 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
     async def extract(system: str, user: str) -> DatasheetFacts:
         assert "9: L2" in user and "=== Page 4 ===" in user
         return DatasheetFacts(
-            pins=[PinFact(pin="9", name="L2", function="Output-side switch node.", page=4)],
+            pins=[
+                PinFact(
+                    pin="9", name="L2", function="Output-side switch node.", role="switch", page=4
+                )
+            ],
             limits=[
                 LimitFact(
                     parameter="VIN input voltage",
@@ -1127,11 +1131,14 @@ async def test_datasheet_facts_names_a_datasheet_that_couldnt_be_read():
         async for e in service.stream(prepared, service.Model(_diagnose, _structure), facts=reader)
     ]
     sheet = next(data for name, data in events if name == "datasheet_facts")
+    # With nothing read, the wiring findings are prepare()'s, sent again
+    # because the browser's summary takes the event's list.
     assert sheet == {
         "datasheet_facts": [],
         "deviations": [],
         "datasheet_failures": [{"ref": "U2", "reason": "the PDF has no text (a scan?)"}],
         "power": {"rails": [], "parts": [], "battery_override": False},
+        "wiring": [f.model_dump() for f in prepared.pin_lookup.findings],
     }
 
 

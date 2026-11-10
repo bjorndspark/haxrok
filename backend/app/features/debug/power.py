@@ -18,8 +18,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from app.features.debug.calc import is_ground, named_voltage
-from app.features.debug.design import Design, short_net_name
-from app.features.debug.pins import is_inductor
+from app.features.debug.design import Design, is_inductor, short_net_name
 from app.features.debug.schemas import (
     Calculation,
     LimitFact,

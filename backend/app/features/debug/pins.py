@@ -12,23 +12,32 @@ their symbols name pins after the datasheet (D, G, S), so the names the
 netlist carries are compared with the datasheet's numbering.
 
 Pins read from an IC's own datasheet (``facts.FactReader``) replace its
-lines here; this table is the fallback where no datasheet was read, and
-``check_wiring`` still runs on it.
+lines here; this table is the fallback where no datasheet was read. Its
+``inductor_pins`` give those pins the switch role ``roles.check`` holds them
+to when no datasheet says otherwise.
 """
 
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from app.features.debug.design import Design, Label, Part, short_net_name
-from app.features.debug.schemas import ErcEntry, IcSummary, PinWarning, WiringFinding
+from app.features.debug import roles
+from app.features.debug.design import Design, Label, Part, is_ic
+from app.features.debug.schemas import (
+    AppPart,
+    ErcEntry,
+    IcSummary,
+    PinRole,
+    PinWarning,
+    WiringFinding,
+)
 
 
 @dataclass(frozen=True)
 class PartPins:
     """One part's pin table. ``pins`` maps pin number to (datasheet name,
     function). ``inductor_pins`` are the pins the datasheet says connect
-    only to the power inductor (switch nodes), which ``check_wiring`` holds
+    only to the power inductor (switch nodes), which ``roles.check`` holds
     to that."""
 
     value_prefix: str
@@ -254,18 +263,15 @@ class PinLookup:
     ics: list[IcSummary]
     pin_refs: frozenset[str]  # REF.PIN covered by the table, for the checker
     text: str  # what the model reads
-    findings: list[WiringFinding]  # from check_wiring and check_pinout, verified
+    findings: list[WiringFinding]  # from roles.check and check_pinout, verified
     warnings: list[PinWarning]  # from check_convention, unverified
-
-
-def is_ic(ref: str) -> bool:
-    """Reference designators KiCad uses for ICs (U1, IC3)."""
-    head = ref.rstrip("0123456789")
-    return head in {"U", "IC"} and head != ref
 
 
 DatasheetPins = Mapping[str, dict[str, tuple[str, str]]]
 """ref -> pin number -> (datasheet name, function), read from its datasheet."""
+
+DatasheetRoles = Mapping[str, Mapping[str, PinRole]]
+"""ref -> pin number -> its role, read from its datasheet."""
 
 
 def lookup(
@@ -273,17 +279,22 @@ def lookup(
     erc: Sequence[ErcEntry] = (),
     labels: Sequence[Label] = (),
     datasheet_pins: DatasheetPins | None = None,
+    datasheet_roles: DatasheetRoles | None = None,
+    application: Mapping[str, Sequence[AppPart]] | None = None,
 ) -> PinLookup:
-    """Match every IC on the board against the pin table. ``erc`` and
+    """Match every IC on the board against the pin table, and check its
+    wiring against its pins' roles (``roles.check``). ``erc`` and
     ``labels`` let a wiring finding name the label behind it. An IC in
     ``datasheet_pins`` is listed from its own datasheet instead of the
-    table (the wiring checks still use the table)."""
+    table; ``datasheet_roles`` and ``application`` (its typical-application
+    parts) are what that datasheet says, for the wiring rules."""
     ics: list[IcSummary] = []
     pin_refs: set[str] = set()
     lines: list[str] = []
     findings: list[WiringFinding] = []
     warnings: list[PinWarning] = []
     used_pins = {n.pin_ref for nodes in design.nets.values() for n in nodes}
+    assigned: dict[str, dict[str, roles.Pin]] = {}
     for part in sorted(design.parts.values(), key=lambda p: _ref_key(p.ref)):
         if not is_ic(part.ref):
             pinout = next((p for p in PINOUTS if p.matches(part.value, part.footprint)), None)
@@ -305,12 +316,20 @@ def lookup(
                 pin_data=entry is not None or bool(read),
             )
         )
-        if entry is not None:
-            findings += check_wiring(design, part.ref, entry, erc, labels)
+        assigned[part.ref] = roles.assign(
+            design,
+            part.ref,
+            datasheet=read,
+            datasheet_roles=(datasheet_roles or {}).get(part.ref),
+            table=entry.pins if entry else None,
+            table_switch=entry.inductor_pins if entry else (),
+            table_source=entry.source if entry else "",
+        )
         if read:
             lines += _table_lines(part, "its datasheet", read, used_pins, pin_refs)
         elif entry is not None:
             lines += _table_lines(part, entry.source, entry.pins, used_pins, pin_refs)
+    findings += roles.check(design, assigned, erc, labels, application)
     missing = [ic.ref for ic in ics if not ic.pin_data]
     if missing:
         lines.append(f"No pin table for: {', '.join(missing)}.")
@@ -352,7 +371,7 @@ def check_pinout(design: Design, ref: str, pinout: Pinout) -> list[WiringFinding
     netlist) other than the datasheet's terminal for that pin number. Pins
     the symbol leaves unnamed can't be judged and are skipped.
 
-    Deterministic, like ``check_wiring``. It exists because a board's
+    Deterministic, like ``roles.check``. It exists because a board's
     AO3400s were drawn with Simulation_SPICE:NMOS (1=D, 2=G, 3=S) on a SOT-23
     footprint (1=G, 2=S, 3=D): every pad wrong, and nothing caught it.
     """
@@ -437,159 +456,16 @@ def format_warnings(warnings: list[PinWarning]) -> str:
     return "\n".join(f"{w.id}: {w.text}" for w in warnings) + "\n"
 
 
-# How many other pins a finding names before it says "and N more": a
-# shorted power rail can carry 40-odd pins.
-_MAX_LISTED = 6
-
-
-def check_wiring(
-    design: Design,
-    ref: str,
-    entry: PartPins,
-    erc: Sequence[ErcEntry] = (),
-    labels: Sequence[Label] = (),
-) -> list[WiringFinding]:
-    """Flag each inductor pin of ``ref`` whose net reaches anything but an
-    inductor (or a test point), or no inductor at all. When the ERC shows a
-    label merged into that net, the finding names it as the likely cause.
-
-    Deterministic, from the netlist and the pin table only, so a finding is
-    verified, not the model's reasoning. It exists because the model saw an
-    L2 pin on the output rail, but treated "a switch node must
-    be its own net" as recalled topology and ranked the short low.
-    """
-    findings: list[WiringFinding] = []
-    for number in sorted(entry.inductor_pins, key=int):
-        pin_ref = f"{ref}.{number}"
-        net = design.net_of(pin_ref)
-        if net is None:
-            continue  # unconnected: KiCad's ERC reports that
-        others = [n for n in design.nets[net] if n.pin_ref != pin_ref]
-        inductors = [n for n in others if is_inductor(design, n.ref)]
-        foreign = [n for n in others if not is_inductor(design, n.ref) and _ref_head(n.ref) != "TP"]
-        if not foreign and inductors:
-            continue
-        name = entry.pins[number][0]
-        # The IC's own pins first, then other ICs': L2 on VOUT is the
-        # telling part, not the decoupling capacitors.
-        foreign.sort(key=lambda n: (n.ref != ref, not is_ic(n.ref), _ref_key(n.ref), n.pin))
-        listed = [f"{n.pin_ref}({n.function})" if n.function else n.pin_ref for n in foreign]
-        more = len(listed) - _MAX_LISTED
-        shown = ", ".join(listed[:_MAX_LISTED]) + (f" and {more} more pins" if more > 0 else "")
-        if foreign:
-            problem = f"but its net {net} also connects {shown}"
-        else:
-            problem = f"but its net {net} has no inductor on it"
-        findings.append(
-            WiringFinding(
-                id="",
-                pin=pin_ref,
-                pin_name=name,
-                net=net,
-                conflicts=[n.pin_ref for n in foreign],
-                inductors=[n.pin_ref for n in inductors],
-                nets=[net],
-                text=(
-                    f"{pin_ref} ({name}) is an inductor connection ({entry.source}), "
-                    f"{problem}. It should connect only to its inductor."
-                    + "".join(
-                        f" {cause}" for cause in label_causes(design, ref, name, net, erc, labels)
-                    )
-                ),
-            )
-        )
-    return findings
-
-
-# "Both +3V3 and SW2 are attached to the same items; +3V3 will be used
-# in the netlist": KiCad's multiple_net_names wording.
-_MERGED = re.compile(r"Both (.+?) and (.+?) are attached to the same items")
-
-
-def label_causes(
-    design: Design,
-    ref: str,
-    pin_name: str,
-    net: str,
-    erc: Sequence[ErcEntry],
-    labels: Sequence[Label],
-) -> list[str]:
-    """Sentences naming each label the ERC reports merged into ``net`` on
-    ``ref``'s sheet, the likely cause of a short there.
-
-    The netlist can't show this: a label joined to a power net takes the
-    power net's name and vanishes. It exists because a private board's L2
-    pin sat on +3V3 through a second L2-node label placed on VOUT, and the
-    model, seeing only the netlist, told the user to rewire the inductor.
-    The ERC said so, but as one of 24 benign-looking warnings.
-    """
-    short = short_net_name(net)
-    sheet = design.parts[ref].sheet if ref in design.parts else ""
-    hits: list[tuple[ErcEntry, str]] = []
-    for e in erc:
-        m = _MERGED.match(e.message)
-        if e.rule != "multiple_net_names" or not m or short not in m.groups():
-            continue
-        if sheet and e.sheet != sheet:
-            continue  # a label on another sheet joined a global net, not this pin's
-        hits.append((e, m.group(2) if m.group(1) == short else m.group(1)))
-    # A label named after the flagged pin (SW_L2 for L2) is the telling
-    # one; when there is one, the rest are naming noise.
-    named = [h for h in hits if _names_pin(h[1], pin_name)]
-    return [_cause(e, merged, short, pin_name, labels) for e, merged in (named or hits)[:3]]
-
-
-def _names_pin(label: str, pin_name: str) -> bool:
-    return pin_name.upper() in re.split(r"[^A-Z0-9]+", label.upper())
-
-
-def _cause(e: ErcEntry, merged: str, short: str, pin_name: str, labels: Sequence[Label]) -> str:
-    label = next((lb for lb in labels if lb.uuid in e.uuids and lb.name == merged), None)
-    if label is None:
-        return (
-            f"Likely cause: {e.id} reports the label {merged} attached to {short} items "
-            f"on sheet {e.sheet}; a misplaced label joins nets without any wire."
-        )
-    # Same-named labels join their wires: local and hierarchical ones within
-    # their sheet, global ones across the whole design.
-    peers = [
-        lb
-        for lb in labels
-        if lb.name == merged
-        and lb.kind == label.kind
-        and lb.uuid != label.uuid
-        and (lb.kind == "global_label" or lb.file == label.file)
-    ]
-    here = f"the {merged} label at ({label.x:g}, {label.y:g}) mm on {label.file}"
-    if not peers:
-        return (
-            f"Likely cause: {e.id} reports {here} attached to {short} items; "
-            "check that the label belongs there."
-        )
-    others = ", ".join(f"({lb.x:g}, {lb.y:g})" for lb in peers)
-    return (
-        f"Likely cause: {e.id} reports {here} attached to {short} items, and another "
-        f"{merged} label sits at {others} mm. Same-named labels join their wires, so if "
-        f"that one is on the {pin_name} node, this label is what shorts it to {short}: "
-        "fix or remove the label, not the wiring."
-    )
-
-
 def format_findings(findings: list[WiringFinding]) -> str:
     """The findings as the model reads them, with ids."""
     if not findings:
         return (
-            "(none: no inductor pin in the pin table shares a net with anything else, "
-            "and no transistor's symbol pins disagree with its datasheet pinout)\n"
+            "(none: no switch pin shares a net with a rail or another IC's pin, no "
+            "feedback pin is on ground or another rail, no typical-application part "
+            "is shorted, and no transistor's symbol pins disagree with its datasheet "
+            "pinout)\n"
         )
     return "\n".join(f"{f.id}: {f.text}" for f in findings) + "\n"
-
-
-def is_inductor(design: Design, ref: str) -> bool:
-    """An inductor by designator (L3) or by symbol (Device:L_Small)."""
-    part = design.parts.get(ref)
-    lib_name = part.lib_part.rsplit(":", 1)[-1].upper() if part else ""
-    return _ref_head(ref) == "L" or lib_name == "L" or lib_name.startswith("L_")
 
 
 def pin_order(number: str) -> tuple[bool, int, str]:

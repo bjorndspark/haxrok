@@ -12,9 +12,8 @@ names.
 
 from collections import Counter
 
-from app.features.debug.design import Design, normalize_pin
+from app.features.debug.design import Design, is_ic, is_inductor, normalize_pin
 from app.features.debug.evidence import mentioned_pins
-from app.features.debug.pins import is_ic, is_inductor
 from app.features.debug.schemas import (
     Calculation,
     CheckedClaim,

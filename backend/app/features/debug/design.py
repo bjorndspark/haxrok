@@ -96,6 +96,19 @@ class Design:
         return {short: full[0] for short, full in self._by_short_name.items() if len(full) == 1}
 
 
+def is_ic(ref: str) -> bool:
+    """Reference designators KiCad uses for ICs (U1, IC3)."""
+    head = ref.rstrip("0123456789")
+    return head in {"U", "IC"} and head != ref
+
+
+def is_inductor(design: Design, ref: str) -> bool:
+    """An inductor by designator (L3) or by symbol (Device:L_Small)."""
+    part = design.parts.get(ref)
+    lib_name = part.lib_part.rsplit(":", 1)[-1].upper() if part else ""
+    return ref.rstrip("0123456789") == "L" or lib_name == "L" or lib_name.startswith("L_")
+
+
 def short_net_name(name: str) -> str:
     return name.rstrip("/").rsplit("/", 1)[-1]
 

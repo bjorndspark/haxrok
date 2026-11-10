@@ -43,8 +43,7 @@ from app.features.debug.calc import (
     parse_farads,
     parse_ohms,
 )
-from app.features.debug.design import Design, Part, short_net_name
-from app.features.debug.pins import is_inductor
+from app.features.debug.design import Design, Part, is_inductor, short_net_name
 from app.features.debug.schemas import AppPart, AppPartKind
 
 # Enough to cover every IC of a typical board, few enough that an MCU whose

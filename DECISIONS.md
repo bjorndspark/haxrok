@@ -346,7 +346,7 @@ go/no-go says nothing about the app; `make eval-app` does run them.
 
 ## Wiring faults the pin table proves are found by code, not the model
 
-**Decision:** before the model runs, `pins.check_wiring` checks the
+**Decision:** before the model runs, a check (now `roles.check`) tests the
 netlist against the pin table. A pin the table marks as an inductor
 connection (TPS63070 L1/L2) that shares a net with anything but an
 inductor or a test point becomes a verified finding (`wf1`, …). It goes
@@ -378,10 +378,24 @@ private board (not in the repo): its fault ranked #1 in 2 of 2
 hedging; `rp-micro-no-fault` still claimed no schematic fault. Datasheet
 retrieval (see above) is what widens the check to other parts.
 
+**Pin roles (added later, plan 005 step 3):** the check now runs on every
+IC, against each pin's role: from its datasheet (the facts extraction
+returns one per pin), else the pin table's inductor pins, else its name
+(SW, LX, L1, L2; FB; VIN, VOUT, GND). Three rules: a switch node on a rail
+or another IC's pin, a feedback pin on ground or on a rail that isn't its
+IC's output, and a typical-application part whose two power pins are
+joined. A role from the name alone is trusted less: a switch name counts
+only on an IC with a feedback or VOS pin, and a name-only FB on ground stays
+quiet, since fixed-output versions ground it. That keeps false positives
+down at the cost of missing a regulator with neither unless its
+datasheet is read. `orbit-l2-shorted` now gets its finding from U15's pin
+names, and the other seven eval boards get none, so the no-fault case is
+quiet by test, not by construction.
+
 **Label causes (added later):** a short is often a label, not a wire. A
 second same-named label placed on the wrong node joins two nets, the
 power symbol's name wins, and the netlist keeps no trace of the label.
-So when `check_wiring` flags a pin, `pins.label_causes` looks for KiCad
+So when `roles.check` flags a pin, `roles.label_causes` looks for KiCad
 ERC `multiple_net_names` entries that merged a label into that net on the
 IC's sheet. It prefers a label named after the pin (`SW_L2` for L2),
 then finds the label in the uploaded sheets by the ERC item's uuid

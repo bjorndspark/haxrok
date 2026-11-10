@@ -45,6 +45,7 @@ from app.features.debug import (
 from app.features.debug.datasheet import DatasheetFinder
 from app.features.debug.design import (
     Design,
+    Label,
     compact,
     format_erc,
     parse_erc,
@@ -79,6 +80,7 @@ from app.features.debug.schemas import (
     SimAnalysis,
     Simulation,
     Symptom,
+    WiringFinding,
 )
 from app.features.debug.spice_models import SpiceModelFinder
 
@@ -114,6 +116,7 @@ class Prepared:
     design: Design
     erc: list[ErcEntry]
     pin_lookup: pins.PinLookup
+    labels: list[Label]  # the schematic's net labels, for the wiring findings' causes
     references: list[ReferenceNote]
     calculations: list[Calculation]
     symptoms: list[Symptom]
@@ -157,7 +160,8 @@ async def prepare(
         erc = parse_erc(output.erc)
     except ValueError as e:
         raise BadRequestError(f"Couldn't parse kicad-cli's output: {e}") from e
-    lookup = pins.lookup(design, erc, parse_labels(project.files))
+    labels = parse_labels(project.files)
+    lookup = pins.lookup(design, erc, labels)
     notes = reference.lookup(design)
     calcs = calc.lookup(design)
     ic_parts = [design.parts[ic.ref] for ic in lookup.ics]
@@ -193,6 +197,7 @@ async def prepare(
         design,
         erc,
         lookup,
+        labels,
         notes,
         calcs,
         symptoms,
@@ -386,15 +391,22 @@ async def _review(
             "(once per part, then cached).",
         )
     reading = await reading_task
-    # Pins read from a datasheet replace that IC's hand-written table lines;
-    # the wiring findings stay the ones prepare() made from the table.
+    # Pins read from a datasheet replace that IC's hand-written table lines,
+    # and its pin roles and typical application recheck the wiring.
     table = (
-        pins.lookup(prepared.design, datasheet_pins=reading.pins)
-        if reading.pins
+        pins.lookup(
+            prepared.design,
+            prepared.erc,
+            prepared.labels,
+            datasheet_pins=reading.pins,
+            datasheet_roles=reading.roles,
+            application=reading.application,
+        )
+        if reading.pins or reading.application
         else prepared.pin_lookup
     )
     with_data = sum(1 for ic in table.ics if ic.pin_data)
-    conflicts = len(prepared.pin_lookup.findings)
+    conflicts = len(table.findings)
     plural = "s" if conflicts > 1 else ""
     found = f" {conflicts} pin{plural} wired against the datasheet." if conflicts else ""
     n_warn = len(prepared.pin_lookup.warnings)
@@ -427,7 +439,8 @@ async def _review(
     )
     if facts is not None and found_sheets:
         yield _event(
-            "datasheet_facts", _datasheet_facts(reading, deviations, tree).model_dump_json()
+            "datasheet_facts",
+            _datasheet_facts(reading, deviations, tree, table.findings).model_dump_json(),
         )
     yield _progress(
         "pin_lookup",
@@ -447,7 +460,7 @@ async def _review(
         netlist=compact(prepared.design),
         erc=format_erc(prepared.erc),
         pin_table=table.text,
-        findings=pins.format_findings(prepared.pin_lookup.findings),
+        findings=pins.format_findings(table.findings),
         warnings=pins.format_warnings(prepared.pin_lookup.warnings),
         references=reference.format_notes(prepared.references),
         calculations=calc.format_calculations(prepared.calculations),
@@ -505,7 +518,7 @@ async def _review(
         datasheet_ids=reading.ids | {d.id for d in deviations},
     )
     checked = check(analysis, ctx)
-    miswired = diagram.miswired_pins(prepared.pin_lookup.findings, prepared.calculations)
+    miswired = diagram.miswired_pins(table.findings, prepared.calculations)
     checked.diagrams = {
         h.id: d for h in checked.hypotheses if (d := diagram.build(h, prepared.design, miswired))
     }
@@ -591,12 +604,17 @@ def _progress(stage: str, message: str) -> SseEvent:
 
 
 def _datasheet_facts(
-    reading: DatasheetReading, deviations: list[application.Deviation], tree: PowerTree
+    reading: DatasheetReading,
+    deviations: list[application.Deviation],
+    tree: PowerTree,
+    wiring: list[WiringFinding],
 ) -> DatasheetFactsEvent:
     """The datasheet_facts event: what claims can cite, and the power tree
-    rebuilt with the datasheets' voltages, for the browser."""
+    and wiring findings rebuilt with what the datasheets said, for the
+    browser."""
     return DatasheetFactsEvent(
         power=tree,
+        wiring=wiring,
         datasheet_facts=[
             DatasheetLine(id=f.id, ref=f.ref, page=f.page, text=f.body) for f in reading.facts
         ],

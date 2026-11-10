@@ -47,9 +47,8 @@ from app.features.debug.calc import (
     parse_farads,
     parse_ohms,
 )
-from app.features.debug.design import Design
+from app.features.debug.design import Design, is_inductor
 from app.features.debug.facts import DatasheetReading
-from app.features.debug.pins import is_inductor
 from app.features.debug.schemas import (
     LimitFact,
     SimAnalysis,

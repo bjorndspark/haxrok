@@ -153,7 +153,7 @@ against its part number, and #3 a CP2102 back-drive (may fail).
 323 backend tests, 46 frontend.
 Effort: 3–5 h.
 
-## 3. Pins the datasheet keeps apart, joined on the board (verified): proposed
+## 3. Pins the datasheet keeps apart, joined on the board (verified): done
 
 - Each IC pin gets a role from its datasheet facts: supply in, supply
   out, ground, switch node, feedback, enable, signal, … (the fact
@@ -168,9 +168,55 @@ Effort: 3–5 h.
 
 Decided (2026-11-11): roles come from the datasheet extraction, with
 pin-name rules as the fallback where the extraction gives none.
+Decided (2026-11-11, default taken in loop): the roles and the three rules
+live in `debug/roles.py` (`roles.assign`, `roles.check`), replacing
+`pins.check_wiring`; `pins.lookup` assigns every IC's roles and runs them.
+A pin's role is its datasheet's first, then the pin table's inductor pins,
+then its name (SW, LX, L1, L2, PH; FB; VIN, VDD, VOUT, GND, …), and the
+finding cites which. A switch role from the name alone counts only on an
+IC that also has a feedback or VOS pin, so a microcontroller's "SW" button
+input or an analog switch's "L1" stays quiet; such a pin isn't flagged
+for a missing inductor either, only for a rail or another IC on its net.
+Decided (2026-11-11, default taken in loop): a feedback pin is flagged on
+a rail that isn't its IC's own output (its VOUT net, the far end of its
+inductor, one hop on through R, L, FB or D), and on ground only when the
+role comes from a datasheet or the table and its function doesn't say to
+ground it, since some fixed-output versions ground FB. A divider node is
+never a rail, so a wrong divider ratio stays `calc.py`'s business.
+Decided (2026-11-11, default taken in loop): a required typical-application
+capacitor, inductor, diode or crystal is shorted when two of its IC pins
+share a net and both have power roles (supply, ground, switch, feedback)
+that differ; EN, MODE or a signal pin tied to VIN or GND is how
+datasheets draw it, and FB on its own VOUT is a fixed-output version.
+Decided (2026-11-11, default taken in loop): `calc.py`'s EN-on-own-output
+check (`_enable_loop`) stays there: no rule here covers an enable pin, and
+it already reports as a calculation the review cites.
+Decided (2026-11-11, default taken in loop): the rules run at upload from
+the table and names, then again once the datasheets are read; the
+`datasheet_facts` event always carries the rechecked findings (`wiring`),
+which replace the summary's, as the power tree does. The review prompt and
+the diagrams get the rechecked ones.
 
-**Checks:** unit tests per rule; `orbit-l2-shorted` caught as verified;
-`rp-micro-no-fault` review stays PASS; the private board's U5.9 flagged.
+**Checks:** 12 unit tests in `test_debug_roles.py`: pin-name roles (and
+KiCad 10's `L2_7` names), the orbit-l2-shorted shape flagged by name with
+U15's own VOUT and FB listed first and quiet when wired right, a switch
+node on another IC, a correct buck (bootstrap cap, catch diode, divider)
+quiet, an MCU's "SW" quiet, FB on another rail flagged and on its own
+output quiet, FB on ground flagged only by a datasheet that doesn't say to
+ground it, a shorted input capacitor flagged, EN tied to VIN and a
+feed-forward cap on the own output quiet. Writing them found the output
+hop walking back through the buck's own inductor onto its switch node;
+fixed. The service test now expects the event's `wiring`. On all 8 eval
+boards without datasheets (the eval path reads none, so roles there come
+from the table and names): only orbit-l2-shorted's U15.7 is flagged;
+HEAD's `check_wiring` flagged nothing on any of them, the TPS63802 not
+being in the table. `make eval-app case=orbit-l2-shorted`: #1 VERIFIED,
+citing U15.7, 221 s; `mode=review`: L2 still #1 (will fail), citing
+U15.7, 245 s (311 s at step 2). `rp-micro-no-fault` review: PASS (no
+issues), 86 s. The datasheet-role path is covered by the unit and service
+tests only. The private board's project isn't on this machine, so U5.9
+being flagged is left for the review. `make lint` and `make test` pass
+(sub-targets, make 3.81): 335 backend tests, 46 frontend.
 Effort: 4–6 h.
 
 ## 4. Each pin's voltage against its datasheet limits (verified): proposed

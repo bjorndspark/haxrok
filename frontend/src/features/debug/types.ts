@@ -142,8 +142,9 @@ export interface ErcEntry {
   items: string[]
 }
 
-/** A pin wired against its pin-table function, found by the backend before
- *  the model runs (pins.check_wiring). Verified, not the model's reasoning. */
+/** A pin wired against its role (datasheet, pin table or pin name), found by
+ *  the backend before the model runs (roles.check, pins.check_pinout).
+ *  Verified, not the model's reasoning. */
 export interface WiringFinding {
   id: string
   pin: string
@@ -398,6 +399,9 @@ export interface DatasheetFacts {
   datasheet_failures: DatasheetReadFailure[]
   /** Rebuilt with the datasheets' output voltages. Absent in older runs. */
   power?: PowerTree | null
+  /** Rechecked with the datasheets' pin roles; replaces the summary's.
+   *  Absent in older runs, which keep the summary's. */
+  wiring?: WiringFinding[]
 }
 
 export interface DesignSummary {

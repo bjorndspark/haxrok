@@ -151,10 +151,13 @@ def _limit(parameter: str, lo: float | None, hi: float | None, page: int) -> Lim
 
 MCU_FACTS = DatasheetFacts(
     pins=[
-        PinFact(pin="44", name="BOOT0", function="Selects the boot memory.", page=33),
-        PinFact(pin="44", name="BOOT0", function="A duplicate.", page=33),
-        PinFact(pin="1", name="VDD", function="Digital supply.", page=99),  # not sent
-        PinFact(pin="12", name="PA2", function="GPIO.", page=33),  # not on the board
+        PinFact(
+            pin="44", name="BOOT0", function="Selects the boot memory.", role="signal", page=33
+        ),
+        PinFact(pin="44", name="BOOT0", function="A duplicate.", role="signal", page=33),
+        # not sent
+        PinFact(pin="1", name="VDD", function="Digital supply.", role="supply_in", page=99),
+        PinFact(pin="12", name="PA2", function="GPIO.", role="signal", page=33),  # not on the board
     ],
     limits=[
         _limit("VDD supply voltage", 2.4, 3.6, 44),
@@ -190,7 +193,7 @@ VDDA = AppPart(
 )
 
 LDO_FACTS = DatasheetFacts(
-    pins=[PinFact(pin="5", name="VOUT", function="Regulated output.", page=2)],
+    pins=[PinFact(pin="5", name="VOUT", function="Regulated output.", role="supply_out", page=2)],
     limits=[_limit("Input voltage", 2.2, 5.5, 3)],
     application=[],
 )
