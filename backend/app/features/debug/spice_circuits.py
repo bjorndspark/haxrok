@@ -555,8 +555,13 @@ def _source_said(tree: PowerTree, c: Chain, vin: float, corner: Corner = NOMINAL
         how = " (the review form's)"
     elif rail.min is not None and rail.max is not None and rail.min != rail.max:
         how = f" (the middle of {_v(rail.min)}–{_v(rail.max)})"
+    elif c.kind == "usb":
+        # VBUS is taken as exactly 5 V (power.py's _USB), not its 4.75–5.25 V
+        # tolerance, so say it's assumed and that no corner sweeps it.
+        how = " (USB's nominal, assumed; no min or max run)"
     else:
-        how = ""
+        # A single voltage has no range for the min and max corners.
+        how = " (one value; no min or max run)"
     what = {
         "battery": "the battery",
         "usb": "USB",

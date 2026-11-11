@@ -462,7 +462,10 @@ def test_without_a_battery_the_chain_runs_from_usb():
     d.nets["+BATT"].append(Node("U15", "2", "EN"))
     (job,) = _chain_jobs(tree, design=Design(d.parts, d.nets))
     assert "V_sw_U3 c0 vin 0" in job.deck.splitlines()
-    assert job.limits.setup.startswith("From USB VBUS at 5.000 V, as an ideal source through U3")
+    assert job.limits.setup.startswith(
+        "From USB VBUS at 5.000 V (USB's nominal, assumed; no min or max run), "
+        "as an ideal source through U3"
+    )
 
 
 def test_the_chain_stops_at_an_upstream_regulators_rail():
@@ -486,7 +489,9 @@ def test_the_chain_stops_at_an_upstream_regulators_rail():
     got = sc.plan(_orbit(), _status(), _files(), _reading(), ["startup"], tree)
     assert isinstance(got, list)
     assert "Rload out lsw 10" in got[0].deck
-    assert got[0].limits.setup.startswith("From U2's output +5V at 5.000 V, as an ideal source")
+    assert got[0].limits.setup.startswith(
+        "From U2's output +5V at 5.000 V (one value; no min or max run), as an ideal source"
+    )
 
 
 def test_a_model_without_input_and_output_pins_isnt_a_regulator():
