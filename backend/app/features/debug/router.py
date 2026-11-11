@@ -35,6 +35,7 @@ from app.features.debug.schemas import (
     Simulation,
 )
 from app.features.debug.spice import Ngspice
+from app.features.debug.spice_cache import CachedRunner
 from app.features.debug.spice_models import SpiceModels, SpiceModelStore
 
 router = APIRouter(prefix="/debug", tags=["debug"])
@@ -176,7 +177,7 @@ async def analyze(
             service.Model(diagnose=_diagnose, structure=_structure),
             ngspice,
             FactReader(_extract, RedisFactsCache()),
-            Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S),
+            CachedRunner(Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S)),
         )
     )
 

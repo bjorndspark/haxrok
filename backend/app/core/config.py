@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     # A vendor model's circuit (a switching regulator's start-up) runs for
     # minutes: orbit's TPS63802 takes 10-12 (plan 004 step 6).
     NGSPICE_MODEL_TIMEOUT_S: float = 900.0
+    # All of one request's vendor-model runs (plan 006 step 4): a run still
+    # queued when this runs out is skipped; one already going finishes.
+    SPICE_BUDGET_S: float = 1800.0
+    # The bench supply's current limit in the extra start-up run, A (assumed;
+    # the review form doesn't ask for it).
+    BENCH_CURRENT_LIMIT_A: float = 1.0
+    # Seconds a finished vendor-model run stays cached in Redis, keyed by the
+    # deck, the model files and ngspice's version; 0 = always run ngspice.
+    SPICE_CACHE_TTL_S: int = 30 * 24 * 3600
     # Each IC's datasheet PDF, kept by part number (git-ignored data/ is
     # bind-mounted at /app/data). The timeout is per request; a part may
     # take three. PDFs over the size cap count as not found.

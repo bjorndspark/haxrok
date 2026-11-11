@@ -247,7 +247,10 @@ them: each IC's datasheet and SPICE model looked up by its value, then
 `spice_circuits.simulate`. A compact netlist drops the schematic's
 Datasheet field, so a case gives the URLs the finders start from in
 `parts.txt` (`U15 https://…` per line); without one, no part is found. It writes `app-simulations.json` and prints
-each verdict. Switching models take minutes per run.
+each verdict. Switching models take minutes per run. Start-up runs at
+the source's nominal, from a current-limited bench supply, and at its min
+and max. Finished runs are cached in Redis (`SPICE_CACHE_TTL_S`), so a
+repeat of an unchanged case reads them back in seconds.
 
 Answers go to `results/<case>/<model>/app-diagnosis.md` and
 `app-analysis.json`. The rank it prints is where the `Auto-check:`

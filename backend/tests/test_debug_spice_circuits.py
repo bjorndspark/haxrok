@@ -3,6 +3,7 @@ the netlist, the decks, the verdicts against the datasheet limits, and
 running them (plan 004 step 6)."""
 
 import dataclasses
+import itertools
 import shutil
 
 import pytest
@@ -144,10 +145,13 @@ ORBIT_SETUP = (
 )
 
 
-def _jobs(analyses=("startup",), design: Design | None = None, **kw) -> list[sc.Job]:
+def _jobs(
+    analyses=("startup",), design: Design | None = None, corner: str | None = "nominal", **kw
+) -> list[sc.Job]:
+    """The orbit's planned decks at ``corner`` (None: every corner's)."""
     got = sc.plan(design or _orbit(), _status(), _files(), _reading(**kw), analyses)
     assert isinstance(got, list)
-    return got
+    return [j for j in got if corner is None or j.corner == corner]
 
 
 # --- ratings -----------------------------------------------------------------
@@ -395,11 +399,15 @@ def _muxed_tree(battery=(3.0, 4.2), budget: RailBudget | None = None, **kw) -> P
 
 
 def _chain_jobs(
-    tree: PowerTree, analyses=("startup",), design: Design | None = None
+    tree: PowerTree,
+    analyses=("startup",),
+    design: Design | None = None,
+    corner: str | None = "nominal",
 ) -> list[sc.Job]:
+    """The chain's planned decks at ``corner`` (None: every corner's)."""
     got = sc.plan(design or _muxed(), _status(), _files(), _reading(), analyses, tree)
     assert isinstance(got, list), got
-    return got
+    return [j for j in got if corner is None or j.corner == corner]
 
 
 def test_the_chain_runs_from_the_battery_through_the_fuse_and_mux():
@@ -408,6 +416,8 @@ def test_the_chain_runs_from_the_battery_through_the_fuse_and_mux():
         tuple(_muxed_tree().parts[:2]),
         "battery",
         3.6,
+        3.0,
+        4.2,
     )
     (job,) = _chain_jobs(_muxed_tree(budget=_budget(150, ["U16"])))
     lines = job.deck.splitlines()
@@ -754,12 +764,14 @@ async def test_simulate_yields_skips_first_then_each_verdict():
             statuses, upload, design, _reading(), ["startup", "load_step"], runner
         )
     ]
+    # vm1 start-up and vm2 load step at nominal, vm3 start-up from the bench.
     assert [(s.id, s.ref, s.verdict) for s in sims] == [
-        ("vm3", "U17", "skipped"),
+        ("vm4", "U17", "skipped"),
         ("vm1", "U15", "passed"),
+        ("vm3", "U15", "passed"),
     ]
     assert "/VREG doesn't name a voltage" in sims[0].text
-    assert len(runner.decks) == 2  # the load step ran but ngspice "wasn't there"
+    assert len(runner.decks) == 3  # the load step ran but ngspice "wasn't there"
 
     assert [s async for s in sc.simulate(statuses, upload, design, _reading(), [], runner)] == []
 
@@ -792,13 +804,17 @@ async def test_a_fixed_finding_runs_its_chain_again_with_the_fix():
             [fixed],
         )
     ]
-    built, with_fix = sorted(sims, key=lambda s: s.id)
+    # Nominal (vm1) and bench (vm2) as built, each again with the fix.
+    built, bench, with_fix, bench_fix = sorted(sims, key=lambda s: s.id)
     assert (built.id, built.fix_of, built.finding) == ("vm1", None, None)
-    assert (with_fix.id, with_fix.fix_of, with_fix.finding) == ("vm2", "vm1", "wf1")
+    assert (with_fix.id, with_fix.fix_of, with_fix.finding) == ("vm3", "vm1", "wf1")
+    assert (bench_fix.id, bench_fix.fix_of) == ("vm4", "vm2")
     assert with_fix.title == f"{built.title}, with wf1's fix"
-    # As built the L2 ammeter sits on the output; with the fix, on its own net.
-    assert "Vam_l2 out sw_l2 0" in runner.decks[0]
-    assert "Vam_l2 out sw_l2 0" not in runner.decks[1]
+    assert bench_fix.title == f"{bench.title}, with wf1's fix"
+    # Queued nominal before bench, each as built before its fix. As built
+    # the L2 ammeter sits on the output; with the fix, on its own net.
+    assert ["Vsrc sup" in d for d in runner.decks] == [False, False, True, True]
+    assert ["Vam_l2 out sw_l2 0" in d for d in runner.decks] == [True, False, True, False]
 
 
 async def test_a_fix_elsewhere_doesnt_run_again():
@@ -820,7 +836,138 @@ async def test_a_fix_elsewhere_doesnt_run_again():
             [fixed],
         )
     ]
-    assert [s.id for s in sims] == ["vm1"]
+    assert [s.id for s in sims] == ["vm1", "vm2"]  # nominal and bench, no fix
+
+
+# --- corners and the time budget (plan 006 step 4) ---------------------------
+
+
+def test_startup_runs_at_nominal_bench_min_and_max():
+    jobs = _chain_jobs(_muxed_tree(), ["startup", "load_step"], corner=None)
+    assert [(j.analysis, j.corner) for j in jobs] == [
+        ("startup", "nominal"),
+        ("load_step", "nominal"),
+        ("startup", "bench"),
+        ("startup", "min"),
+        ("startup", "max"),
+    ]
+    _, _, bench, lo, hi = jobs
+    assert bench.title == (
+        "U15 (TPS63802) start-up from VBAT on a 1 A current-limited supply (assumed), vendor model"
+    )
+    assert (
+        lo.title == "U15 (TPS63802) start-up from VBAT at min 3.000 V, C and L −20 %, vendor model"
+    )
+    assert (
+        hi.title == "U15 (TPS63802) start-up from VBAT at max 4.200 V, C and L −20 %, vendor model"
+    )
+    assert "Vsrc src 0 PWL(0 0 5e-05 3)" in lo.deck and "Vsrc src 0 PWL(0 0 5e-05 4.2)" in hi.deck
+    assert (lo.limits.vin, hi.limits.vin) == (3.0, 4.2)
+    assert lo.limits.setup == (
+        "From the battery VBAT at 3.000 V (its min), as an ideal source through F1 (1A) as "
+        "an ideal wire, U3 (TPS2121) as an ideal switch; load the rated 2000 mA, no budget "
+        "for +3.3V; ceramic C and L −20 %."
+    )
+
+
+def test_the_bench_supply_is_an_ideal_source_behind_a_smooth_current_limit():
+    (bench,) = _chain_jobs(_muxed_tree(), corner="bench")
+    lines = bench.deck.splitlines()
+    assert "Vsrc sup 0 PWL(0 0 5e-05 3.6)" in lines
+    assert "Bbench sup src I=1*tanh((v(sup)-v(src))/0.05)" in lines
+    assert "Vam_in src c0 0" in lines  # the ammeter still reads what it gives
+    assert bench.limits.setup.startswith(
+        "From the battery VBAT at 3.600 V (the middle of 3.000 V–4.200 V), "
+        "as a 1 A current-limited supply (assumed) through F1"
+    )
+    # Without a chain, the regulator's own input is the bench supply's.
+    (alone,) = _jobs(corner="bench")
+    assert alone.limits.setup.startswith(
+        "From a 1 A current-limited 3.600 V supply (assumed) on +BATT"
+    )
+
+
+def test_the_bench_limit_is_config(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(sc.settings, "BENCH_CURRENT_LIMIT_A", 0.5)
+    (bench,) = _jobs(corner="bench")
+    assert "Bbench sup src I=0.5*tanh((v(sup)-v(src))/0.025)" in bench.deck
+    assert "on a 0.5 A current-limited supply (assumed)" in bench.title
+
+
+def test_min_and_max_derate_ceramic_c_and_l_but_not_a_polarized_cap():
+    d = _muxed()
+    parts = {**d.parts, "C13": Part("C13", "22u", "Device:C_Polarized", "")}
+    design = Design(parts, d.nets)
+    jobs = {
+        j.corner: j.deck.splitlines()
+        for j in _chain_jobs(_muxed_tree(), design=design, corner=None)
+    }
+    for corner in ("nominal", "bench"):
+        assert "L1 n2 n3 4.7e-07" in jobs[corner] and "C14 vin 0 1e-05" in jobs[corner]
+        assert "C9 rst 0 1e-07" in jobs[corner]
+    for corner in ("min", "max"):
+        assert "L1 n2 n3 3.76e-07" in jobs[corner]
+        assert "C14 vin 0 8e-06" in jobs[corner] and "C7 0 c1 8e-06" in jobs[corner]
+        assert "C9 rst 0 8e-08" in jobs[corner]  # the reset RC's too
+        assert "C13 out 0 2.2e-05" in jobs[corner]  # polarized: no DC-bias derating
+
+
+def test_a_source_with_one_voltage_has_no_min_or_max():
+    tree = _muxed_tree(battery=(4.8, 4.8), battery_override=True)
+    assert [j.corner for j in _chain_jobs(tree, corner=None)] == ["nominal", "bench"]
+    assert [j.corner for j in _jobs(corner=None)] == ["nominal", "bench"]  # no chain
+
+
+def test_runs_queue_by_corner_each_as_built_before_its_fix():
+    planned = _chain_jobs(_muxed_tree(), corner=None)
+    jobs = [(f"vm{k}", j) for k, j in enumerate(planned, 1)]
+    fixes = [
+        (f"vm{k}", dataclasses.replace(j, fix_of=i)) for k, (i, j) in enumerate(jobs, len(jobs) + 1)
+    ]
+    queued = sc._queued([*reversed(jobs), *fixes])
+    assert [(i, j.corner, j.fix_of) for i, j in queued] == [
+        ("vm1", "nominal", None),
+        ("vm5", "nominal", "vm1"),
+        ("vm2", "bench", None),
+        ("vm6", "bench", "vm2"),
+        ("vm3", "min", None),
+        ("vm7", "min", "vm3"),
+        ("vm4", "max", None),
+        ("vm8", "max", "vm4"),
+    ]
+
+
+async def test_a_run_still_queued_when_the_budget_is_spent_is_skipped():
+    design = _l2_shorted()
+    [finding] = pins.lookup(design).findings
+    assert finding.fix is not None
+    fixed = sc.Fixed(finding.id, finding.fix, roles.apply_fix(design, finding.fix), None)
+    ticks = itertools.chain([0.0, 0.0, 300.0], itertools.repeat(600.0))  # start, vm1, vm3, …
+    runner = FakeRunner()
+    sims = [
+        s
+        async for s in sc.simulate(
+            [_status()],
+            {"tps63802.lib": TPS_LIB},
+            design,
+            _reading(),
+            ["startup"],
+            runner,
+            None,
+            [fixed],
+            budget_s=600,
+            clock=lambda: next(ticks),
+        )
+    ]
+    got = {s.id: s for s in sims}
+    assert len(runner.decks) == 2  # nominal as built and with the fix
+    assert (got["vm1"].verdict, got["vm3"].verdict) == ("passed", "passed")
+    assert (got["vm2"].verdict, got["vm4"].verdict) == ("skipped", "skipped")
+    assert got["vm4"].fix_of == "vm2" and got["vm4"].finding == "wf1"  # still paired
+    assert got["vm2"].title.endswith("current-limited supply (assumed), vendor model")
+    assert got["vm2"].text == (
+        "Not simulated: over the time budget (10 min for all of a request's vendor-model runs)."
+    )
 
 
 @needs_ngspice
@@ -848,13 +995,19 @@ async def test_a_toy_regulator_starts_up_in_real_ngspice():
         }
     )
     status = _status("U1", "TOYREG", value="TOYREG", status="ngspice", file="toy.lib")
-    (sim,) = [
-        s
-        async for s in sc.simulate(
-            [status], upload, design, reading, ["startup"], Ngspice(timeout_s=60)
-        )
-    ]
+    sim, bench = sorted(
+        [
+            s
+            async for s in sc.simulate(
+                [status], upload, design, reading, ["startup"], Ngspice(timeout_s=60)
+            )
+        ],
+        key=lambda s: s.id,
+    )
     assert sim.verdict == "passed", sim.text
+    # The bench supply's behavioural current limit runs in ngspice too.
+    assert bench.verdict == "passed", bench.text
+    assert "Bbench sup src I=1*tanh((v(sup)-v(src))/0.05)" in bench.deck
     assert sim.t_unit == "µs" and sim.t[-1] == pytest.approx(160)
     assert sim.v[-1] == pytest.approx(3.3, abs=0.01)
     # No switch-node pin: the linear solver settings, the operating point solved.

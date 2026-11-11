@@ -151,6 +151,15 @@ class Ngspice:
             out = data.read_text("utf-8") if data.exists() else None
             return Run(log.code, out, text + log.text)
 
+    async def version(self) -> str | None:
+        """ngspice's version banner (``ngspice -v``), for the run cache's
+        key; None if it isn't installed or doesn't say."""
+        with tempfile.TemporaryDirectory(prefix="haxrok-spice-") as tmp:
+            log = await self._exec(Path(tmp), "-v")
+        if log is None or log.code != 0 or not log.text.strip():
+            return None
+        return log.text.strip()
+
     async def _exec(self, work: Path, *args: str) -> Log | None:
         """Run ngspice in ``work``: its exit status (None after the timeout)
         and stdout and stderr together; None if it isn't installed."""

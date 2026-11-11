@@ -42,16 +42,26 @@ without one). A regulator that can't be set up this way (no rated current,
 a model pin with no board pin, an enable driven by another IC) yields a
 ``skipped`` simulation that says why.
 
-``simulate`` runs the decks (two at once) and yields each verdict as it
-finishes. A run that times out or fails is ``timed_out`` or ``failed``,
-with ngspice's error; it never fails the request.
+Start-up runs at corners (plan 006 step 4): the source's nominal, then
+nominal from a current-limited bench supply (``BENCH_CURRENT_LIMIT_A``,
+assumed), then the source's min and max when its range has two ends, with
+ceramic capacitors and inductors at −20 % there. Each corner is its own
+run, named in its title and setup sentence; load step and dropout run at
+nominal only.
+
+``simulate`` runs the decks (two at once; nominal, bench, min, max, each
+as built before its fix) and yields each verdict as it finishes. A run
+that times out or fails is ``timed_out`` or ``failed``, with ngspice's
+error; it never fails the request. A run still queued when the request's
+``SPICE_BUDGET_S`` is spent is ``skipped``.
 """
 
 import asyncio
 import math
 import re
+import time
 from collections import Counter
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 
 from app.core.config import settings
@@ -109,6 +119,15 @@ _LOAD_HYSTERESIS = 0.02  # the start-up load's switch, as a share of the output 
 # The chain's source, best first (plan 006 step 2); an upstream regulator's
 # rail comes after these.
 _SOURCE_RANK = {"battery": 0, "usb": 1, "input": 2}
+# Start-up corners (plan 006 step 4), in the order they're run.
+_CORNER_ORDER = {"nominal": 0, "bench": 1, "min": 2, "max": 3}
+_DERATE = 0.8  # ceramic C (DC bias) and L at the min and max corners
+# The bench supply's current limit is smooth: a resistor this size at low
+# current, saturating at the limit (a tanh), so ngspice sees no corner.
+_BENCH_R = 0.05
+# A capacitor that isn't ceramic (no DC-bias derating): polarized,
+# electrolytic or tantalum, by symbol or footprint.
+_POLARIZED = re.compile(r"(^|[:_\s])CP($|[_:\s])|polari|elec|tantal", re.IGNORECASE)
 
 # Pin names, normalized to uppercase letters and digits.
 _IN_PIN = re.compile(r"P?V?IN\d*|VI")
@@ -208,6 +227,7 @@ class Job:
     limits: Limits
     files: dict[str, bytes] = field(default_factory=dict, repr=False)
     nets: frozenset[str] = frozenset()  # the board nets the deck holds
+    corner: str = "nominal"  # Corner.name
     fix_of: str | None = None  # a with-fix run: the as-built run it pairs with
     finding: str | None = None  # and the WiringFinding whose fix it applies
 
@@ -247,6 +267,7 @@ class _Cut:
     src: str = "vin"  # the node the source drives: the chain's top net
     setup: str = ""  # the source, the chain's parts and the load, said
     source_net: str | None = None  # the chain's top net, for the title
+    span: tuple[float, float] | None = None  # the source's range, when it has two ends
 
 
 @dataclass(frozen=True)
@@ -258,6 +279,24 @@ class Chain:
     parts: tuple[PowerPart, ...]  # parts[i] joins nets[i] to nets[i + 1]
     kind: str  # "battery", "usb", "input", or "rail" (an upstream regulator's)
     vin: float | None  # the source's nominal: the middle of its range
+    lo: float | None = None  # its range, for the min and max corners
+    hi: float | None = None
+
+
+@dataclass(frozen=True)
+class Corner:
+    """Where a start-up run sits (plan 006 step 4): at the source's
+    nominal, min or max, or at nominal from a current-limited bench
+    supply. Min and max take the parts' tolerances too: ceramic C and L
+    at ``derate`` of their value."""
+
+    name: str  # "nominal", "bench", "min", "max"
+    vin: float | None = None  # the source's voltage; None: its nominal
+    derate: float = 1.0
+    limit: float | None = None  # the bench supply's current limit, A
+
+
+NOMINAL = Corner("nominal")
 
 
 # --- datasheet facts -------------------------------------------------------
@@ -461,7 +500,12 @@ def chain(tree: PowerTree, net: str) -> Chain | None:
             mid = (
                 (rail.min + rail.max) / 2 if rail.min is not None and rail.max is not None else None
             )
-            found.append((_SOURCE_RANK.get(kind, len(_SOURCE_RANK)), Chain(nets, parts, kind, mid)))
+            found.append(
+                (
+                    _SOURCE_RANK.get(kind, len(_SOURCE_RANK)),
+                    Chain(nets, parts, kind, mid, rail.min, rail.max),
+                )
+            )
             return
         for p in makers:
             for up in p.inputs:
@@ -487,11 +531,27 @@ def _is_wire(design: Design, part: PowerPart) -> bool:
     return True
 
 
-def _source_said(tree: PowerTree, c: Chain, vin: float) -> str:
+def _supply(corner: Corner) -> str:
+    """What drives the chain's top net: "an ideal source", or the bench
+    supply, said."""
+    if corner.limit is None:
+        return "an ideal source"
+    return f"a {corner.limit:g} A current-limited supply (assumed)"
+
+
+def _is_ceramic(design: Design, ref: str) -> bool:
+    """Whether capacitor ``ref`` derates with DC bias: not polarized."""
+    part = design.parts[ref]
+    return not _POLARIZED.search(f"{part.lib_part} {part.footprint}")
+
+
+def _source_said(tree: PowerTree, c: Chain, vin: float, corner: Corner = NOMINAL) -> str:
     """The chain's source, said: "the battery VBAT at 4.8 V (the review form's)"."""
     net = c.nets[0]
     rail = next(r for r in tree.rails if r.net == net)
-    if c.kind == "battery" and tree.battery_override:
+    if corner.name in ("min", "max"):
+        how = f" (its {corner.name})"
+    elif c.kind == "battery" and tree.battery_override:
         how = " (the review form's)"
     elif rail.min is not None and rail.max is not None and rail.min != rail.max:
         how = f" (the middle of {_v(rail.min)}–{_v(rail.max)})"
@@ -502,7 +562,7 @@ def _source_said(tree: PowerTree, c: Chain, vin: float) -> str:
         "usb": "USB",
         "input": "the input",
     }.get(c.kind, f"{', '.join(rail.fed_by)}'s output")
-    return f"{what} {net} at {_v(vin)}{how}, as an ideal source"
+    return f"{what} {net} at {_v(vin)}{how}, as {_supply(corner)}"
 
 
 def _cut(
@@ -512,10 +572,12 @@ def _cut(
     status: SpiceModelStatus,
     rate: Ratings,
     tree: PowerTree | None = None,
+    corner: Corner = NOMINAL,
 ) -> _Cut | str | None:
     """The regulator's circuit, or why it can't be simulated; None when the
     model isn't a single-rail regulator's: no input and output pin, or input
-    or output pins on more than one net (a driver's IN1/IN2, OUT1/OUT2)."""
+    or output pins on more than one net (a driver's IN1/IN2, OUT1/OUT2).
+    ``corner`` sets the source's voltage and the C and L derating."""
     board: dict[str, str] = {}
     number: dict[str, str] = {}  # normalized pin name -> the board's pin number
     for pin, on in _pins_of(design, ref):
@@ -548,6 +610,13 @@ def _cut(
             f"its input net {net_in} doesn't name a voltage and the datasheet gives no "
             "typical input"
         )
+    if corner.vin is not None:
+        vin = corner.vin
+    span = (
+        (up.lo, up.hi)
+        if up is not None and up.lo is not None and up.hi is not None and up.lo < up.hi
+        else None
+    )
     if "set by the schematic" in status.reason:
         return "its model needs parameters the schematic sets"
     budget = next((r.budget for r in tree.rails if r.net == net_out), None) if tree else None
@@ -578,14 +647,20 @@ def _cut(
                 kind = "switch" if step.kind == "switch" else "wire"
                 said += f" as an ideal {kind}"
             via.append(said)
-    source_said = (
-        _source_said(tree, up, vin)
-        if up is not None and tree is not None
-        else f"an ideal {_v(vin)} source on {net_in}"
-        + (" (its name)" if named_voltage(net_in) else " (the datasheet's typical input)")
-    )
+    if up is not None and tree is not None:
+        source_said = _source_said(tree, up, vin, corner)
+    else:
+        what = (
+            f"an ideal {_v(vin)} source"
+            if corner.limit is None
+            else f"a {corner.limit:g} A current-limited {_v(vin)} supply (assumed)"
+        )
+        source_said = f"{what} on {net_in}" + (
+            " (its name)" if named_voltage(net_in) else " (the datasheet's typical input)"
+        )
     through = f" through {', '.join(via)}" if via else ""
-    setup = f"From {source_said}{through}; load {load_said}."
+    derated = f"; ceramic C and L −{(1 - corner.derate) * 100:g} %" if corner.derate != 1 else ""
+    setup = f"From {source_said}{through}; load {load_said}{derated}."
     pins_used: list[str] = []
     ammeters: list[str] = []
     switches: list[Switch] = []
@@ -649,8 +724,10 @@ def _cut(
                 "spice circuits: %s's value %r doesn't parse; left out", part.ref, part.value
             )
             continue
+        if letter == "L" or (letter == "C" and _is_ceramic(design, part.ref)):
+            value *= corner.derate
         lines.append(f"{name} {a} {b} {value:g}")
-    rc = _reset_rc(design, ref, net_out, nodes)
+    rc = _reset_rc(design, ref, net_out, nodes, corner.derate)
     if rc is not None:
         reset, extra = rc
         lines += extra
@@ -668,6 +745,7 @@ def _cut(
         src=nodes[up.nets[0]] if up is not None else "vin",
         setup=setup,
         source_net=up.nets[0] if up is not None else None,
+        span=span,
     )
 
 
@@ -685,10 +763,11 @@ def _diode_ends(
 
 
 def _reset_rc(
-    design: Design, ref: str, net_out: str, nodes: dict[str, str]
+    design: Design, ref: str, net_out: str, nodes: dict[str, str], derate: float = 1.0
 ) -> tuple[str, list[str]] | None:
     """A resistor from the output to another IC's pin with a capacitor to
-    ground: (that pin, the two deck lines, on node ``rst``)."""
+    ground: (that pin, the two deck lines, on node ``rst``); a ceramic
+    capacitor at ``derate`` of its value."""
     for net, members in design.nets.items():
         if net in nodes:
             continue
@@ -706,11 +785,12 @@ def _reset_rc(
             elif letter == "C" and is_ground(other[0][1]):
                 c = (n.ref, parse_farads(design.parts[n.ref].value))
         if r and c and r[1] and c[1]:
+            farads = c[1] * (derate if _is_ceramic(design, c[0]) else 1.0)
             pin = ic_pins[0]
             label = f"{pin.pin_ref}" + (f" ({pin.function})" if pin.function else "")
             return label, [
                 f"{_element('R', r[0])} out rst {r[1]:g}",
-                f"{_element('C', c[0])} rst 0 {c[1]:g}",
+                f"{_element('C', c[0])} rst 0 {farads:g}",
             ]
     return None
 
@@ -726,10 +806,18 @@ def _window(rate: Ratings) -> float:
     return min(_RAMP + 1.1 * rate.startup, _WINDOW_MAX)
 
 
-def _source(wave: str, node: str = "vin") -> list[str]:
+def _source(wave: str, node: str = "vin", limit: float | None = None) -> list[str]:
     """The source, ``wave`` from 0 V, through the input ammeter onto
-    ``node`` (the chain's top net): i(vam_in) is the current it gives."""
-    return [f"Vsrc src 0 PWL({wave})", f"Vam_in src {node} 0"]
+    ``node`` (the chain's top net): i(vam_in) is the current it gives.
+    With ``limit``, a bench supply: the ideal source behind a smooth
+    current limit (a behavioural current source, ``_BENCH_R`` below it)."""
+    if limit is None:
+        return [f"Vsrc src 0 PWL({wave})", f"Vam_in src {node} 0"]
+    return [
+        f"Vsrc sup 0 PWL({wave})",
+        f"Bbench sup src I={limit:g}*tanh((v(sup)-v(src))/{limit * _BENCH_R:g})",
+        f"Vam_in src {node} 0",
+    ]
 
 
 def _switched_load(ohms: float, on: float, vout: float) -> list[str]:
@@ -797,7 +885,9 @@ def plan(
     """The decks for one regulator, or why it's skipped; None when the
     model isn't a regulator's. ``tree`` (budgeted, ``budget.apply``) gives
     the chain from the source and the load; without it, the regulator
-    alone from its input. Pure; nothing runs yet."""
+    alone from its input. Every analysis runs at the source's nominal;
+    start-up also runs from the bench supply and at the source's min and
+    max (``Corner``), in that order. Pure; nothing runs yet."""
     ref = status.ref
     rate = ratings(reading.limits.get(ref, []))
     cut = _cut(design, ref, m, status, rate, tree)
@@ -806,6 +896,36 @@ def plan(
         return None
     if isinstance(cut, str):
         return Skip(ref, title, cut)
+    jobs = _jobs(ref, design, m, reading, analyses, rate, cut, title, NOMINAL)
+    if "startup" not in analyses:
+        return jobs
+    corners = [Corner("bench", limit=settings.BENCH_CURRENT_LIMIT_A)]
+    if cut.span is not None:
+        corners += [
+            Corner("min", cut.span[0], _DERATE),
+            Corner("max", cut.span[1], _DERATE),
+        ]
+    for corner in corners:
+        at = _cut(design, ref, m, status, rate, tree, corner)
+        if not isinstance(at, _Cut):
+            logger.info("spice circuits: %s at %s isn't planned: %s", ref, corner.name, at)
+            continue
+        jobs += _jobs(ref, design, m, reading, ["startup"], rate, at, title, corner)
+    return jobs
+
+
+def _jobs(
+    ref: str,
+    design: Design,
+    m: ModelFiles,
+    reading: DatasheetReading,
+    analyses: Sequence[SimAnalysis],
+    rate: Ratings,
+    cut: _Cut,
+    title: str,
+    corner: Corner,
+) -> list[Job]:
+    """One regulator's decks at one corner, an analysis each."""
     vout, vin, current = cut.vout, cut.vin, cut.current
     lo, hi = vout * (1 - rate.accuracy), vout * (1 + rate.accuracy)
     pct = f"±{rate.accuracy * 100:g} %" + ("" if rate.accuracy_cited else ", not cited")
@@ -848,7 +968,7 @@ def plan(
         if analysis == "startup":
             limits = base
             sources = [
-                *_source(f"0 0 {_RAMP:g} {vin:g}", src),
+                *_source(f"0 0 {_RAMP:g} {vin:g}", src, corner.limit),
                 *_switched_load(vout / current, droop, vout),
             ]
             what = "start-up"
@@ -873,10 +993,31 @@ def plan(
             ]
             what = "dropout"
         start = f" from {cut.source_net}" if cut.source_net else ""
-        full = f"{title} {what}{start}, vendor model"
+        full = f"{title} {what}{start}{_corner_said(corner, vin)}, vendor model"
         deck = _deck(full, m.name, cut, sources, limits.stop, probes)
-        jobs.append(Job(ref, analysis, full, deck, limits, m.files, frozenset(cut.nodes)))
+        jobs.append(
+            Job(
+                ref,
+                analysis,
+                full,
+                deck,
+                limits,
+                m.files,
+                frozenset(cut.nodes),
+                corner=corner.name,
+            )
+        )
     return jobs
+
+
+def _corner_said(corner: Corner, vin: float) -> str:
+    """The corner, for a run's title: "" at nominal."""
+    if corner.limit is not None:
+        return f" on a {corner.limit:g} A current-limited supply (assumed)"
+    if corner.name in ("min", "max"):
+        derated = f", C and L −{(1 - corner.derate) * 100:g} %" if corner.derate != 1 else ""
+        return f" at {corner.name} {_v(vin)}{derated}"
+    return ""
 
 
 def _supply_limits(
@@ -1211,6 +1352,29 @@ def _peaks(lim: Limits, peaks: Peaks) -> list[SimPeak]:
     return got[:10]
 
 
+def over_budget(sim_id: str, job: Job, budget_s: float) -> Simulation:
+    """The Simulation for a run still queued when the request's time
+    budget ran out; it keeps its pairing."""
+    return Simulation(
+        id=sim_id,
+        ref=job.ref,
+        analysis=job.analysis,
+        verdict="skipped",
+        title=job.title[:200],
+        deck="",
+        t=[],
+        t_unit="µs",
+        v=[],
+        levels=[],
+        text=(
+            f"Not simulated: over the time budget ({budget_s / 60:g} min for all of a "
+            "request's vendor-model runs)."
+        ),
+        fix_of=job.fix_of,
+        finding=job.finding,
+    )
+
+
 def skipped(sim_id: str, skip: Skip) -> Simulation:
     """The Simulation for a regulator that isn't simulated, saying why."""
     return Simulation(
@@ -1236,6 +1400,20 @@ def _touches(fix: WiringFix, job: Job) -> bool:
     return fix.leaves in job.nets or any(p.split(".", 1)[0] == job.ref for p in fix.pins)
 
 
+def _queued(jobs: list[tuple[str, Job]]) -> list[tuple[str, Job]]:
+    """The runs in the order they go to ngspice: by corner (nominal, bench,
+    min, max), each as-built run right before its fixes. Stable, so a
+    corner's runs keep the order they were planned in."""
+    ids = {i: k for k, (i, _) in enumerate(jobs)}
+
+    def rank(item: tuple[str, Job]) -> tuple[int, int, int]:
+        sim_id, job = item
+        anchor = ids[job.fix_of] if job.fix_of else ids[sim_id]
+        return (_CORNER_ORDER.get(job.corner, len(_CORNER_ORDER)), anchor, job.fix_of is not None)
+
+    return sorted(jobs, key=rank)
+
+
 def _runnable(statuses: Iterable[SpiceModelStatus]) -> list[SpiceModelStatus]:
     return [s for s in statuses if s.loads and s.status in MODES and s.subckt]
 
@@ -1249,14 +1427,18 @@ async def simulate(
     runner: ModelRunner,
     tree: PowerTree | None = None,
     fixes: Sequence[Fixed] = (),
+    budget_s: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> AsyncIterator[Simulation]:
     """Plan each loading model's decks and run them (``_PARALLEL`` at once),
     yielding the skipped ones first, then each verdict as it finishes.
     ``tree`` is the budgeted power tree each chain and load come from.
     Each deck a fix touches (its IC's pin moves, or the net it leaves is in
     the deck) runs again with the fix, naming the as-built run it pairs
-    with (plan 006 step 3). Closing the iterator early cancels the runs
-    still going."""
+    with (plan 006 step 3), at the same corner. Runs are queued by corner
+    (nominal, bench, min, max), each as built before its fix; one still
+    queued after ``budget_s`` (default ``SPICE_BUDGET_S``) of ``clock`` is
+    skipped. Closing the iterator early cancels the runs still going."""
     if not analyses:
         return
     jobs: list[tuple[str, Job]] = []
@@ -1280,28 +1462,33 @@ async def simulate(
             built.append((f"vm{n}", job))
         jobs.extend(built)
         for f in fixes:
-            touched = {j.analysis: i for i, j in built if _touches(f.fix, j)}
+            touched = {(j.analysis, j.corner): i for i, j in built if _touches(f.fix, j)}
             if not touched:
                 continue
-            again = plan(f.design, s, m, reading, list(touched), f.tree)
+            again = plan(
+                f.design, s, m, reading, list(dict.fromkeys(a for a, _ in touched)), f.tree
+            )
             if not isinstance(again, list):
                 logger.info(
                     "spice circuits: %s with %s's fix isn't planned: %s", s.ref, f.finding, again
                 )
                 continue
             for job in again:
+                if (of := touched.get((job.analysis, job.corner))) is None:
+                    continue  # this corner's as-built run doesn't touch it
                 n += 1
                 title = f"{job.title}, with {f.finding}'s fix"
-                jobs.append(
-                    (
-                        f"vm{n}",
-                        replace(job, title=title, fix_of=touched[job.analysis], finding=f.finding),
-                    )
-                )
+                jobs.append((f"vm{n}", replace(job, title=title, fix_of=of, finding=f.finding)))
+    jobs = _queued(jobs)
+    budget = settings.SPICE_BUDGET_S if budget_s is None else budget_s
+    start = clock()
     gate = asyncio.Semaphore(_PARALLEL)
 
     async def one(sim_id: str, job: Job) -> Simulation | None:
         async with gate:
+            if clock() - start >= budget:
+                logger.info("spice circuits: %s %s over the time budget", job.ref, job.title)
+                return over_budget(sim_id, job, budget)
             run = await runner.transient(job.deck, job.files)
         if run is None:
             return None  # ngspice isn't installed

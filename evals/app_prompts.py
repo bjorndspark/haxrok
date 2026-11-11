@@ -66,6 +66,7 @@ from app.features.debug.schemas import (  # noqa: E402
     Simulation,
 )
 from app.features.debug.spice import Ngspice  # noqa: E402
+from app.features.debug.spice_cache import CachedRunner  # noqa: E402
 from app.features.debug.spice_models import SpiceModels, SpiceModelStore  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -215,7 +216,7 @@ async def simulate(
         if f.fix is not None:
             fixed = roles.apply_fix(design, f.fix)
             fixes.append(spice_circuits.Fixed(f.id, f.fix, fixed, budgeted(fixed)))
-    runner = Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S)
+    runner = CachedRunner(Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S))
     return [
         sim
         async for sim in spice_circuits.simulate(

@@ -240,7 +240,7 @@ board's before/after pair, both runs finishing with their numbers
 recorded; a frontend test of the paired chart.
 Effort: 6–10 h. Big: backend and frontend.
 
-## 4. Corners and tolerances: proposed
+## 4. Corners and tolerances: done
 
 - The source at min, nominal and max; a current-limited supply (the
   bench supplies in the private board's symptom).
@@ -278,6 +278,52 @@ entries expire after `SPICE_CACHE_TTL_S` (default 30 days; 0 turns it
 off). Timeouts and failures aren't cached. It fails open on a Redis
 outage, like `core/ai/cache.py`, and sits in the debug feature on top of
 `core/redis.py`'s client, wrapping the `ModelRunner`.
+
+Decided (2026-11-11, default taken in step): the bench run's setup says
+"as a 1 A current-limited supply (assumed)" and its title "on a 1 A
+current-limited supply (assumed)"; the limit is a `tanh` behavioural
+source with a 0.05 Ω slope near zero. Min and max run only when the
+source has two ends (a rail range); a single voltage gets nominal and
+the bench run.
+Decided (2026-11-11, default taken in step): capacitors whose part or
+footprint reads polarized, electrolytic or tantalum aren't derated; a
+ceramic C in the reset RC is. The budget's clock starts once the jobs
+are planned, and a skipped run keeps its `fix_of` and finding. The cache
+wraps the runner in the eval script too, so a repeated eval is fast.
+
+Built: `Corner` and `_queued` in `spice_circuits.py` (corner rank, then
+anchor, as built before its fix; fixes paired per analysis and corner),
+`spice_cache.py` (`CachedRunner`, `RedisRunStore`, `Ngspice.version()`),
+and three settings (`SPICE_BUDGET_S`, `BENCH_CURRENT_LIMIT_A`,
+`SPICE_CACHE_TTL_S`, in `.env.example`). 7 new tests in
+`test_debug_spice_circuits.py` (corner list and titles, the bench deck,
+the limit from config, derating with a polarized C left alone, no min or
+max from one voltage, queue order, a budget skip on a fake clock) and 9
+in `test_debug_spice_cache.py` (the key, a round trip, a repeat served,
+a timeout or failure not kept, the bypasses, Redis's TTL and an outage).
+
+`evals/cases/orbit-l2-shorted` with `sim=startup` now gives 8 runs in
+18 min 49 s, and the same 8 from the cache in 1.3 s:
+
+- nominal 3.6 V: as built **passed** (3.30 V, 3.17 A out of L1); with
+  the fix **passed** (3.08 A).
+- min 3.0 V, C and L −20 %: as built **flagged**: settles at 2.11 V, PG
+  stays low, 130.55 A into U15.7 (L2) on +3.3V, 6.51 A out of L1, above
+  the 5.75 A switch limit; with the fix **passed** (3.30 V, 3.63 A). The
+  fault shows at the low corner, not at nominal.
+- max 4.2 V, C and L −20 %: both **passed** (3.30 A, 3.32 A).
+- the 1 A bench supply: as built **flagged** (0.78 V, 103.31 A into L2);
+  with the fix also **flagged** (2.84 V): the rated 2000 mA load at
+  3.3 V needs more than 1 A at 3.6 V. The run is right for its
+  assumption; `BENCH_CURRENT_LIMIT_A` should be the user's real supply.
+
+The private board at 4.8 V and 6 V wasn't run: its project isn't on this
+machine, so it is checked by hand.
+
+Bugs found: the bench setup first read "assumed,;" (now in
+parentheses); the reset RC's C wasn't derated at first. `make lint` and
+`make test` pass (sub-targets, make 3.81): 408 backend tests, 52
+frontend.
 
 **Check:** unit tests on the corner list and the cache key; the private
 board at 4.8 V and 6 V; a repeat run served from the cache.
