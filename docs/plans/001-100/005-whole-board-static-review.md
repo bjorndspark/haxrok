@@ -275,7 +275,7 @@ for the review. `make lint` and `make test` pass (sub-targets, make
 3.81): 344 backend tests, 46 frontend.
 Effort: 2–4 h.
 
-## 5. A current budget per rail: proposed
+## 5. A current budget per rail: done
 
 - Each rail's load: the sum of its parts' maximum supply currents (the
   facts, with the extraction adding supply-current limits if they're
@@ -291,9 +291,44 @@ Decided (2026-11-11): a part with no supply-current figure counts as
 unknown; the rail reads "at least X mA, N parts unknown".
 Decided (2026-11-11): the private board's +3V3 budget is checked by hand
 at the loop's final review, since its project isn't on this machine.
+Decided (2026-11-11, default taken in loop): the rating is the rated
+output current of the regulator or switch making the rail; a rail made by
+USB, a battery, a pass part or a charger has none. "Its input's limit" is
+the input rail's own budget against its maker, since every rail carries
+one.
+Decided (2026-11-11, default taken in loop): a regulator draws its output
+rail's load scaled by Vout max over Vin min when it steps up (lossless, so
+a floor), plus its own supply current when given; a mux counts its whole
+output load on each input, since either may carry it; a charger draws its
+`charge_current` calc, else is unknown.
+Decided (2026-11-11, default taken in loop): a rail with several makers
+takes the largest rating, and only when every maker has one.
+Decided (2026-11-11, default taken in loop): a supply figure naming supply
+pins counts on their rail; one naming none counts on each rail of a
+multi-rail IC ("whole part, counted on each of its rails"). The max
+column, else the typical (noted). Unknown parts carry up to every rail
+above them.
+Decided (2026-11-11, default taken in loop): the budget is filled once the
+datasheets are read (`budget.apply` in the review), so the first summary
+and the eval path have none. The extraction prompt now asks every part
+for its "supply current" and power muxes and switches for their output
+current, so every cached datasheet reading misses once and is read again.
 
-**Checks:** unit tests; the private board's +3V3 budget checked by hand
-against the ESP32-S3, MAX98357 and INMP441 datasheets.
+**Checks:** 7 unit tests in `test_debug_budget.py`: the mux and
+buck-boost chain (the max active figure over the sleep one, U4 unknown,
+the rating and its page), the load carried up stepped up ×1.10 with the
+unknowns and on each mux input, over the rating as OVER BUDGET in the
+prompt line, a typical-only figure reading without "at least", figures
+split by supply pin against one whole-part figure on two rails, a
+charger's charge current, and no budget before `apply`. Writing them
+found `IDDA` missed by the supply-current pattern (a word boundary after
+`IDD`); it now takes a suffix. `present.test.ts` words the budget, "at
+least" and over. The eval path reads no datasheets, so it shows no
+budget; the review prompt's input text changed, so `make eval-app
+case=rp-micro-no-fault mode=review` ran fresh: READ, no issues (96 s).
+The private board's +3V3 budget is left for the loop's final review.
+`make lint` and `make test` pass (sub-targets, make 3.81): 351 backend
+tests, 47 frontend.
 Effort: 3–5 h.
 
 ## 6. Operating states: which rails come up from which source: proposed

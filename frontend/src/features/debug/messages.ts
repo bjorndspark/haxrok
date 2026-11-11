@@ -263,7 +263,8 @@ Used outdoors, so it may see -10 °C.`,
     datasheetFacts: (n: number) => `Datasheet facts (${String(n)})`,
     deviations: (n: number) => `Deviations from the typical application (${String(n)})`,
     powerTree: (n: number) => `Power tree (${String(n)} rails)`,
-    powerNote: "Built from the netlist. An inferred voltage is a guess to check.",
+    powerNote:
+      "Built from the netlist. An inferred voltage is a guess to check. Loads are datasheet maximums; over budget may fail, but peaks rarely coincide.",
     source: { usb: "USB", battery: "battery", input: "input" } satisfies Record<
       NonNullable<PowerRail["source"]>,
       string
@@ -289,6 +290,11 @@ Used outdoors, so it may see -10 °C.`,
     inferred: "inferred",
     voltageUnknown: "voltage unknown",
     supplies: "supplies",
+    load: (ma: string) => `load ${ma} mA`,
+    loadAtLeast: (ma: string, unknown: string[]) =>
+      `load at least ${ma} mA (${String(unknown.length)} unknown: ${unknown.join(", ")})`,
+    rated: (ma: string, note: string) => `against ${ma} mA rated (${note})`,
+    overBudget: "over budget",
   },
   simulations: {
     title: (n: number) => `Simulations (${String(n)})`,
@@ -656,7 +662,8 @@ USB 5 V では動く: マイコンが起動する。
     datasheetFacts: (n: number) => `データシートの事実 (${String(n)})`,
     deviations: (n: number) => `標準アプリケーションとの違い (${String(n)})`,
     powerTree: (n: number) => `電源ツリー (レール ${String(n)} 本)`,
-    powerNote: "ネットリストから組み立てたものです。「推定」の電圧は確認が必要です。",
+    powerNote:
+      "ネットリストから組み立てたものです。「推定」の電圧は確認が必要です。負荷はデータシートの最大値の合計です。定格超過は故障の恐れがありますが、ピークが重なることはまれです。",
     source: { usb: "USB", battery: "電池", input: "入力" },
     basis: {
       named: "ネット名から",
@@ -679,6 +686,11 @@ USB 5 V では動く: マイコンが起動する。
     inferred: "推定",
     voltageUnknown: "電圧不明",
     supplies: "供給先",
+    load: (ma: string) => `負荷 ${ma} mA`,
+    loadAtLeast: (ma: string, unknown: string[]) =>
+      `負荷 ${ma} mA 以上 (不明 ${String(unknown.length)} 個: ${unknown.join(", ")})`,
+    rated: (ma: string, note: string) => `/ 定格 ${ma} mA (${note})`,
+    overBudget: "定格超過",
   },
   simulations: {
     title: (n: number) => `シミュレーション (${String(n)})`,

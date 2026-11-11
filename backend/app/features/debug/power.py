@@ -195,7 +195,7 @@ def build(
 
 def format_power(tree: PowerTree | None) -> str:
     """The tree as the prompt's "Power tree" section: one line per part,
-    then one per rail, roots first."""
+    then one per rail, roots first, with its budget once it has one."""
     if tree is None or not tree.rails:
         return "(no power rails found: no regulator, power switch or pass part)\n"
     lines = ["Parts (inputs -> output):"]
@@ -217,8 +217,29 @@ def format_power(tree: PowerTree | None) -> str:
             head += f"; made by {', '.join(r.fed_by)}"
         if r.loads:
             head += f"; supplies {', '.join(r.loads)}"
+        if budget := format_budget(r):
+            head += f"; {budget}"
         lines.append(head)
     return "\n".join(lines) + "\n"
+
+
+def format_budget(rail: PowerRail) -> str:
+    """The rail's budget for the prompt's power tree line; "" without one."""
+    b = rail.budget
+    if b is None or (not b.loads and b.rated_ma is None):
+        return ""
+    if b.unknown:
+        n = len(b.unknown)
+        load = f"at least {b.load_ma:g} mA ({n} part{'s' if n > 1 else ''} unknown: "
+        load += f"{', '.join(b.unknown)})"
+    else:
+        load = f"{b.load_ma:g} mA"
+    text = f"load {load}"
+    if b.rated_ma is not None:
+        text += f" against {b.rated_ma:g} mA rated ({b.rated_note})"
+    if b.over:
+        text += "; OVER BUDGET: may fail, not verified, peaks rarely coincide"
+    return text
 
 
 def volts(lo: float | None, hi: float | None) -> str:

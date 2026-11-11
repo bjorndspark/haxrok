@@ -32,6 +32,7 @@ from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
 from app.features.debug import (
     application,
+    budget,
     calc,
     diagram,
     pins,
@@ -413,10 +414,15 @@ async def _review(
     n_warn = len(prepared.pin_lookup.warnings)
     if n_warn:
         found += f" {n_warn} transistor{'s' if n_warn > 1 else ''} with a pin order to check."
-    # Rebuilt with the datasheets' output and charge voltages, now they're read;
-    # its rails then meet each pin's datasheet limits.
-    tree = power.build(
-        prepared.design, prepared.calculations, reading.limits, battery=prepared.battery
+    # Rebuilt with the datasheets' output and charge voltages, now they're read,
+    # with each rail's current budget; its rails then meet each pin's limits.
+    tree = budget.apply(
+        prepared.design,
+        power.build(
+            prepared.design, prepared.calculations, reading.limits, battery=prepared.battery
+        ),
+        reading.limits,
+        prepared.calculations,
     )
     calcs = prepared.calculations + voltage.check(
         prepared.design, tree, reading.limits, first_id=len(prepared.calculations) + 1

@@ -241,7 +241,10 @@ manufacturers' reference designs and datasheets, values the backend \
 calculated from the netlist with datasheet formulas (cf1, ...), and the \
 power tree the backend built from the netlist (each rail, its voltage, the \
 part that makes it and what it supplies; a voltage marked inferred is a \
-guess to check, not a fact)."""
+guess to check, not a fact; once the datasheets are read, each rail's load \
+from its parts' maximum supply currents against the rated current of the \
+part making it, where "at least" means some parts give no figure and OVER \
+BUDGET is a risk to weigh, may fail, not verified)."""
 
 REVIEW_DIAGNOSE = f"""\
 You are an expert hardware engineer reviewing a hobbyist's KiCad schematic \
@@ -615,11 +618,15 @@ packages has one column per package: read the board's.
 maximum supply and pin voltages, the recommended operating supply range, \
 input logic thresholds, enable and undervoltage thresholds, reference or \
 feedback voltage, current limits, reset pulse width and start-up times, \
-internal pull-up and pull-down resistance. For a regulator also its rated \
-(maximum continuous) output current, its output voltage accuracy (as a \
-percentage when printed so) and its dropout voltage, under those names \
-("output current", "output voltage accuracy", "dropout voltage") at the \
-start of parameter. At most 30. Numbers and units as printed; null where \
+internal pull-up and pull-down resistance. For a regulator, power mux or \
+load switch also its rated (maximum continuous) output current, and for a \
+regulator its output voltage accuracy (as a percentage when printed so) and \
+its dropout voltage, under those names ("output current", "output voltage \
+accuracy", "dropout voltage") at the start of parameter. For every part \
+also the most current it draws from its supply in normal operation (its \
+highest active mode, e.g. radio transmit; not shutdown or sleep) as \
+"supply current" at the start of parameter, with pins its supply pins; \
+always include it when printed. At most 30. Numbers and units as printed; null where \
 the table gives no min, typ or max, or gives it relative to another pin \
 ("VDD + 0.3 V"; say so in conditions). kind is the table the limit is \
 from. pins are the board pins it limits: for a supply voltage every pin \

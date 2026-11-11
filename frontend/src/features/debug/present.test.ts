@@ -831,5 +831,43 @@ describe("powerRows", () => {
     expect(v33).toMatchObject({ voltage: "3.3 V", basis: "calculated, U5 feedback (cf1)" })
     // A part missing from the list still shows by its ref.
     expect(core).toMatchObject({ voltage: "voltage unknown", from: ["U9"] })
+    // No budget until the datasheets are read.
+    expect(v33).toMatchObject({ budget: null, over: false })
+  })
+
+  it("words a rail's budget: at least when parts are unknown, over against its rating", () => {
+    const rails = tree.rails.map((r) =>
+      r.net === "+3V3"
+        ? {
+            ...r,
+            budget: {
+              load_ma: 502.4,
+              unknown: ["U4"],
+              loads: [],
+              rated_ma: 300,
+              rated_note: "U5 datasheet p.1",
+              over: true,
+            },
+          }
+        : r.net === "VBAT"
+          ? {
+              ...r,
+              budget: {
+                load_ma: 550,
+                unknown: [],
+                loads: [],
+                rated_ma: null,
+                rated_note: "",
+                over: false,
+              },
+            }
+          : r,
+    )
+    const [bat, , v33] = powerRows({ ...tree, rails }, en)
+    expect(v33).toMatchObject({
+      budget: "load at least 502 mA (1 unknown: U4) against 300 mA rated (U5 datasheet p.1)",
+      over: true,
+    })
+    expect(bat).toMatchObject({ budget: "load 550 mA", over: false })
   })
 })

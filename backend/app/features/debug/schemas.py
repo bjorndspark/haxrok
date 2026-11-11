@@ -657,6 +657,34 @@ class PowerPart(BaseModel):
     output: str
 
 
+class RailLoad(BaseModel):
+    """One part drawing from a rail, and how much (``budget.apply``)."""
+
+    ref: str
+    ma: float | None = Field(description="Its most current from this rail; None when unknown.")
+    note: str = Field(
+        description='Where the figure comes from, e.g. "datasheet p.27" or "+3V3\'s load ×1.1".'
+    )
+
+
+class RailBudget(BaseModel):
+    """A rail's load against what feeds it: the sum of its parts' maximum
+    supply currents (a regulator or switch downstream counts its output's
+    load), against the rated output current of the part that makes it."""
+
+    load_ma: float = Field(description="The known part of the load: at least this much.")
+    unknown: list[str] = Field(
+        description="Parts with no supply-current figure, here or downstream."
+    )
+    loads: list[RailLoad]
+    rated_ma: float | None = Field(description="What the parts making it are rated for.")
+    rated_note: str = Field(description='Where the rating comes from, e.g. "U5 datasheet p.1".')
+    over: bool = Field(
+        description="The known load alone is above the rating: may fail, not verified, "
+        "since peaks rarely coincide."
+    )
+
+
 class PowerRail(BaseModel):
     """A power net, its voltage range and where that comes from, the parts
     that make it and the ICs it supplies. A source (``source`` set) is a
@@ -671,6 +699,9 @@ class PowerRail(BaseModel):
     note: str = Field(description='Where the voltage comes from, e.g. "U5 feedback (cf1)".')
     fed_by: list[str] = Field(description="Refs of the parts that make it.")
     loads: list[str] = Field(description="ICs with a supply pin on it.")
+    budget: RailBudget | None = Field(
+        default=None, description="Its current budget, once the datasheets are read."
+    )
 
 
 class PowerTree(BaseModel):

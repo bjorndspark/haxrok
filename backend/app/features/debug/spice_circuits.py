@@ -113,6 +113,7 @@ class Ratings:
     """A regulator's numbers from its datasheet facts (SI units)."""
 
     current: float | None = None  # rated output current, A
+    current_page: int | None = None  # the datasheet page it's on
     accuracy: float = _DEFAULT_ACCURACY  # output accuracy, as a fraction
     accuracy_cited: bool = False
     dropout: float | None = None  # V
@@ -177,7 +178,7 @@ class _Cut:
 # --- datasheet facts -------------------------------------------------------
 
 
-def _scaled(value: float | None, unit: str, kind: str) -> float | None:
+def scaled(value: float | None, unit: str, kind: str) -> float | None:
     """``value`` in SI units when ``unit`` is of ``kind`` ("A", "V", "s")."""
     u = unit.strip().replace("μ", "U").replace("µ", "U").upper()
     if value is None or not u.endswith(kind.upper()):
@@ -190,6 +191,7 @@ def ratings(limits: Sequence[LimitFact]) -> Ratings:
     """The regulator's rated current, accuracy, dropout, start-up time and
     typical input, as its datasheet facts give them."""
     current = None
+    current_page = None
     accuracy = None
     dropout = None
     startup = 0.0
@@ -203,23 +205,25 @@ def ratings(limits: Sequence[LimitFact]) -> Ratings:
         if current is None and _CURRENT.search(p) and not _NOT_RATED.search(p):
             # a rating may be only a guaranteed minimum ("min 2 A")
             rated = next((b for b in (lim.max, lim.typ, lim.min) if b is not None), None)
-            current = _scaled(rated, lim.unit, "A")
+            current = scaled(rated, lim.unit, "A")
+            current_page = lim.page
         elif accuracy is None and _ACCURACY.search(p) and lim.unit.strip() == "%":
             bounds = [abs(b) for b in (lim.min, lim.max) if b is not None]
             accuracy = max(bounds) / 100 if bounds else None
         elif dropout is None and _DROPOUT.search(p):
-            dropout = _scaled(lim.typ if lim.typ is not None else lim.max, lim.unit, "V")
+            dropout = scaled(lim.typ if lim.typ is not None else lim.max, lim.unit, "V")
         elif _STARTUP.search(p) and not _NOT_STARTUP.search(p):
-            t = _scaled(lim.typ if lim.typ is not None else lim.max, lim.unit, "s")
+            t = scaled(lim.typ if lim.typ is not None else lim.max, lim.unit, "s")
             if t is not None:
                 startup += t
                 timed = True
         elif vin is None and _INPUT.search(p):
-            vin = _scaled(lim.typ, lim.unit, "V")
+            vin = scaled(lim.typ, lim.unit, "V")
     if vin is None and conditions:
         vin = conditions.most_common(1)[0][0]
     return Ratings(
         current=current if current and current > 0 else None,
+        current_page=current_page if current and current > 0 else None,
         accuracy=accuracy or _DEFAULT_ACCURACY,
         accuracy_cited=accuracy is not None,
         dropout=dropout,
@@ -275,7 +279,7 @@ def supply_range(limits: Sequence[LimitFact], nominal: float) -> tuple[float, fl
     for lim in limits:
         if not _SUPPLY.search(lim.parameter) or _NOT_SUPPLY.search(lim.parameter):
             continue
-        lo, hi = _scaled(lim.min, lim.unit, "V"), _scaled(lim.max, lim.unit, "V")
+        lo, hi = scaled(lim.min, lim.unit, "V"), scaled(lim.max, lim.unit, "V")
         if lo is None or hi is None or lo <= 0 or not lo <= nominal <= hi:
             continue
         if best is None or hi - lo > best[1] - best[0]:

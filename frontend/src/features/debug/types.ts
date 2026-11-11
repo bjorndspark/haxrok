@@ -366,6 +366,29 @@ export type VoltageBasis =
   | "user"
   | "unknown"
 
+/** What one part draws from a rail (budget.apply). */
+export interface RailLoad {
+  ref: string
+  /** Milliamps; null when its datasheet gives no figure. */
+  ma: number | null
+  /** Where the figure came from, e.g. "datasheet p.27". */
+  note: string
+}
+
+/** A rail's load against the rated current of the part making it, filled
+ *  once the datasheets are read. Over budget may fail; it isn't verified. */
+export interface RailBudget {
+  /** The sum of the known loads; a floor when `unknown` isn't empty. */
+  load_ma: number
+  /** Refs with no figure, here or on a rail below. */
+  unknown: string[]
+  loads: RailLoad[]
+  rated_ma: number | null
+  /** Where the rating came from, e.g. "U5 datasheet p.1". */
+  rated_note: string
+  over: boolean
+}
+
 /** A rail of the power tree (power.build). */
 export interface PowerRail {
   net: string
@@ -382,6 +405,7 @@ export interface PowerRail {
   /** Refs of the parts that make it, and of the parts that draw from it. */
   fed_by: string[]
   loads: string[]
+  budget?: RailBudget | null
 }
 
 /** Each rail, the part that makes it and what it supplies, built from the

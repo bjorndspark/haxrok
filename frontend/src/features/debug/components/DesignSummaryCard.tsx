@@ -167,7 +167,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
                   {r.inferred && <Badge tone="warn">{t.inferred}</Badge>}
                   <span className="min-w-0 text-muted-foreground">{r.basis}</span>
                 </div>
-                {(r.from.length > 0 || r.loads.length > 0) && (
+                {(r.from.length > 0 || r.loads.length > 0 || r.budget) && (
                   <div className="space-y-0.5 pl-[2ch] text-muted-foreground">
                     {r.from.map((line) => (
                       <p key={line}>{line}</p>
@@ -175,6 +175,12 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
                     {r.loads.length > 0 && (
                       <p>
                         {t.supplies} {r.loads.join(", ")}
+                      </p>
+                    )}
+                    {r.budget && (
+                      <p className="flex flex-wrap items-baseline gap-x-[1ch]">
+                        {r.over && <Badge tone="warn">{t.overBudget}</Badge>}
+                        <span className="min-w-0">{r.budget}</span>
                       </p>
                     )}
                   </div>

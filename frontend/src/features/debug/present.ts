@@ -15,6 +15,7 @@ import type {
   Run,
   PinWarning,
   PowerTree,
+  RailBudget,
   SimCircuit,
   WiringFinding,
 } from "./types"
@@ -269,11 +270,31 @@ export interface PowerRow {
   /** One per part that makes it: "U3 TPS2121 (mux/switch) ← VBUS, VBAT". */
   from: string[]
   loads: string[]
+  /** "load at least 550 mA (1 unknown: U4) against 2000 mA rated (…)";
+   *  null before the datasheets are read. */
+  budget: string | null
+  over: boolean
 }
 
 /** Volts with at most three significant digits, so 3.2999 reads 3.3. */
 function volt(v: number): string {
   return String(Number(v.toPrecision(3)))
+}
+
+/** Milliamps with at most three significant digits. */
+function milliamps(v: number): string {
+  return String(Number(v.toPrecision(3)))
+}
+
+/** A rail's budget in one line, or null when it has none. */
+function budgetLine(b: RailBudget | null | undefined, m: Messages): string | null {
+  if (!b) return null
+  const t = m.summary
+  const load =
+    b.unknown.length > 0
+      ? t.loadAtLeast(milliamps(b.load_ma), b.unknown)
+      : t.load(milliamps(b.load_ma))
+  return b.rated_ma === null ? load : `${load} ${t.rated(milliamps(b.rated_ma), b.rated_note)}`
 }
 
 /** The power tree as rows, roots first (the backend's order). */
@@ -299,6 +320,8 @@ export function powerRows(tree: PowerTree, m: Messages): PowerRow[] {
       basis: r.note ? `${t.basis[r.basis]}, ${r.note}` : t.basis[r.basis],
       from,
       loads: r.loads,
+      budget: budgetLine(r.budget, m),
+      over: r.budget?.over ?? false,
     }
   })
 }
