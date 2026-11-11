@@ -63,6 +63,39 @@ def test_the_same_buck_boost_wired_right_is_quiet():
     assert pins.lookup(_buck_boost("/L2")).findings == []
 
 
+def test_l2_on_its_own_output_gets_a_fix_to_a_net_of_its_own():
+    # The inductor's other end is on L1, so L2 and that end belong together.
+    [finding] = pins.lookup(_buck_boost("+3.3V")).findings
+    fix = finding.fix
+    assert fix is not None
+    assert (fix.pins, fix.leaves, fix.joins, fix.new_net) == (
+        ["U15.5", "L3.2"],
+        "+3.3V",
+        "Net-(U15-L2)",
+        True,
+    )
+    assert "L3 runs from U15.4 (L1) to U15.5 (L2)" in fix.text
+
+
+def test_applying_the_fix_wires_the_buck_boost_right():
+    design = _buck_boost("+3.3V")
+    [finding] = pins.lookup(design).findings
+    assert finding.fix is not None
+    fixed = roles.apply_fix(design, finding.fix)
+    assert fixed.net_of("U15.5") == fixed.net_of("L3.2") == "Net-(U15-L2)"
+    assert [n.pin_ref for n in fixed.nets["+3.3V"]] == ["U15.6", "U15.7", "U3.1"]
+    assert pins.lookup(fixed).findings == []
+    # The board it came from is untouched.
+    assert design.net_of("U15.5") == "+3.3V"
+
+
+def test_a_fixs_new_net_doesnt_take_an_existing_name():
+    design = _buck_boost("+3.3V")
+    design = Design(design.parts, {**design.nets, "Net-(U15-L2)": [Node("TP1", "1", "")]})
+    [finding] = pins.lookup(design).findings
+    assert finding.fix is not None and finding.fix.joins == "Net-(U15-L2)_2"
+
+
 def test_a_switch_pin_reaching_another_ic_is_a_finding():
     design = _design(
         {"U1": "AP62200", "U2": "TLV1117", "L1": "4u7", "C5": "100n", "D1": "SS34"},
@@ -76,6 +109,8 @@ def test_a_switch_pin_reaching_another_ic_is_a_finding():
     [finding] = pins.lookup(design).findings
     assert finding.pin == "U1.3"
     assert finding.conflicts == ["U2.3", "C5.2"]
+    # Which of U2.3 and C5.2 should leave isn't the rule's to say.
+    assert finding.fix is None
 
 
 def test_a_buck_with_its_bootstrap_cap_and_catch_diode_is_quiet():

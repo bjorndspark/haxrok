@@ -28,11 +28,12 @@ picked becomes one deck:
 
 Ammeters (zero-volt sources) sit on the source and on each switch-node pin
 (LX, SW, a buck-boost's L1/L2; plan 006 step 1), and their peaks are
-measured in every deck: a burst into a switch-node pin above the
-datasheet's switch current limit (2× the rated current without one,
-labelled not cited) is flagged, whatever the voltages do. A PG pin on its
-own net is probed and its rise reported. A model with a switch-node pin
-gets the switching solver settings (gear, relaxed tolerances, ``uic``).
+measured in every deck (MAX and MIN; the larger by magnitude): a burst
+into or out of a switch-node pin above the datasheet's switch current
+limit (2× the rated current without one, labelled not cited) is flagged,
+whatever the voltages do. A PG pin on its own net is probed and its rise
+reported. A model with a switch-node pin gets the switching solver
+settings (gear, relaxed tolerances, ``uic``).
 
 The limits come from the datasheet facts (``facts.DatasheetReading.limits``):
 the regulator's rated current, accuracy (±5 % without one), start-up time,
@@ -71,10 +72,12 @@ from app.features.debug.schemas import (
     PowerTree,
     SimAnalysis,
     SimLevel,
+    SimPeak,
     SimRamp,
     Simulation,
     SimVerdict,
     SpiceModelStatus,
+    WiringFix,
 )
 from app.features.debug.spice import RESET_RELEASE, ModelRunner, Run, one_line, time_unit
 from app.features.debug.spice_convert import MODES, ModelFiles, model_files, ngspice_error
@@ -204,6 +207,20 @@ class Job:
     deck: str
     limits: Limits
     files: dict[str, bytes] = field(default_factory=dict, repr=False)
+    nets: frozenset[str] = frozenset()  # the board nets the deck holds
+    fix_of: str | None = None  # a with-fix run: the as-built run it pairs with
+    finding: str | None = None  # and the WiringFinding whose fix it applies
+
+
+@dataclass(frozen=True)
+class Fixed:
+    """A wiring finding's fix applied to the board (plan 006 step 3): each
+    chain it touches runs again on ``design``, beside the as-built run."""
+
+    finding: str  # the WiringFinding's id, "wf1"
+    fix: WiringFix
+    design: Design  # the board with the fix (``roles.apply_fix``)
+    tree: PowerTree | None  # its budgeted power tree
 
 
 @dataclass(frozen=True)
@@ -758,6 +775,7 @@ def _deck(
             + " ".join(f"i(vam_{a})" for a in ammeters),
             f"tran {_STEP:g} {stop:g}" + (" uic" if switching else ""),
             *(f"meas tran pk_{a} MAX i(vam_{a})" for a in ammeters),
+            *(f"meas tran nk_{a} MIN i(vam_{a})" for a in ammeters),
             "linearize",
             f"wrdata out.txt {' '.join(f'v({p})' for p in probes)}",
             "quit",
@@ -857,7 +875,7 @@ def plan(
         start = f" from {cut.source_net}" if cut.source_net else ""
         full = f"{title} {what}{start}, vendor model"
         deck = _deck(full, m.name, cut, sources, limits.stop, probes)
-        jobs.append(Job(ref, analysis, full, deck, limits, m.files))
+        jobs.append(Job(ref, analysis, full, deck, limits, m.files, frozenset(cut.nodes)))
     return jobs
 
 
@@ -890,10 +908,12 @@ def _supply_limits(
 
 
 Rows = list[tuple[float, ...]]
-Peaks = dict[str, tuple[float, float]]  # ammeter -> (peak current, A; when, s)
+Peaks = dict[str, tuple[float, float]]  # ammeter -> (signed peak current, A; when, s)
 
-# ``meas tran pk_l2 MAX i(vam_l2)`` prints "pk_l2 = 1.77e+00 at= 3.75e-04".
-_PEAK = re.compile(r"^pk_(\w+)\s*=\s*(\S+)\s+at=\s*(\S+)", re.MULTILINE | re.IGNORECASE)
+# ``meas tran pk_l2 MAX i(vam_l2)`` prints "pk_l2 = 1.77e+00 at= 3.75e-04", and
+# ``nk_l2 … MIN`` the most negative: a switch pin sources current as often as
+# it sinks it (L1 into its inductor), so the peak is whichever is larger.
+_PEAK = re.compile(r"^[pn]k_(\w+)\s*=\s*(\S+)\s+at=\s*(\S+)", re.MULTILINE | re.IGNORECASE)
 
 
 def parse_columns(text: str, n: int) -> Rows:
@@ -916,16 +936,19 @@ def parse_columns(text: str, n: int) -> Rows:
 
 def parse_peaks(log: str) -> Peaks:
     """Each ammeter's peak current and when, from the ``meas`` lines in
-    ngspice's log; an ammeter whose line is missing, unreadable or not a
-    number ("nan") is left out."""
+    ngspice's log: the larger of its MAX and MIN by magnitude, signed, so a
+    negative peak is current out of the pin. An ammeter whose lines are
+    missing, unreadable or not a number ("nan") is left out."""
     peaks: Peaks = {}
     for m in _PEAK.finditer(log):
         try:
             peak, at = float(m.group(2)), float(m.group(3))
         except ValueError:
             continue
-        if math.isfinite(peak) and math.isfinite(at):
-            peaks[m.group(1).lower()] = (peak, at)
+        name = m.group(1).lower()
+        bigger = name not in peaks or abs(peak) > abs(peaks[name][0])
+        if math.isfinite(peak) and math.isfinite(at) and bigger:
+            peaks[name] = (peak, at)
     return peaks
 
 
@@ -967,19 +990,25 @@ def _a(amps: float) -> str:
     return f"{amps:.2f} A"
 
 
+def _through(peak: float, label: str) -> str:
+    """The peak's direction and pin: "into U5.9 (L2) on +3V3", or "out of
+    U5.9 (L2) on +3V3" for a negative peak."""
+    return f"{'into' if peak >= 0 else 'out of'} {label}"
+
+
 def _currents(lim: Limits, peaks: Peaks) -> tuple[list[str], str]:
     """(what's wrong, what's said) about the ammeters' peaks: a burst into
-    a switch-node pin above the switch current limit is flagged."""
+    or out of a switch-node pin above the switch current limit is flagged."""
     wrong = []
     said = []
     for sw in lim.switches:
         if sw.name not in peaks:
             continue
         peak, at = peaks[sw.name]
-        said.append(f"into {sw.label} {_a(peak)} at {_t(at)}")
-        if peak > lim.switch_limit:
+        said.append(f"{_through(peak, sw.label)} {_a(abs(peak))} at {_t(at)}")
+        if abs(peak) > lim.switch_limit:
             wrong.append(
-                f"draws {_a(peak)} into {sw.label} at {_t(at)}, above "
+                f"draws {_a(abs(peak))} {_through(peak, sw.label)} at {_t(at)}, above "
                 f"{_a(lim.switch_limit)} ({lim.switch_label})"
             )
     if "in" in peaks:
@@ -1126,6 +1155,7 @@ def result(sim_id: str, job: Job, run: Run) -> Simulation:
     unit, scale = time_unit(job.limits.stop)
     got: SimVerdict
     rows: Rows = []
+    peaks: list[SimPeak] = []
     if run.code is None:
         minutes = settings.NGSPICE_MODEL_TIMEOUT_S / 60
         got, text = "timed_out", f"ngspice was stopped after {minutes:g} min, before it finished."
@@ -1136,8 +1166,10 @@ def result(sim_id: str, job: Job, run: Run) -> Simulation:
                 rows = parse_columns(run.data, len(job.limits.probes))
             except ValueError as e:
                 error = f"its output was unreadable ({e})"
+        parsed = parse_peaks(run.log)
+        peaks = _peaks(job.limits, parsed)
         if rows:
-            got, text = verdict(job.analysis, job.limits, rows, parse_peaks(run.log))
+            got, text = verdict(job.analysis, job.limits, rows, parsed)
         else:
             error = error or ngspice_error(run.log) or f"ngspice exited with {run.code}"
             got, text = "failed", f"The run failed: {error}"
@@ -1154,7 +1186,29 @@ def result(sim_id: str, job: Job, run: Run) -> Simulation:
         v=[round(r[1], 4) for r in thin],
         levels=_levels(job.analysis, job.limits),
         text=text[:2000],
+        peaks=peaks,
+        fix_of=job.fix_of,
+        finding=job.finding,
     )
+
+
+def _peaks(lim: Limits, peaks: Peaks) -> list[SimPeak]:
+    """The ammeters' peaks as the UI lists them: each switch pin's, then
+    the input's. Named by ammeter, so a with-fix run's rows line up with
+    the as-built run's."""
+    got = [
+        SimPeak(
+            name=sw.name,
+            label=_through(peaks[sw.name][0], sw.label)[:200],
+            a=peaks[sw.name][0],
+            t_s=peaks[sw.name][1],
+        )
+        for sw in lim.switches
+        if sw.name in peaks
+    ]
+    if "in" in peaks:
+        got.append(SimPeak(name="in", label="from the input", a=peaks["in"][0], t_s=peaks["in"][1]))
+    return got[:10]
 
 
 def skipped(sim_id: str, skip: Skip) -> Simulation:
@@ -1176,6 +1230,12 @@ def skipped(sim_id: str, skip: Skip) -> Simulation:
 # --- running -----------------------------------------------------------------
 
 
+def _touches(fix: WiringFix, job: Job) -> bool:
+    """Whether ``fix`` changes ``job``'s circuit: a pin of its IC moves, or
+    the net the pins leave is one of its deck's."""
+    return fix.leaves in job.nets or any(p.split(".", 1)[0] == job.ref for p in fix.pins)
+
+
 def _runnable(statuses: Iterable[SpiceModelStatus]) -> list[SpiceModelStatus]:
     return [s for s in statuses if s.loads and s.status in MODES and s.subckt]
 
@@ -1188,11 +1248,15 @@ async def simulate(
     analyses: Sequence[SimAnalysis],
     runner: ModelRunner,
     tree: PowerTree | None = None,
+    fixes: Sequence[Fixed] = (),
 ) -> AsyncIterator[Simulation]:
     """Plan each loading model's decks and run them (``_PARALLEL`` at once),
     yielding the skipped ones first, then each verdict as it finishes.
     ``tree`` is the budgeted power tree each chain and load come from.
-    Closing the iterator early cancels the runs still going."""
+    Each deck a fix touches (its IC's pin moves, or the net it leaves is in
+    the deck) runs again with the fix, naming the as-built run it pairs
+    with (plan 006 step 3). Closing the iterator early cancels the runs
+    still going."""
     if not analyses:
         return
     jobs: list[tuple[str, Job]] = []
@@ -1210,9 +1274,30 @@ async def simulate(
             logger.info("spice circuits: %s skipped: %s", s.ref, got.reason)
             yield skipped(f"vm{n}", got)
             continue
+        built: list[tuple[str, Job]] = []
         for job in got:
             n += 1
-            jobs.append((f"vm{n}", job))
+            built.append((f"vm{n}", job))
+        jobs.extend(built)
+        for f in fixes:
+            touched = {j.analysis: i for i, j in built if _touches(f.fix, j)}
+            if not touched:
+                continue
+            again = plan(f.design, s, m, reading, list(touched), f.tree)
+            if not isinstance(again, list):
+                logger.info(
+                    "spice circuits: %s with %s's fix isn't planned: %s", s.ref, f.finding, again
+                )
+                continue
+            for job in again:
+                n += 1
+                title = f"{job.title}, with {f.finding}'s fix"
+                jobs.append(
+                    (
+                        f"vm{n}",
+                        replace(job, title=title, fix_of=touched[job.analysis], finding=f.finding),
+                    )
+                )
     gate = asyncio.Semaphore(_PARALLEL)
 
     async def one(sim_id: str, job: Job) -> Simulation | None:

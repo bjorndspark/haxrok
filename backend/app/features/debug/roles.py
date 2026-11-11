@@ -25,7 +25,7 @@ from dataclasses import dataclass
 
 from app.features.debug.calc import is_ground, named_voltage
 from app.features.debug.design import Design, Label, Node, is_ic, is_inductor, short_net_name
-from app.features.debug.schemas import AppPart, ErcEntry, PinRole, WiringFinding
+from app.features.debug.schemas import AppPart, ErcEntry, PinRole, WiringFinding, WiringFix
 
 # Where a role came from, as a finding names it. A name-only role is the
 # weakest: it only counts on an IC that looks like a regulator (``assign``).
@@ -200,7 +200,78 @@ def _switch(
             f"{pin_ref} ({pin.name}) is an inductor connection, a switch node "
             f"({_cited(pin)}), {problem}. It should connect only to its inductor."
         ),
+        fix=_switch_fix(design, ref, pins, pin, net, inductors),
     )
+
+
+def _switch_fix(
+    design: Design,
+    ref: str,
+    pins: Mapping[str, Pin],
+    pin: Pin,
+    net: str,
+    inductors: Sequence[Node],
+) -> WiringFix | None:
+    """The fix for a switch pin that shares its net with one inductor end
+    whose other end is on another of its IC's switch pins: a buck-boost's
+    inductor runs from L1 to this net, so the pin and that end belong on a
+    net of their own (plan 006 step 3; the private board's U5.9, orbit's
+    U15.7). Any other shape has no unambiguous fix, so None."""
+    if len(inductors) != 1:
+        return None
+    end = inductors[0]
+    far = _far_ends(design, end) - {net}
+    if len(far) != 1:
+        return None
+    partner = next(
+        (
+            n
+            for n in design.nets[far.pop()]
+            if n.ref == ref
+            and n.pin != pin.number
+            and n.pin in pins
+            and pins[n.pin].role == "switch"
+        ),
+        None,
+    )
+    if partner is None:
+        return None
+    pin_ref = f"{ref}.{pin.number}"
+    joins = _free_name(design, f"Net-({ref}-{pin.name})")
+    return WiringFix(
+        pins=[pin_ref, end.pin_ref],
+        leaves=net,
+        joins=joins,
+        new_net=True,
+        text=(
+            f"{pin_ref} ({pin.name}) and {end.pin_ref} leave {net} for a net of their own, "
+            f"{joins}, so {end.ref} runs from {partner.pin_ref} ({pins[partner.pin].name}) "
+            f"to {pin_ref} ({pin.name})."
+        ),
+    )
+
+
+def _free_name(design: Design, name: str) -> str:
+    """``name``, or ``name_2``, … when the design already has it."""
+    got, n = name, 1
+    while got in design.nets:
+        n += 1
+        got = f"{name}_{n}"
+    return got
+
+
+def apply_fix(design: Design, fix: WiringFix) -> Design:
+    """``design`` with ``fix``'s pins moved from its ``leaves`` net to its
+    ``joins`` net (created when new). The parts stay; ``design`` is untouched."""
+    moved = set(fix.pins)
+    nets = {
+        name: [n for n in nodes if name != fix.leaves or n.pin_ref not in moved]
+        for name, nodes in design.nets.items()
+    }
+    nets.setdefault(fix.joins, []).extend(
+        n for n in design.nets.get(fix.leaves, []) if n.pin_ref in moved
+    )
+    return Design(dict(design.parts), nets)
 
 
 def _feedback(

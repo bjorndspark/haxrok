@@ -16,7 +16,9 @@ import {
   isVendorModel,
   modelBadge,
   nearestPoint,
+  pairVendorSims,
   parseSi,
+  peakRows,
   powerRows,
   stateRows,
   simulationLayout,
@@ -721,6 +723,62 @@ describe("toMarkdown with datasheets and vendor models", () => {
     )
     expect(md).not.toContain("## Simulations\n")
     expect(md).not.toContain("```spice")
+  })
+})
+
+describe("vendor-model runs before and after a fix", () => {
+  const built: Simulation = {
+    id: "vm1",
+    calc_id: null,
+    ref: "U15",
+    analysis: "startup",
+    verdict: "flagged",
+    title: "U15 start-up with its vendor model",
+    deck: "",
+    t: [0, 1],
+    t_unit: "ms",
+    v: [0, 3.3],
+    levels: [],
+    text: "",
+    peaks: [
+      { name: "l2", label: "into U15.6 (L2) on /+3V3", a: 12.5, t_s: 8e-5 },
+      { name: "in", label: "from the input", a: 13.1, t_s: 8e-5 },
+    ],
+  }
+  const fixed: Simulation = {
+    ...built,
+    id: "vm3",
+    verdict: "passed",
+    title: "U15 start-up with its vendor model, with W2's fix",
+    fix_of: "vm1",
+    finding: "W2",
+    peaks: [
+      { name: "l2", label: "into U15.6 (L2) on Net-(U15-L2)", a: 0.84, t_s: 2e-4 },
+      { name: "in", label: "from the input", a: 0.0021, t_s: 2e-4 },
+    ],
+  }
+  const other: Simulation = { ...built, id: "vm2", ref: "U3", peaks: [] }
+
+  it("pairs a with-fix run with the as-built run it names", () => {
+    expect(pairVendorSims([built, other, fixed])).toEqual([
+      { sim: built, fixed },
+      { sim: other, fixed: null },
+    ])
+  })
+
+  it("keeps a with-fix run whose as-built run is missing on its own", () => {
+    expect(pairVendorSims([other, fixed])).toEqual([
+      { sim: other, fixed: null },
+      { sim: fixed, fixed: null },
+    ])
+  })
+
+  it("lines up each ammeter's peak as built and with the fix, under the as-built label", () => {
+    expect(peakRows(built, fixed)).toEqual([
+      { name: "l2", label: "into U15.6 (L2) on /+3V3", built: "12.5 A", fixed: "840 mA" },
+      { name: "in", label: "from the input", built: "13.1 A", fixed: "2.1 mA" },
+    ])
+    expect(peakRows(other, null)).toEqual([])
   })
 })
 

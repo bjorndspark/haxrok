@@ -1275,7 +1275,7 @@ class FakeVendorSims:
         self.fail = fail
         self.calls: list[tuple[str, ...]] = []
 
-    async def __call__(self, statuses, upload, design, reading, analyses, runner, tree):
+    async def __call__(self, statuses, upload, design, reading, analyses, runner, tree, fixes=()):
         import asyncio
 
         from app.features.debug import spice_circuits as sc

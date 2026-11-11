@@ -176,7 +176,7 @@ tests, 49 frontend.
 board's chain runs from its battery through U3 to U5.
 Effort: 6–10 h.
 
-## 3. Before and after a fix: proposed
+## 3. Before and after a fix: done
 
 - The review gives a structured fix (pin → net) for a wiring finding.
 - The chain runs as built and with the fix; both are drawn on one chart
@@ -198,6 +198,42 @@ step 4's current-limited supply.
 Decided (2026-11-11, default): the with-fix run happens only for a
 chain a fixed finding touches, and keeps its own verdict; the pair is
 linked by the with-fix run naming the as-built run's id and the finding.
+
+`roles.apply_fix` moves the switch pin off the output onto a fresh net
+(`Net-(U5-L2)`, renamed if taken) and `spice_circuits.simulate` runs each
+chain a fixed finding touches a second time, as `Simulation.fix_of` /
+`finding`, with its peaks as `SimPeak` rows. The UI pairs the two runs:
+the with-fix output dashed over the as-built one, both verdicts, a peak
+table (as built vs with the fix) and both netlists. Peaks are now signed:
+ngspice measures each ammeter's `MIN` as well as its `MAX`, and the
+larger magnitude is kept, worded "into" or "out of" the pin.
+
+**Checks:** 3 new tests in `test_debug_roles.py` (the TPS63802's L2 on
+its own output gets a fix to a net of its own; applying it wires the
+buck-boost right; the new net never takes an existing name). 3 new in
+`test_debug_spice_circuits.py`: a burst out of a switch pin is flagged
+and worded "out of", a fixed finding runs its chain again with the fix
+(the pair linked, both verdicts kept), and a fix elsewhere doesn't; the
+deck and peak-parsing tests now expect the `MIN` lines and signed peaks.
+3 new in `present.test.ts`: pairing by `fix_of`, a with-fix run whose
+as-built run is missing stays on its own, and the peak rows ("840 mA"
+beside "2.1 mA", the as-built label).
+
+`evals/cases/orbit-l2-shorted` (U15, a TPS63802 with L2 on +3.3V), with
+`sim=startup`, gives the pair in about 7 min: as built **passed**, 3.30 V,
+3.17 A out of L1 and the input, L2 0.00 A; with wf1's fix **passed**,
+3.30 V, 3.08 A through L1, L2 (on `Net-(U15-L2)`) and the input. The
+private board's pair wasn't run: its project isn't on this machine, so
+it is checked by hand with step 4's current-limited supply.
+
+Bugs found: the first orbit run read L1 as "-0.00 A" while the input drew
+3.17 A, since peaks were measured with `MAX` only and an outward burst is
+negative. Step 2's "L2 shows no burst (0.00 A)" on the private board was
+read the same way and wants rereading in step 4. Also caught: the new
+`Simulation` fields first landed in the wrong TS interface (tsc), an
+`&&` chain ESLint wanted optional, and a nested `if` ruff flagged
+(SIM102). `make lint` and `make test` pass (sub-targets, make 3.81): 392
+backend tests, 52 frontend.
 
 **Check:** unit tests for applying a fix to the design; the private
 board's before/after pair, both runs finishing with their numbers

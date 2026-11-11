@@ -174,6 +174,54 @@ export function isVendorModel(sim: Simulation): boolean {
   return sim.ref != null
 }
 
+/** A vendor-model run and, when a wiring finding's fix touched its chain,
+ *  the same run with the fix (plan 006). */
+export interface SimPair {
+  sim: Simulation
+  fixed: Simulation | null
+}
+
+/** Pair each with-fix run with the as-built run it names in `fix_of`; a
+ *  with-fix run whose as-built run isn't there stays on its own. */
+export function pairVendorSims(sims: Simulation[]): SimPair[] {
+  const ids = new Set(sims.map((s) => s.id))
+  const fixed = new Map<string, Simulation>()
+  for (const s of sims) if (s.fix_of && ids.has(s.fix_of)) fixed.set(s.fix_of, s)
+  return sims
+    .filter((s) => !(s.fix_of && ids.has(s.fix_of)))
+    .map((sim) => ({ sim, fixed: fixed.get(sim.id) ?? null }))
+}
+
+export interface PeakRow {
+  name: string
+  label: string
+  /** "12.5 A", or null when that run has no such ammeter. */
+  built: string | null
+  fixed: string | null
+}
+
+/** Amps with an SI prefix: 12.5 → `12.5 A`, 0.0021 → `2.1 mA`. */
+function amps(a: number): string {
+  if (a === 0) return "0 A"
+  const si = formatSi(Math.abs(a))
+  const prefix = /\D$/.test(si) ? si.slice(-1) : ""
+  return `${si.slice(0, si.length - prefix.length)} ${prefix}A`
+}
+
+/** Each ammeter's peak as built beside the same ammeter with the fix,
+ *  keyed by name; the as-built label wins, since the fix renames the net. */
+export function peakRows(built: Simulation, fixed: Simulation | null): PeakRow[] {
+  const rows = new Map<string, PeakRow>()
+  for (const p of built.peaks ?? [])
+    rows.set(p.name, { name: p.name, label: p.label, built: amps(p.a), fixed: null })
+  for (const p of fixed?.peaks ?? []) {
+    const row = rows.get(p.name)
+    if (row) row.fixed = amps(p.a)
+    else rows.set(p.name, { name: p.name, label: p.label, built: null, fixed: amps(p.a) })
+  }
+  return [...rows.values()]
+}
+
 export type StatusTone = "ok" | "warn" | "neutral"
 
 /** An IC's datasheet or model status in the summary card: a label, the PDF

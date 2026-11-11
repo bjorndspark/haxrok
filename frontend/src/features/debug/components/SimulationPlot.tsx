@@ -6,13 +6,16 @@ import type { Simulation } from "../types"
 
 /** ngspice's waveform for an RC node: a flagged I²C line rising past the
  *  IC's supply + 0.3 V, or an enable pin rising through its RC delay.
- *  A what-if re-run is drawn dashed over it. Hover reads off a sample. */
+ *  A what-if re-run, or the same run with a wiring fix, is drawn dashed
+ *  over it; `legend` names the dashed line. Hover reads off a sample. */
 export function SimulationPlot({
   sim,
   whatIf = null,
+  legend,
 }: {
   sim: Simulation
   whatIf?: Simulation | null
+  legend?: string
 }) {
   const t = useMessages().simulations.whatIf
   const layout = simulationLayout(sim, whatIf)
@@ -125,7 +128,7 @@ export function SimulationPlot({
         <p>{sim.text}</p>
         {whatIf && (
           <p>
-            <span className="mr-[1ch] text-warn">╌ {t.legend}</span>
+            <span className="mr-[1ch] text-warn">╌ {legend ?? t.legend}</span>
             {whatIf.text}
           </p>
         )}

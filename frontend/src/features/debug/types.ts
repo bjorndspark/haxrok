@@ -155,6 +155,19 @@ export interface WiringFinding {
   /** Every net the text names. Absent in runs recorded before it existed. */
   nets?: string[]
   text: string
+  /** The unambiguous rewiring, when the rule gives one (plan 006 step 3). */
+  fix?: WiringFix | null
+}
+
+/** A wiring finding's fix: its pins leave one net and join another (a new
+ *  one when `new_net`). The vendor-model runs it touches run again with it. */
+export interface WiringFix {
+  /** REF.PIN refs that move, the finding's pin first. */
+  pins: string[]
+  leaves: string
+  joins: string
+  new_net: boolean
+  text: string
 }
 
 /** A transistor whose symbol pin order breaks the common SOT-23 pinout
@@ -245,6 +258,21 @@ export interface Simulation {
   text: string
   /** RC runs only: what a what-if re-run needs. */
   circuit?: SimCircuit | null
+  /** Vendor model only: each ammeter's peak, switch pins then the input. */
+  peaks?: SimPeak[]
+  /** A with-fix run: the as-built run it pairs with, and the finding. */
+  fix_of?: string | null
+  finding?: string | null
+}
+
+/** One ammeter's peak current in a vendor-model run. */
+export interface SimPeak {
+  /** The ammeter, "l2" or "in": the same in an as-built run and its with-fix run. */
+  name: string
+  /** "into U5.9 (L2) on +3V3", "from the input". */
+  label: string
+  a: number
+  t_s: number
 }
 
 /** Re-run an RC simulation with the user's R and C. */

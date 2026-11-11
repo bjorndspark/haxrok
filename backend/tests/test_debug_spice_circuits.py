@@ -7,6 +7,7 @@ import shutil
 
 import pytest
 
+from app.features.debug import pins, roles
 from app.features.debug import spice_circuits as sc
 from app.features.debug.design import Design, Node, Part
 from app.features.debug.facts import DatasheetReading
@@ -17,6 +18,7 @@ from app.features.debug.schemas import (
     PowerTree,
     RailBudget,
     SpiceModelStatus,
+    WiringFix,
 )
 from app.features.debug.spice import Ngspice, Run
 from app.features.debug.spice_convert import ModelFiles
@@ -234,6 +236,7 @@ def test_the_startup_deck_ramps_the_input_and_switches_on_the_rated_load():
     assert "tran 2.5e-07 0.0006495 uic" in lines  # the ramp, then 1.1 × (224 + 321) µs
     for a in ("in", "l1", "l2"):
         assert f"meas tran pk_{a} MAX i(vam_{a})" in lines
+        assert f"meas tran nk_{a} MIN i(vam_{a})" in lines
     assert "wrdata out.txt v(out) v(vin) v(rst) v(n4)" in lines
     assert job.limits.reset == "U16.7 (NRST)" and job.limits.pg == "U15.8 (PG)"
     assert job.limits.probes == ("out", "vin", "rst", "n4")
@@ -647,10 +650,12 @@ def test_parse_peaks_reads_the_meas_lines():
         "pk_in               =  2.880005e+00 at=  5.000000e-05\n"
         "pk_l2               =  1.772828e+00 at=  3.747500e-04\n"
         "pk_l1 = nan at= nan\n"
+        "nk_in               = -3.000000e-01 at=  1.000000e-05\n"
+        "nk_l2               = -2.500000e+00 at=  2.000000e-04\n"
         "Error: measure  pk_x  (MAX) : out of interval\n"
     )
     peaks = sc.parse_peaks(log)
-    assert peaks["in"] == (2.880005, 5e-5) and peaks["l2"] == (1.772828, 3.7475e-4)
+    assert peaks["in"] == (2.880005, 5e-5) and peaks["l2"] == (-2.5, 2e-4)
     assert "x" not in peaks
 
 
@@ -685,6 +690,21 @@ def test_result_reads_the_ammeters_peaks_from_the_log():
     rows = _rows(649.5e-6, _ramp, rst=lambda t: _ramp(t, 500e-6), step=0.25e-6)
     sim = sc.result("vm1", job, Run(0, _wrdata(rows), "pk_l2 = 1.25e+01 at= 8.0e-05\n"))
     assert sim.verdict == "flagged" and sim.text.startswith("U15 draws 12.50 A into U15.6 (L2)")
+    assert [(p.name, p.label, p.a, p.t_s) for p in sim.peaks] == [
+        ("l2", "into U15.6 (L2) on /L2", 12.5, 8e-5)
+    ]
+    assert sim.fix_of is None and sim.finding is None
+
+
+def test_a_burst_out_of_a_switch_pin_counts_too():
+    # L1 sources its inductor's current: the burst is the MIN, negative.
+    (job,) = _jobs()
+    rows = _rows(649.5e-6, _ramp, rst=lambda t: _ramp(t, 500e-6), step=0.25e-6)
+    log = "pk_l2 = 1.0e-03 at= 3.0e-04\nnk_l2 = -1.25e+01 at= 8.0e-05\n"
+    sim = sc.result("vm1", job, Run(0, _wrdata(rows), log))
+    assert sim.verdict == "flagged"
+    assert sim.text.startswith("U15 draws 12.50 A out of U15.6 (L2)")
+    assert [(p.label, p.a) for p in sim.peaks] == [("out of U15.6 (L2) on /L2", -12.5)]
 
 
 def test_a_skip_becomes_a_simulation_without_samples():
@@ -742,6 +762,65 @@ async def test_simulate_yields_skips_first_then_each_verdict():
     assert len(runner.decks) == 2  # the load step ran but ngspice "wasn't there"
 
     assert [s async for s in sc.simulate(statuses, upload, design, _reading(), [], runner)] == []
+
+
+def _l2_shorted() -> Design:
+    """The orbit board with L2 drawn onto its own output, as the
+    orbit-l2-shorted eval case and the private board have it."""
+    design = _orbit()
+    nets = {k: v for k, v in design.nets.items() if k != "/L2"}
+    nets["+3.3V"] = [*nets["+3.3V"], Node("U15", "6", "L2"), Node("L1", "2", "")]
+    return Design(design.parts, nets)
+
+
+async def test_a_fixed_finding_runs_its_chain_again_with_the_fix():
+    design = _l2_shorted()
+    [finding] = pins.lookup(design).findings
+    assert finding.fix is not None and finding.fix.pins == ["U15.6", "L1.2"]
+    fixed = sc.Fixed(finding.id, finding.fix, roles.apply_fix(design, finding.fix), None)
+    runner = FakeRunner()
+    sims = [
+        s
+        async for s in sc.simulate(
+            [_status()],
+            {"tps63802.lib": TPS_LIB},
+            design,
+            _reading(),
+            ["startup"],
+            runner,
+            None,
+            [fixed],
+        )
+    ]
+    built, with_fix = sorted(sims, key=lambda s: s.id)
+    assert (built.id, built.fix_of, built.finding) == ("vm1", None, None)
+    assert (with_fix.id, with_fix.fix_of, with_fix.finding) == ("vm2", "vm1", "wf1")
+    assert with_fix.title == f"{built.title}, with wf1's fix"
+    # As built the L2 ammeter sits on the output; with the fix, on its own net.
+    assert "Vam_l2 out sw_l2 0" in runner.decks[0]
+    assert "Vam_l2 out sw_l2 0" not in runner.decks[1]
+
+
+async def test_a_fix_elsewhere_doesnt_run_again():
+    design = _orbit()
+    fix = WiringFix(
+        pins=["U9.3", "L4.2"], leaves="/SW9", joins="Net-(U9-SW)", new_net=True, text=""
+    )
+    fixed = sc.Fixed("wf1", fix, design, None)
+    sims = [
+        s
+        async for s in sc.simulate(
+            [_status()],
+            {"tps63802.lib": TPS_LIB},
+            design,
+            _reading(),
+            ["startup"],
+            FakeRunner(),
+            None,
+            [fixed],
+        )
+    ]
+    assert [s.id for s in sims] == ["vm1"]
 
 
 @needs_ngspice

@@ -340,6 +340,12 @@ Used outdoors, so it may see -10 °C.`,
       legend: "dashed: what-if",
       verdict: "what-if",
     },
+    fix: {
+      legend: (finding: string) => `dashed: with ${finding}'s fix`,
+      asBuilt: "as built",
+      withFix: (finding: string) => `with ${finding}'s fix`,
+      peak: "peak current",
+    },
   },
   resultChat: {
     title: "Ask about this result",
@@ -745,6 +751,12 @@ USB 5 V では動く: マイコンが起動する。
       failed: "変更後のシミュレーションを実行できませんでした。",
       legend: "破線: 変更後",
       verdict: "変更後",
+    },
+    fix: {
+      legend: (finding: string) => `破線: ${finding} の修正後`,
+      asBuilt: "現状",
+      withFix: (finding: string) => `${finding} の修正後`,
+      peak: "ピーク電流",
     },
   },
   resultChat: {

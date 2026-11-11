@@ -40,6 +40,7 @@ from app.features.debug import (
     power,
     prompt,
     reference,
+    roles,
     spice,
     spice_circuits,
     spice_convert,
@@ -275,19 +276,52 @@ async def _read(prepared: Prepared, facts: FactReader | None) -> DatasheetReadin
     return await facts.read(prepared.design, prepared.datasheets)
 
 
-def _budgeted_tree(prepared: Prepared, reading: DatasheetReading) -> PowerTree:
+def _budgeted_tree(
+    prepared: Prepared, reading: DatasheetReading, design: Design | None = None
+) -> PowerTree:
     """The power tree rebuilt with the datasheets' output and charge
     voltages, now they're read, and each rail's current budget: the review
     meets its rails against each pin's limits, and the vendor-model
-    simulations run each regulator's chain and load from it."""
+    simulations run each regulator's chain and load from it. ``design``
+    is the board with a wiring fix applied; the as-built board without."""
+    board = design if design is not None else prepared.design
     return budget.apply(
-        prepared.design,
-        power.build(
-            prepared.design, prepared.calculations, reading.limits, battery=prepared.battery
-        ),
+        board,
+        power.build(board, prepared.calculations, reading.limits, battery=prepared.battery),
         reading.limits,
         prepared.calculations,
     )
+
+
+def _wiring(prepared: Prepared, reading: DatasheetReading) -> pins.PinLookup:
+    """The pin table and wiring findings: pins read from a datasheet
+    replace that IC's hand-written table lines, and its pin roles and
+    typical application recheck the wiring. The review and the vendor-model
+    runs both use it, so a with-fix run names the review's finding id."""
+    if not (reading.pins or reading.application):
+        return prepared.pin_lookup
+    return pins.lookup(
+        prepared.design,
+        prepared.erc,
+        prepared.labels,
+        datasheet_pins=reading.pins,
+        datasheet_roles=reading.roles,
+        application=reading.application,
+    )
+
+
+def _fixes(prepared: Prepared, reading: DatasheetReading) -> list[spice_circuits.Fixed]:
+    """Each wiring finding with an unambiguous fix, applied to the board
+    with its own budgeted tree, for the with-fix vendor-model runs."""
+    got = []
+    for f in _wiring(prepared, reading).findings:
+        if f.fix is None:
+            continue
+        fixed = roles.apply_fix(prepared.design, f.fix)
+        got.append(
+            spice_circuits.Fixed(f.id, f.fix, fixed, _budgeted_tree(prepared, reading, fixed))
+        )
+    return got
 
 
 async def _vendor_simulations(
@@ -310,6 +344,7 @@ async def _vendor_simulations(
             prepared.analyses,
             runner,
             _budgeted_tree(prepared, got),
+            _fixes(prepared, got),
         ):
             n += 1
             await out.put(_event("simulation", sim.model_dump_json()))
@@ -415,20 +450,7 @@ async def _review(
             "(once per part, then cached).",
         )
     reading = await reading_task
-    # Pins read from a datasheet replace that IC's hand-written table lines,
-    # and its pin roles and typical application recheck the wiring.
-    table = (
-        pins.lookup(
-            prepared.design,
-            prepared.erc,
-            prepared.labels,
-            datasheet_pins=reading.pins,
-            datasheet_roles=reading.roles,
-            application=reading.application,
-        )
-        if reading.pins or reading.application
-        else prepared.pin_lookup
-    )
+    table = _wiring(prepared, reading)
     with_data = sum(1 for ic in table.ics if ic.pin_data)
     conflicts = len(table.findings)
     plural = "s" if conflicts > 1 else ""

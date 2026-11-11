@@ -466,6 +466,19 @@ class ErcEntry(BaseModel):
     uuids: list[str] = Field(default_factory=list, exclude=True)
 
 
+class WiringFix(BaseModel):
+    """The rewiring a wiring rule finds unambiguous (plan 006 step 3):
+    ``pins`` leave ``leaves`` and join ``joins``, a net of their own when
+    ``new_net``. The backend's, never the model's: the vendor-model
+    simulations run the board with it as well as as built."""
+
+    pins: list[str] = Field(description="REF.PIN refs that move, the finding's pin first.")
+    leaves: str
+    joins: str
+    new_net: bool
+    text: str
+
+
 class WiringFinding(BaseModel):
     """A pin wired against its role, found by ``roles.check`` (or
     ``pins.check_pinout``) before the model runs. Verified: it follows from
@@ -480,6 +493,9 @@ class WiringFinding(BaseModel):
     inductors: list[str] = Field(description="Inductor pins on the net, which belong there.")
     nets: list[str] = Field(description="Every net the text names, for the browser to mark.")
     text: str
+    fix: WiringFix | None = Field(
+        default=None, description="The unambiguous rewiring, when the rule gives one."
+    )
 
 
 class PinWarning(BaseModel):
@@ -513,6 +529,20 @@ class SimLevel(BaseModel):
     v: float
     label: str
     danger: bool = Field(description="A limit the waveform shouldn't cross.")
+
+
+class SimPeak(BaseModel):
+    """An ammeter's peak in a vendor-model run (plan 006 step 1): the
+    source's (``in``) or a switch-node pin's (``l2``). ``name`` is the same
+    in an as-built run and its with-fix run, so the two line up."""
+
+    name: str = Field(max_length=20)
+    label: str = Field(max_length=200, description='"into U5.9 (L2) on +3V3", "from the input".')
+    a: float = Field(
+        description="The peak current, A: the larger of its maximum and minimum, signed; "
+        "negative is current out of the pin (the label says so)."
+    )
+    t_s: float = Field(description="When it peaks, s.")
 
 
 SimAnalysis = Literal["startup", "load_step", "dropout"]
@@ -590,6 +620,17 @@ class Simulation(BaseModel):
     text: str = Field(max_length=2000)
     circuit: SimCircuit | None = Field(
         default=None, description="RC runs only: what a what-if re-run rebuilds."
+    )
+    peaks: list[SimPeak] = Field(
+        default_factory=list, max_length=10, description="Vendor-model runs: the ammeters' peaks."
+    )
+    fix_of: str | None = Field(
+        default=None,
+        max_length=20,
+        description="A with-fix run: the as-built run it pairs with (plan 006 step 3).",
+    )
+    finding: str | None = Field(
+        default=None, max_length=20, description="A with-fix run: the WiringFinding it fixes."
     )
 
 

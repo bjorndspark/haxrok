@@ -51,6 +51,7 @@ from app.features.debug import (  # noqa: E402
     power,
     prompt,
     reference,
+    roles,
     spice_circuits,
     spice_convert,
 )
@@ -196,14 +197,29 @@ async def simulate(
     calcs = calc.lookup(design)
     # The budgeted tree, as the review rebuilds it once the facts are read:
     # each regulator's chain from its source, and its rail's load.
-    tree = budget.apply(
-        design, power.build(design, calcs, reading.limits), reading.limits, calcs
+    def budgeted(board: Design):
+        return budget.apply(
+            board, power.build(board, calcs, reading.limits), reading.limits, calcs
+        )
+
+    # Each wiring finding with a fix runs its chains again with it applied
+    # (plan 006 step 3), as service._fixes does.
+    wiring = pins.lookup(
+        design,
+        datasheet_pins=reading.pins,
+        datasheet_roles=reading.roles,
+        application=reading.application,
     )
+    fixes = []
+    for f in wiring.findings:
+        if f.fix is not None:
+            fixed = roles.apply_fix(design, f.fix)
+            fixes.append(spice_circuits.Fixed(f.id, f.fix, fixed, budgeted(fixed)))
     runner = Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S)
     return [
         sim
         async for sim in spice_circuits.simulate(
-            models, {}, design, reading, analyses, runner, tree
+            models, {}, design, reading, analyses, runner, budgeted(design), fixes
         )
     ]
 

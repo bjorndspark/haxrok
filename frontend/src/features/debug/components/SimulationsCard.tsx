@@ -4,7 +4,7 @@ import { Card } from "@/shared/ui/card"
 import { Title } from "@/shared/ui/title"
 
 import { useMessages } from "../messages"
-import { isVendorModel } from "../present"
+import { isVendorModel, pairVendorSims, peakRows, type SimPair } from "../present"
 import type { Run, SimCircuit, Simulation, SimVerdict } from "../types"
 import { formatElapsed, useElapsed, useSimulationChat, useWhatIf, type WhatIf } from "../useDebug"
 import { ChatThread } from "./ChatThread"
@@ -125,12 +125,15 @@ function RcSimulation({
 }
 
 /** The netlist that was run, folded away; absent when nothing ran. */
-function Netlist({ sim }: { sim: Simulation }) {
+function Netlist({ sim, label }: { sim: Simulation; label?: string }) {
   const t = useMessages().simulations
   if (!sim.deck.trim()) return null
   return (
     <details className="text-xs text-muted-foreground">
-      <summary className="cursor-pointer">{t.netlist}</summary>
+      <summary className="cursor-pointer">
+        {t.netlist}
+        {label && ` · ${label}`}
+      </summary>
       <pre className="mt-1.5 overflow-x-auto border-l-2 pl-[1ch]">{sim.deck}</pre>
     </details>
   )
@@ -196,26 +199,81 @@ export function VendorSimulationsCard({ run, onStop }: { run: Run; onStop: () =>
       <Title as="h3">{t.vendorTitle(sims.length)}</Title>
       {running && <StillRunning run={run} onStop={onStop} />}
       <div className="space-y-4">
-        {sims.map((sim) => (
-          <div key={sim.id} className="min-w-0 space-y-3 border p-3">
-            <p className="flex flex-wrap items-baseline gap-[1ch] text-sm">
-              <span className="font-bold text-info">{sim.ref}</span>
-              {sim.analysis && <span>· {t.analysis[sim.analysis]}</span>}
-              {sim.verdict && <VerdictBadge verdict={sim.verdict} className="ml-auto" />}
-            </p>
-            {sim.t.length > 0 ? (
-              <>
-                <p className="text-sm font-bold">{sim.title}</p>
-                <SimulationPlot sim={sim} />
-              </>
-            ) : (
-              <p className="text-sm leading-relaxed">{sim.text}</p>
-            )}
-            <Netlist sim={sim} />
-            <SimulationChat runNumber={run.number} sim={sim} />
-          </div>
+        {pairVendorSims(sims).map((pair) => (
+          <VendorSimulation key={pair.sim.id} runNumber={run.number} pair={pair} />
         ))}
       </div>
     </Card>
+  )
+}
+
+/** Each ammeter's peak, as built and (when there is one) with the fix. */
+function PeakTable({ pair }: { pair: SimPair }) {
+  const t = useMessages().simulations.fix
+  const rows = peakRows(pair.sim, pair.fixed)
+  if (rows.length === 0) return null
+  const finding = pair.fixed?.finding ?? ""
+  return (
+    <table className="text-xs">
+      <thead className="text-muted-foreground">
+        <tr>
+          <th className="pr-[2ch] text-left font-normal">{t.peak}</th>
+          <th className="pr-[2ch] text-right font-normal">{t.asBuilt}</th>
+          {pair.fixed && <th className="text-right font-normal">{t.withFix(finding)}</th>}
+        </tr>
+      </thead>
+      <tbody className="font-mono tabular-nums">
+        {rows.map((r) => (
+          <tr key={r.name}>
+            <td className="pr-[2ch] font-sans">{r.label}</td>
+            <td className="pr-[2ch] text-right text-info">{r.built ?? "—"}</td>
+            {pair.fixed && <td className="text-right text-warn">{r.fixed ?? "—"}</td>}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+/** One regulator's vendor-model run; with a wiring fix, the with-fix run's
+ *  output is drawn dashed over the as-built one and both verdicts show. */
+function VendorSimulation({ runNumber, pair }: { runNumber: number; pair: SimPair }) {
+  const t = useMessages().simulations
+  const { sim, fixed } = pair
+  const finding = fixed?.finding ?? ""
+  return (
+    <div className="min-w-0 space-y-3 border p-3">
+      <p className="flex flex-wrap items-baseline gap-[1ch] text-sm">
+        <span className="font-bold text-info">{sim.ref}</span>
+        {sim.analysis && <span>· {t.analysis[sim.analysis]}</span>}
+        <span className="ml-auto flex flex-wrap items-baseline gap-[1ch]">
+          {fixed && <span className="text-xs text-muted-foreground">{t.fix.asBuilt}</span>}
+          {sim.verdict && <VerdictBadge verdict={sim.verdict} />}
+          {fixed?.verdict && (
+            <>
+              <span className="text-xs text-muted-foreground">{t.fix.withFix(finding)}</span>
+              <VerdictBadge verdict={fixed.verdict} />
+            </>
+          )}
+        </span>
+      </p>
+      {sim.t.length > 0 ? (
+        <>
+          <p className="text-sm font-bold">{sim.title}</p>
+          <SimulationPlot
+            sim={sim}
+            whatIf={fixed && fixed.t.length > 0 ? fixed : null}
+            legend={t.fix.legend(finding)}
+          />
+        </>
+      ) : (
+        <p className="text-sm leading-relaxed">{sim.text}</p>
+      )}
+      {fixed?.t.length === 0 && <p className="text-sm leading-relaxed">{fixed.text}</p>}
+      <PeakTable pair={pair} />
+      <Netlist sim={sim} label={fixed ? t.fix.asBuilt : undefined} />
+      {fixed && <Netlist sim={fixed} label={t.fix.withFix(finding)} />}
+      <SimulationChat runNumber={runNumber} sim={sim} />
+    </div>
   )
 }
