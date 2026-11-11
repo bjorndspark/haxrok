@@ -247,6 +247,38 @@ Effort: 6–10 h. Big: backend and frontend.
 - Part tolerances, a time budget for all runs in a request, and runs
   cached in Redis.
 
+Decided (2026-11-11): start-up runs at the source's min, nominal and max
+(the rail's range, or the review form's battery value); load step and
+dropout stay at nominal (dropout already sweeps the input). A fixed
+finding's with-fix run happens at each of the three corners, paired with
+the as-built run at the same one.
+Decided (2026-11-11): the current-limited supply is one extra start-up
+run per chain at nominal: an ideal source behind a smooth current limit
+(a behavioural source), set by `BENCH_CURRENT_LIMIT_A` (default 1 A),
+labelled "assumed". No review-form field, so this stays backend-only. It
+gets a with-fix pair like the corners do.
+Decided (2026-11-11): tolerances are folded into the min and max
+corners, with no runs of their own: ceramic capacitors at −20 % (DC-bias
+derating) and inductors at −20 %, named in the setup sentence. Nominal
+and the bench run keep the parts' values.
+Decided (2026-11-11): a time budget, `SPICE_BUDGET_S` (default 1800 s),
+for all of a request's vendor-model runs. Runs are queued nominal →
+bench → min → max, each as built before its fix. A run still queued when
+the budget ends is `skipped` ("over the time budget"). A run already
+going finishes under its own `NGSPICE_MODEL_TIMEOUT_S`.
+Decided (2026-11-11, default): the corner is named in each run's title
+and setup sentence ("at min 3.6 V, C and L −20 %"; "from a 1 A
+current-limited supply, assumed"), so each corner is its own card and
+the output schema doesn't change. The frontend pairs runs by `fix_of`,
+as it does now.
+Decided (2026-11-11, default): the cache keeps ngspice's raw `Run`, not
+the verdict, so verdict changes still apply to cached runs. The key is a
+sha256 of the deck, the model files' bytes and ngspice's version, and
+entries expire after `SPICE_CACHE_TTL_S` (default 30 days; 0 turns it
+off). Timeouts and failures aren't cached. It fails open on a Redis
+outage, like `core/ai/cache.py`, and sits in the debug feature on top of
+`core/redis.py`'s client, wrapping the `ModelRunner`.
+
 **Check:** unit tests on the corner list and the cache key; the private
 board at 4.8 V and 6 V; a repeat run served from the cache.
 Effort: 4–6 h.
