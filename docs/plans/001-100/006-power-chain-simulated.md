@@ -108,5 +108,14 @@ Decided (2026-11-11): kept as the last step, marked "ask first" in
 `AGENTS.md`'s "Current work", so a loop stops before it and the user
 decides with steps 1–4's eval results in hand.
 
+Alternative to weigh then (not decided): expose the checks (pin table,
+datasheet, reference calculations, SPICE runs) as an MCP server instead of
+building a tool loop in the app. An outside agent's own model does the
+round trips, so the gateway's ~90 s calls and 503s don't bound it, and the
+server is a thin edge over the service functions. Against it: it needs an
+MCP client (Claude Desktop, Cursor), so the web app's users don't get it,
+and its runs take a different path each time, so `make eval-app` can't
+measure them.
+
 **Check:** decided when the step is.
 Effort: 8–12 h.
