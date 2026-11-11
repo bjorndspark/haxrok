@@ -169,5 +169,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `005-whole-board-static-review.md` step 7 (MCU pin rules from the
-   datasheet), then its steps in order.
+None. Plan 006 (the power chain simulated) is outlined at the end of
+`005-whole-board-static-review.md` but not yet written.

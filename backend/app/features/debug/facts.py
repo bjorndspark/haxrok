@@ -6,9 +6,9 @@ comes back is checked before anything uses it: a fact on a page that wasn't
 sent, or about a pin the board's part doesn't have, is dropped.
 
 Pin facts replace the hand-written pin table's lines for that IC
-(``pins.lookup``) and are cited as ``pin_function``. Limits and application
-parts are numbered ``ds1``, ``ds2``, … across the board and cited as kind
-``datasheet``.
+(``pins.lookup``) and are cited as ``pin_function``. Limits, application
+parts and a microcontroller's pin rules (``mcu.check``) are numbered
+``ds1``, ``ds2``, … across the board and cited as kind ``datasheet``.
 
 Answers are cached per part (the PDF's key) and per everything that shapes
 the answer (prompt, schema, board pins, model), so a part is read once, not
@@ -38,6 +38,7 @@ from app.features.debug.schemas import (
     DatasheetStatus,
     LimitFact,
     PinRole,
+    PinRuleFact,
 )
 
 logger = get_logger(__name__)
@@ -97,6 +98,8 @@ class DatasheetReading:
     application: dict[str, list[AppPart]] = field(default_factory=dict)
     # ref -> its limits as read, for the vendor-model simulations' ratings
     limits: dict[str, list[LimitFact]] = field(default_factory=dict)
+    # ref -> a microcontroller's pin rules, for mcu.check
+    rules: dict[str, list[PinRuleFact]] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)  # ref -> PDF URL
     failed: dict[str, str] = field(default_factory=dict)  # ref -> why
 
@@ -167,16 +170,19 @@ class FactReader:
                 reading.application[sheet.ref] = got.application
             if got.limits:
                 reading.limits[sheet.ref] = got.limits
+            if got.pin_rules:
+                reading.rules[sheet.ref] = got.pin_rules
             for page, body in _fact_lines(got):
                 n += 1
                 reading.facts.append(Fact(f"ds{n}", sheet.ref, page, body))
             logger.info(
-                "datasheet facts %s (%s): %d pins, %d limits, %d application parts",
+                "datasheet facts %s (%s): %d pins, %d limits, %d application parts, %d pin rules",
                 sheet.ref,
                 sheet.value,
                 len(got.pins),
                 len(got.limits),
                 len(got.application),
+                len(got.pin_rules),
             )
         return reading
 
@@ -217,7 +223,8 @@ class FactReader:
 def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> DatasheetFacts:
     """Drop what the model couldn't have read: facts on pages it wasn't
     sent, pins the board's part doesn't have (and duplicates of a pin),
-    application and limit pins likewise."""
+    application, limit and pin-rule pins likewise; a pin rule left with no
+    board pin goes too."""
     seen: set[str] = set()
     kept = []
     for p in facts.pins:
@@ -228,6 +235,11 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
         lim.model_copy(update={"pins": [pin for pin in lim.pins if pin in board_pins]})
         for lim in facts.limits
         if lim.page in pages
+    ]
+    rules = [
+        rule.model_copy(update={"pins": on})
+        for rule in facts.pin_rules
+        if rule.page in pages and (on := [pin for pin in rule.pins if pin in board_pins])
     ]
     application = [
         a.model_copy(
@@ -244,10 +256,12 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
         - len(limits)
         + len(facts.application)
         - len(application)
+        + len(facts.pin_rules)
+        - len(rules)
     )
     if dropped:
         logger.info("datasheet facts: dropped %d not backed by a sent page or board pin", dropped)
-    return DatasheetFacts(pins=kept, limits=limits, application=application)
+    return DatasheetFacts(pins=kept, limits=limits, application=application, pin_rules=rules)
 
 
 # A range printed on a page the model wasn't sent isn't one it read.
@@ -255,7 +269,7 @@ _NO_RANGE = {"min": None, "max": None, "unit": "", "range_page": None}
 
 
 def _fact_lines(facts: DatasheetFacts) -> list[tuple[int, str]]:
-    """Each limit and typical-application part as (page, text)."""
+    """Each limit, typical-application part and pin rule as (page, text)."""
     lines: list[tuple[int, str]] = []
     for lim in facts.limits:
         bounds = [
@@ -280,8 +294,26 @@ def _fact_lines(facts: DatasheetFacts) -> list[tuple[int, str]]:
         lines.append(
             (a.page, f"typical application: {a.role}, {a.kind}{value}{on}{allowed}{optional}")
         )
+    for rule in facts.pin_rules:
+        level = f", normal boot needs it {rule.boot_level}" if rule.boot_level != "either" else ""
+        cond = f", {rule.condition}" if rule.condition else ""
+        lines.append(
+            (
+                rule.page,
+                f"pin rule: {_RULE_NAME[rule.kind]}, pins {', '.join(rule.pins)}{level}{cond}: "
+                f"{rule.text}",
+            )
+        )
     return lines
 
+
+_RULE_NAME = {
+    "reserved": "reserved",
+    "input_only": "input only",
+    "strapping": "strapping",
+    "usb_d_plus": "USB D+",
+    "usb_d_minus": "USB D-",
+}
 
 _LIMIT_TABLE = {
     "absolute_maximum": "absolute maximum: ",

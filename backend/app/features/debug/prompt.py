@@ -645,6 +645,14 @@ recommended-components table, "CO ≥ 10 µF", "L = 0.33 µH to 1 µH"); match \
 symbols like CO or L to the part they name. A typical value alone sets \
 neither. required is false when the datasheet calls the part optional or \
 it serves a feature a board may not use.
+- pin_rules: for a microcontroller, SoC or module only ([] for any other \
+part), the rules on its pins: pins reserved for in-package flash or PSRAM \
+or not to be connected, input-only pins, strapping pins with the level \
+each needs at reset for the normal boot from flash, and the built-in \
+USB's D+ and D-. Read the variant from the part's value (flash and PSRAM \
+size and voltage); a rule that depends on a variant or setting the value \
+doesn't settle keeps that in condition. A strapping pin the normal boot \
+doesn't depend on is either.
 - page: the N of the '=== Page N ===' header the fact is under."""
 
 

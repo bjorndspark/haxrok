@@ -35,6 +35,7 @@ from app.features.debug import (
     budget,
     calc,
     diagram,
+    mcu,
     pins,
     power,
     prompt,
@@ -175,6 +176,11 @@ async def prepare(
         Measurement(id=f"m{i}", step_id=m.step_id, context=m.context, value=m.value)
         for i, m in enumerate(measurements, start=1)
     ]
+    tree = power.build(design, calcs, battery=battery)
+    # The pin table's microcontroller rules, shown before the datasheets are
+    # read; kept out of Prepared.calculations, which the power tree and the
+    # simulations read.
+    pin_rules = mcu.check(design, tree, mcu.rules(design), first_id=len(calcs) + 1)
     summary = DesignSummary(
         mode=mode,
         project=project.name,
@@ -188,10 +194,10 @@ async def prepare(
         wiring=lookup.findings,
         pin_warnings=lookup.warnings,
         references=notes,
-        calculations=calcs,
+        calculations=calcs + pin_rules,
         symptoms=symptoms,
         measurements=numbered,
-        power=power.build(design, calcs, battery=battery),
+        power=tree,
     )
     return Prepared(
         mode,
@@ -426,6 +432,9 @@ async def _review(
     )
     calcs = prepared.calculations + voltage.check(
         prepared.design, tree, reading.limits, first_id=len(prepared.calculations) + 1
+    )
+    calcs += mcu.check(
+        prepared.design, tree, mcu.rules(prepared.design, reading.rules), first_id=len(calcs) + 1
     )
     n_calcs = len(calcs)
     flagged = sum(1 for c in calcs if c.flagged)

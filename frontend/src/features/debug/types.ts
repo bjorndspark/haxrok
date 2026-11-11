@@ -272,6 +272,7 @@ export interface Calculation {
     | "enable_pin"
     | "overvoltage_pullup"
     | "pin_voltage"
+    | "mcu_pin"
   ic: string
   pins: string[]
   /** Null when the thing to measure is missing (no pull-up, no resistor). */

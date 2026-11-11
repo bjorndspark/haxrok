@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-11 | 2026-11-11 | In progress | — | `002-verified-wiring-checks.md`, `004-datasheets-and-simulation.md`, `DECISIONS.md` ("Evidence labels are checked references, not verified conclusions") |
+| 2026-11-11 | 2026-11-11 | done | — | `002-verified-wiring-checks.md`, `004-datasheets-and-simulation.md`, `DECISIONS.md` ("Evidence labels are checked references, not verified conclusions") |
 
 A private board (an ESP32-S3 with a TPS2121 power mux feeding a TPS63070
 buck-boost) was built with the TPS63070's L2 pin wired to its own output,
@@ -381,7 +381,7 @@ frontend tests. `make eval-app case=rust-board-i2c-vbus`: still #1,
 state shows +BATT, +5V and +3V3 up, VBUS down, and R17/R18 back-feeding
 VBUS. `rp-micro-no-fault` in review mode: one state, no issues (188 s).
 
-## 7. MCU pin rules from the datasheet: proposed
+## 7. MCU pin rules from the datasheet: done
 
 - Reserved pins (flash/PSRAM), input-only pins, strapping pins and their
   required levels, and pins with a fixed function (USB D+/D−), read from
@@ -394,9 +394,39 @@ defined level is "may fail".
 Decided (2026-11-11): the private board's ESP32-S3 pins are checked by
 hand at the loop's final review, since its project isn't on this machine.
 
-**Checks:** unit tests; the private board's ESP32-S3 pins checked by
-hand.
-Effort: 3–5 h.
+Decided (2026-11-11, default taken in loop): the rules are a `pin_rules`
+list in the datasheet extraction (kind, pins, the strapping level normal
+boot needs or `either`, a `condition` when the value doesn't settle the
+variant, text, page), filtered to sent pages and board pins like the other
+facts and shown as `ds` facts. The pin table carries the ESP32-S3-WROOM-1's
+rules as the fallback: IO0 high, IO45 low (3.3 V flash), IO46 and IO3
+`either`, IO19/IO20 USB D-/D+, IO35–37 reserved on octal-PSRAM variants.
+A datasheet's rules replace the table's for that IC.
+Decided (2026-11-11, default taken in loop): `mcu.check` returns
+calculations of kind `mcu_pin`, numbered after the voltage checks in the
+review and after the netlist's own at upload (table rules only there);
+they stay out of the calculations the power tree and simulations read.
+A flagged one marks its pin miswired in the diagram.
+Decided (2026-11-11, default taken in loop): a strapping pin's level is
+read with switches and jumpers open and capacitors ignored: tied (its net
+is ground or a rail) or pulled (resistors all one way). A wrong tie is
+verified; a wrong pull is verified alone and "may fail" with another part
+on the net. A reserved pin reaching another part is verified (listed only
+under a condition); an input-only pin that's the only thing driving an LED
+or transistor is verified; a USB line reaching a pin named for the other
+line, and none for its own, is verified as swapped.
+
+**Checks:** `test_debug_mcu.py` (15: wrong tie, right tie, wrong pull
+alone and with a load, pull-up with a boot button, a load with no level,
+pulls both ways, `either`, reserved wired and unconnected, reserved under
+a condition, input-only driving an LED, swapped USB through a series
+resistor, USB right, order and ids, table and datasheet sources);
+`test_debug_facts.py` pin-rule filtering and fact line (2). `make lint`
+and `make test` (sub-targets on make 3.81): pass, 376 backend and 49
+frontend tests. The extraction prompt changed, but the eval path reads no
+datasheets and no case has an ESP32-S3, so `rp-micro-no-fault` in review
+mode came from cache: no issues (0 s). The private board's ESP32-S3 pins
+are left for the final review, as decided.
 
 ## Next: plan 006, the power chain simulated
 

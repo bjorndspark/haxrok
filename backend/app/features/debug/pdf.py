@@ -4,7 +4,7 @@ A datasheet up to ``budget`` characters is read whole. A longer one (a
 microcontroller's runs to hundreds of pages) is cut to that budget by page,
 preferring pages whose headings name what a schematic review needs: pin
 descriptions, limits, electrical characteristics, the typical application,
-boot and reset. Package drawings, ordering codes and revision history go
+boot, strapping pins and reset. Package drawings, ordering codes and revision history go
 first.
 
 pypdfium2 reads every page's plain text fast (RP2040's 642 pages in about
@@ -39,7 +39,7 @@ _CORE = re.compile(
     r"pinout|absolute maximum|recommended operating|operating conditions|"
     r"electrical (characteristics|specifications)|typical application|"
     r"application (circuit|information)|boot (mode|configuration)|power-on reset|"
-    r"reset pin|nrst",
+    r"reset pin|nrst|strapping",
     re.IGNORECASE,
 )
 _USEFUL = re.compile(

@@ -34,7 +34,7 @@ sys.path.insert(0, "/app")
 from app.core.ai.chat import complete_text  # noqa: E402
 from app.core.ai.structured import complete_structured  # noqa: E402
 from app.core.config import settings  # noqa: E402
-from app.features.debug import calc, pins, power, prompt, reference  # noqa: E402
+from app.features.debug import calc, mcu, pins, power, prompt, reference  # noqa: E402
 from app.features.debug.design import Design, Node, Part  # noqa: E402
 from app.features.debug.schemas import Analysis, Claim  # noqa: E402
 
@@ -78,6 +78,8 @@ def build_input(
     design = parse_compact(netlist)
     lookup = pins.lookup(design)
     calcs = calc.lookup(design)
+    tree = power.build(design, calcs)
+    calcs += mcu.check(design, tree, mcu.rules(design), first_id=len(calcs) + 1)
     symptoms = (
         []
         if mode == "review"
@@ -94,7 +96,7 @@ def build_input(
         warnings=pins.format_warnings(lookup.warnings),
         references=reference.format_notes(reference.lookup(design)),
         calculations=calc.format_calculations(calcs),
-        power=power.format_power(power.build(design, calcs)),
+        power=power.format_power(tree),
     )
     return user, lookup
 

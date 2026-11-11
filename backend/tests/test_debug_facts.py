@@ -14,6 +14,7 @@ from app.features.debug.evidence import EvidenceContext, check_claim
 from app.features.debug.facts import FactReader
 from app.features.debug.schemas import (
     AppPart,
+    BootLevel,
     Cite,
     Claim,
     DatasheetFacts,
@@ -21,6 +22,8 @@ from app.features.debug.schemas import (
     LimitFact,
     LimitKind,
     PinFact,
+    PinRuleFact,
+    PinRuleKind,
 )
 
 # --- pdf: choosing pages ------------------------------------------------------------
@@ -194,6 +197,7 @@ MCU_FACTS = DatasheetFacts(
             required=True,
         ),
     ],
+    pin_rules=[],
 )
 
 VDDA = AppPart(
@@ -213,6 +217,7 @@ LDO_FACTS = DatasheetFacts(
     pins=[PinFact(pin="5", name="VOUT", function="Regulated output.", role="supply_out", page=2)],
     limits=[_limit("Input voltage", 2.2, 5.5, 3)],
     application=[],
+    pin_rules=[],
 )
 
 
@@ -345,7 +350,7 @@ def test_check_filters_application_pins_to_the_board():
 
 
 def test_check_keeps_a_part_but_drops_a_range_read_from_a_page_not_sent():
-    with_vdda = DatasheetFacts(pins=[], limits=[], application=[VDDA])
+    with_vdda = DatasheetFacts(pins=[], limits=[], application=[VDDA], pin_rules=[])
     [kept] = facts.check(with_vdda, {44, 45}, {"9"}).application
     assert (kept.role, kept.min, kept.unit, kept.range_page) == (
         "VDDA filter capacitor",
@@ -357,9 +362,44 @@ def test_check_keeps_a_part_but_drops_a_range_read_from_a_page_not_sent():
     assert (ranged.min, ranged.unit, ranged.range_page) == (0.1, "µF", 99)
 
 
+def _pin_rule(
+    pins: list[str],
+    page: int,
+    kind: PinRuleKind = "strapping",
+    level: BootLevel = "high",
+    condition: str = "",
+) -> PinRuleFact:
+    return PinRuleFact(
+        kind=kind, pins=pins, boot_level=level, condition=condition, text="Boot mode.", page=page
+    )
+
+
+def test_check_keeps_pin_rules_on_sent_pages_and_board_pins_only():
+    rules = [
+        _pin_rule(["44", "48"], 33),  # 48 isn't on the board
+        _pin_rule(["48"], 33),  # no pin left on the board
+        _pin_rule(["44"], 99),  # page not sent
+    ]
+    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
+    [kept] = facts.check(read, {33}, {"44"}).pin_rules
+    assert kept.pins == ["44"] and kept.page == 33
+
+
+def test_fact_line_names_a_pin_rule_with_its_boot_level_and_condition():
+    rules = [
+        _pin_rule(["27"], 9),
+        _pin_rule(["28", "29"], 4, kind="reserved", level="either", condition="with octal PSRAM"),
+    ]
+    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
+    assert facts._fact_lines(read) == [
+        (9, "pin rule: strapping, pins 27, normal boot needs it high: Boot mode."),
+        (4, "pin rule: reserved, pins 28, 29, with octal PSRAM: Boot mode."),
+    ]
+
+
 def test_fact_line_shows_the_allowed_range_and_optional_parts():
     vdda = VDDA.model_copy(update={"max": 22})
-    lines = facts._fact_lines(DatasheetFacts(pins=[], limits=[], application=[vdda]))
+    lines = facts._fact_lines(DatasheetFacts(pins=[], limits=[], application=[vdda], pin_rules=[]))
     assert lines == [
         (
             44,

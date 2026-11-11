@@ -284,12 +284,51 @@ class AppPart(_Strict):
     )
 
 
+PinRuleKind = Literal["reserved", "input_only", "strapping", "usb_d_plus", "usb_d_minus"]
+"""A microcontroller pin's rule (``mcu.check``): reserved for in-package
+flash or PSRAM, input only, a strapping pin sampled at reset, or the
+built-in USB's D+ or D-."""
+
+BootLevel = Literal["high", "low", "either"]
+
+
+class PinRuleFact(_Strict):
+    """A rule the datasheet sets on some of a microcontroller's pins:
+    where the board may not use them, or the level they need at reset."""
+
+    kind: PinRuleKind = Field(
+        description="reserved: the datasheet says not to connect or use the pin (it is "
+        "taken by in-package flash or PSRAM, or not available on this variant). "
+        "input_only: the pin can't drive an output. strapping: the chip samples it at "
+        "reset to choose its boot mode or a setting. usb_d_plus, usb_d_minus: the built-in "
+        "USB's D+ or D- line."
+    )
+    pins: list[str] = Field(description="The board pin numbers it applies to, as listed to you.")
+    boot_level: BootLevel = Field(
+        description="strapping only: the level the pin must have at reset for the normal "
+        "boot from flash with this part's settings (high, low), or either when that boot "
+        "doesn't depend on it. either for every other kind."
+    )
+    condition: str = Field(
+        description="When the rule depends on a variant or setting the part's value doesn't "
+        'settle, that condition as printed (e.g. "on modules with octal PSRAM"); "" when '
+        "it applies to this part as named."
+    )
+    text: str = Field(
+        description="The rule in one short sentence, with the internal pull at reset if printed."
+    )
+    page: int
+
+
 class DatasheetFacts(_Strict):
     """Everything one model call reads from one datasheet."""
 
     pins: list[PinFact]
     limits: list[LimitFact]
     application: list[AppPart]
+    pin_rules: list[PinRuleFact] = Field(
+        description="The pin rules of a microcontroller, SoC or module; [] for any other part."
+    )
 
 
 # --- checked output ----------------------------------------------------------------
@@ -560,13 +599,15 @@ class Calculation(BaseModel):
     current, an I²C pull-up, an RC delay, a divider, USB-C CC pull-downs,
     supply decoupling, a UART's TX/RX wiring, a regulator's enable or an
     STM32's BOOT0, a pull-up above an IC's supply, an IC pin's rail against
-    its datasheet limits (``voltage.check``, once the datasheets are read).
+    its datasheet limits (``voltage.check``, once the datasheets are read), a
+    microcontroller pin against its datasheet's pin rules (``mcu.check``).
     Verified, not the model's.
     ``flagged`` means the netlist as drawn contradicts itself or misses what
     every such circuit needs (+3V3 set to 0.73 V, an I²C line with no
     pull-up, CC1 and CC2 sharing one resistor, a supply rail with no
     capacitor, TX wired to TX, an enable pin on its own output, a BOOT0 with
-    no path to ground, a pin on a rail above its absolute maximum)."""
+    no path to ground, a pin on a rail above its absolute maximum, a
+    strapping pin tied to the wrong boot level)."""
 
     id: str
     kind: Literal[
@@ -583,6 +624,7 @@ class Calculation(BaseModel):
         "enable_pin",
         "overvoltage_pullup",
         "pin_voltage",
+        "mcu_pin",
     ]
     ic: str
     pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")
@@ -833,7 +875,8 @@ class DatasheetFactsEvent(BaseModel):
     )
     calculations: list[Calculation] = Field(
         description="The calculations again, with each IC pin's rail checked against its "
-        "datasheet limits (kind pin_voltage); they replace the summary's."
+        "datasheet limits (kind pin_voltage) and microcontroller pins against their "
+        "datasheet's pin rules (kind mcu_pin); they replace the summary's."
     )
 
 

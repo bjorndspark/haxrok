@@ -1044,6 +1044,7 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
                     required=True,
                 )
             ],
+            pin_rules=[],
         )
 
     class Cache:

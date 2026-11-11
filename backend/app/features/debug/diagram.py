@@ -33,7 +33,7 @@ MAX_MEMBERS = 4
 # Calculations whose flagged pins are wired wrong: against their function
 # (TX on TX, EN on its own output; the UI's "miswired" badge), or onto a
 # rail above their absolute maximum (pin_voltage).
-_MISWIRED_KINDS = {"uart", "enable_pin", "pin_voltage"}
+_MISWIRED_KINDS = {"uart", "enable_pin", "pin_voltage", "mcu_pin"}
 
 
 def miswired_pins(findings: list[WiringFinding], calculations: list[Calculation]) -> set[str]:

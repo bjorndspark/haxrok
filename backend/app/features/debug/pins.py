@@ -14,7 +14,9 @@ netlist carries are compared with the datasheet's numbering.
 Pins read from an IC's own datasheet (``facts.FactReader``) replace its
 lines here; this table is the fallback where no datasheet was read. Its
 ``inductor_pins`` give those pins the switch role ``roles.check`` holds them
-to when no datasheet says otherwise.
+to when no datasheet says otherwise, and its ``rules`` are the
+microcontroller pin rules ``mcu.check`` holds the board to when no
+datasheet gave any.
 """
 
 import re
@@ -25,9 +27,12 @@ from app.features.debug import roles
 from app.features.debug.design import Design, Label, Part, is_ic
 from app.features.debug.schemas import (
     AppPart,
+    BootLevel,
     ErcEntry,
     IcSummary,
     PinRole,
+    PinRuleFact,
+    PinRuleKind,
     PinWarning,
     WiringFinding,
 )
@@ -45,6 +50,7 @@ class PartPins:
     source: str
     pins: dict[str, tuple[str, str]]
     inductor_pins: frozenset[str] = frozenset()
+    rules: tuple[PinRuleFact, ...] = ()  # for ``mcu.check``; page 0 = this table
 
     def matches(self, value: str, lib_part: str, footprint: str) -> bool:
         if not value.upper().startswith(self.value_prefix):
@@ -206,6 +212,34 @@ def _esp32_s3_wroom_1() -> PartPins:
         package_hint=None,
         source="Espressif ESP32-S3-WROOM-1 datasheet v1.3, Table 3 and 3.3 Strapping Pins",
         pins=pins,
+        rules=(
+            _rule("strapping", ["27"], "high", "GPIO0 high at reset: SPI boot from flash."),
+            _rule(
+                "strapping",
+                ["26"],
+                "low",
+                "GPIO45 low at reset: VDD_SPI 3.3 V, the module's flash voltage.",
+            ),
+            _rule("strapping", ["16"], "either", "GPIO46: with GPIO0 high it doesn't matter."),
+            _rule("strapping", ["15"], "either", "GPIO3: JTAG source, eFuse default ignores it."),
+            _rule("usb_d_minus", ["13"], "either", "GPIO19 is USB_D-."),
+            _rule("usb_d_plus", ["14"], "either", "GPIO20 is USB_D+."),
+            _rule(
+                "reserved",
+                ["28", "29", "30"],
+                "either",
+                "IO35, IO36 and IO37 connect to the octal PSRAM.",
+                condition="on modules with octal PSRAM (the R8/R16V variants)",
+            ),
+        ),
+    )
+
+
+def _rule(
+    kind: PinRuleKind, pins: list[str], level: BootLevel, text: str, condition: str = ""
+) -> PinRuleFact:
+    return PinRuleFact(
+        kind=kind, pins=pins, boot_level=level, condition=condition, text=text, page=0
     )
 
 
