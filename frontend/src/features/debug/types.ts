@@ -408,6 +408,25 @@ export interface PowerRail {
   budget?: RailBudget | null
 }
 
+/** A rail that's down in an operating state but may be fed backwards from
+ *  a live one: may fail, not verified. */
+export interface BackPower {
+  rail: string
+  /** The parts and pins it flows through, e.g. ["R17", "U2.5"]. */
+  via: string[]
+  text: string
+}
+
+/** Which rails are up from one combination of the sources (states.walk). */
+export interface OperatingState {
+  sources: string[]
+  up: string[]
+  down: string[]
+  /** Parts held off by their enable, or taken as on with nothing on it. */
+  off: string[]
+  back_powered: BackPower[]
+}
+
 /** Each rail, the part that makes it and what it supplies, built from the
  *  netlist by the backend before the model runs. */
 export interface PowerTree {
@@ -415,6 +434,8 @@ export interface PowerTree {
   parts: PowerPart[]
   /** The battery's range came from the review form, not inferred. */
   battery_override: boolean
+  /** Missing from runs saved before operating states existed. */
+  states?: OperatingState[]
 }
 
 /** The datasheet_facts event: merged into the run's summary. */

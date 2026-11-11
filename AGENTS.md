@@ -169,5 +169,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `005-whole-board-static-review.md` step 6 (operating states: which
-   rails come up from which source), then its steps in order.
+1. `005-whole-board-static-review.md` step 7 (MCU pin rules from the
+   datasheet), then its steps in order.

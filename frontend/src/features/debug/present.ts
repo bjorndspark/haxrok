@@ -326,6 +326,38 @@ export function powerRows(tree: PowerTree, m: Messages): PowerRow[] {
   })
 }
 
+/** An operating state, worded for the summary card. */
+export interface StateRow {
+  /** "VBUS only", "VBUS + VBAT". */
+  name: string
+  up: string[]
+  down: string[]
+  /** Parts held off by their enable, in the backend's words. */
+  off: string[]
+  /** "VBUS may be back-powered through R17, U1.9". */
+  backPowered: string[]
+}
+
+/** A net's name without its sheet path: "/power/VSYS" reads "VSYS". */
+function shortNet(net: string): string {
+  return net.slice(net.lastIndexOf("/") + 1) || net
+}
+
+/** The power tree's operating states as rows, in the backend's order. */
+export function stateRows(tree: PowerTree, m: Messages): StateRow[] {
+  const t = m.summary
+  return (tree.states ?? []).map((s) => {
+    const names = s.sources.map(shortNet)
+    return {
+      name: names.length === 1 ? t.stateOnly(names[0] ?? "") : names.join(" + "),
+      up: s.up.map(shortNet),
+      down: s.down.map(shortNet),
+      off: s.off,
+      backPowered: s.back_powered.map((b) => t.backPower(shortNet(b.rail), b.via)),
+    }
+  })
+}
+
 /** Everything read from the datasheets, for the summary card: the facts
  *  grouped by IC (in reading order), then the deviations. */
 export function datasheetLines(summary: DesignSummary): {

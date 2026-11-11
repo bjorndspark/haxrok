@@ -12,6 +12,7 @@ import {
   findingTokens,
   modelBadge,
   powerRows,
+  stateRows,
   type StatusBadge,
 } from "../present"
 import type { DesignSummary } from "../types"
@@ -59,6 +60,7 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
   const m = useMessages()
   const t = m.summary
   const power = summary.power ? powerRows(summary.power, m) : []
+  const states = summary.power ? stateRows(summary.power, m) : []
   return (
     <Card className="space-y-5 p-4 sm:p-5">
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
@@ -189,6 +191,43 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
             ))}
           </ul>
           <p className="text-muted-foreground">{t.powerNote}</p>
+        </div>
+      )}
+
+      {states.length > 0 && (
+        <div className="space-y-2 text-xs">
+          <Rule>{t.states(states.length)}</Rule>
+          <ul className="space-y-1.5">
+            {states.map((s) => (
+              <li key={s.name} className="space-y-0.5">
+                <div className="flex flex-wrap items-baseline gap-x-[2ch]">
+                  <span className="font-bold text-info">{s.name}</span>
+                  <span>
+                    {t.up} <span className="text-value">{s.up.join(", ")}</span>
+                  </span>
+                  {s.down.length > 0 && (
+                    <span className="text-muted-foreground">
+                      {t.down} {s.down.join(", ")}
+                    </span>
+                  )}
+                </div>
+                {(s.off.length > 0 || s.backPowered.length > 0) && (
+                  <div className="space-y-0.5 pl-[2ch] text-muted-foreground">
+                    {s.off.map((line) => (
+                      <p key={line}>{line}</p>
+                    ))}
+                    {s.backPowered.map((line) => (
+                      <p key={line} className="flex flex-wrap items-baseline gap-x-[1ch]">
+                        <Badge tone="warn">{t.backPowered}</Badge>
+                        <span className="min-w-0">{line}</span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">{t.statesNote}</p>
         </div>
       )}
 

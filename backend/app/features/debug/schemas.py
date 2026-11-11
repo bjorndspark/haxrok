@@ -704,15 +704,39 @@ class PowerRail(BaseModel):
     )
 
 
+class BackPower(BaseModel):
+    """A rail that's down in an operating state but may be fed backwards
+    from a live one: may fail, not verified."""
+
+    rail: str
+    via: list[str] = Field(description='The parts and pins it flows through, e.g. ["R17", "U2.5"].')
+    text: str
+
+
+class OperatingState(BaseModel):
+    """Which rails are up from one combination of the power tree's sources
+    (``states.walk``)."""
+
+    sources: list[str]
+    up: list[str]
+    down: list[str]
+    off: list[str] = Field(
+        default_factory=list,
+        description="Parts held off by their enable, or taken as on with nothing on it.",
+    )
+    back_powered: list[BackPower] = Field(default_factory=list)
+
+
 class PowerTree(BaseModel):
     """The board's power tree, built from the netlist (``power.build``):
-    rails roots first, and the parts between them."""
+    rails roots first, the parts between them, and its operating states."""
 
     rails: list[PowerRail]
     parts: list[PowerPart]
     battery_override: bool = Field(
         default=False, description="The battery's range is the user's, from the review form."
     )
+    states: list[OperatingState] = Field(default_factory=list)
 
 
 class DesignSummary(BaseModel):

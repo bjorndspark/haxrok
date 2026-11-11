@@ -17,6 +17,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from app.features.debug import states
 from app.features.debug.calc import is_ground, named_voltage
 from app.features.debug.design import Design, is_inductor, short_net_name
 from app.features.debug.schemas import (
@@ -109,7 +110,8 @@ def build(
 ) -> PowerTree:
     """The power tree of ``design``. ``calculations`` are ``calc.lookup``'s
     (feedback-divider outputs); ``limits`` the datasheet facts by ref, when
-    they're read; ``battery`` the user's (min, max) for every battery."""
+    they're read; ``battery`` the user's (min, max) for every battery. Its
+    operating states are ``states.walk``'s."""
     limits = limits or {}
     index = _pin_index(design)
     usb = {net for net in design.nets if _is_usb(design, net)}
@@ -190,7 +192,8 @@ def build(
         )
         for e in sorted(edges, key=lambda e: (_ref_key(e.ref), e.output))
     ]
-    return PowerTree(rails=out, parts=parts, battery_override=battery is not None)
+    tree = PowerTree(rails=out, parts=parts, battery_override=battery is not None)
+    return tree.model_copy(update={"states": states.walk(design, tree)})
 
 
 def format_power(tree: PowerTree | None) -> str:
@@ -220,6 +223,7 @@ def format_power(tree: PowerTree | None) -> str:
         if budget := format_budget(r):
             head += f"; {budget}"
         lines.append(head)
+    lines += states.format_states(tree)
     return "\n".join(lines) + "\n"
 
 
@@ -340,7 +344,8 @@ def _ic_edges(design: Design, index: _Pins, power: set[str]) -> list[_Edge]:
 
 def _pass_edges(design: Design, index: _Pins, power: set[str], edges: list[_Edge]) -> list[_Edge]:
     """Diodes (anodes to cathode, so a BAT54C ORs two rails), and fuses,
-    ferrites, 0 Ω links and slide switches between two rails, oriented from
+    ferrites, 0 Ω links, slide switches and FETs (drain and source; a
+    load-sharing P-FET from the battery) between two rails, oriented from
     the side nearer a source."""
     on_tree = {e.output for e in edges} | {n for e in edges for n in e.inputs}
     found: list[_Edge] = []
@@ -359,15 +364,23 @@ def _pass_edges(design: Design, index: _Pins, power: set[str], edges: list[_Edge
                 if any(a != k for a in anodes)
             ]
             continue
+        fet = head == "Q" and {_norm(fn) for fn, _ in pins} >= {"D", "S"}
+        if fet:
+            pins = [(fn, n) for fn, n in pins if _norm(fn) in {"D", "S"}]
         nets = sorted({n for _, n in pins if _rail(n)})
         if (
             len(nets) != 2
             or any(is_ground(n) for _, n in pins)
-            or not _passive(head, lib, part.value)
+            or not (fet or _passive(head, lib, part.value))
         ):
             continue
         a, b = nets
         if a not in power | on_tree and b not in power | on_tree:
+            continue
+        cells = [n for n in nets if _is_battery(design, index, n)]
+        if fet and len(cells) == 1:
+            # A load-sharing FET passes the battery on to the system rail.
+            found.append(_Edge(ref, "pass", (cells[0],), b if cells[0] == a else a))
             continue
         rank_a, rank_b = _rank(design, index, a, edges), _rank(design, index, b, edges)
         if b not in power | on_tree or rank_a > rank_b:

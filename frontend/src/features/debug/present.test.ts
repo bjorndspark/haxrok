@@ -18,6 +18,7 @@ import {
   nearestPoint,
   parseSi,
   powerRows,
+  stateRows,
   simulationLayout,
   splitGlossary,
   toMarkdown,
@@ -869,5 +870,47 @@ describe("powerRows", () => {
       over: true,
     })
     expect(bat).toMatchObject({ budget: "load 550 mA", over: false })
+  })
+})
+
+describe("stateRows", () => {
+  const tree: PowerTree = {
+    battery_override: false,
+    parts: [],
+    rails: [],
+    states: [
+      {
+        sources: ["/power/VBUS"],
+        up: ["/power/VBUS", "+3V3"],
+        down: [],
+        off: [],
+        back_powered: [],
+      },
+      {
+        sources: ["VBAT"],
+        up: ["VBAT", "+3V3"],
+        down: ["/power/VBUS"],
+        off: ["U2 held off: U2.3 (EN) is tied to ground"],
+        back_powered: [{ rail: "/power/VBUS", via: ["R17", "U1.9"], text: "R17 pulls SCL up" }],
+      },
+      { sources: ["VBAT", "/power/VBUS"], up: ["VBAT"], down: [], off: [], back_powered: [] },
+    ],
+  }
+
+  it("names each state by its sources and words its back-powering", () => {
+    const [usb, bat, both] = stateRows(tree, en)
+    expect(usb).toMatchObject({ name: "VBUS only", up: ["VBUS", "+3V3"], backPowered: [] })
+    expect(bat).toMatchObject({
+      name: "VBAT only",
+      down: ["VBUS"],
+      off: ["U2 held off: U2.3 (EN) is tied to ground"],
+      backPowered: ["VBUS may be back-powered through R17, U1.9"],
+    })
+    expect(both).toMatchObject({ name: "VBAT + VBUS" })
+    expect(stateRows(tree, MESSAGES.ja)[0]?.name).toBe("VBUS のみ")
+  })
+
+  it("has none for a run saved before operating states", () => {
+    expect(stateRows({ ...tree, states: undefined }, en)).toEqual([])
   })
 })

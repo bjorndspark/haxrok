@@ -1155,7 +1155,7 @@ async def test_datasheet_facts_names_a_datasheet_that_couldnt_be_read():
         "datasheet_facts": [],
         "deviations": [],
         "datasheet_failures": [{"ref": "U2", "reason": "the PDF has no text (a scan?)"}],
-        "power": {"rails": [], "parts": [], "battery_override": False},
+        "power": {"rails": [], "parts": [], "battery_override": False, "states": []},
         "wiring": [f.model_dump() for f in prepared.pin_lookup.findings],
         "calculations": [c.model_dump() for c in prepared.calculations],
     }

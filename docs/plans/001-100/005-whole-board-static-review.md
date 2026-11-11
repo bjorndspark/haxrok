@@ -331,7 +331,7 @@ The private board's +3V3 budget is left for the loop's final review.
 tests, 47 frontend.
 Effort: 3–5 h.
 
-## 6. Operating states: which rails come up from which source: proposed
+## 6. Operating states: which rails come up from which source: done
 
 - For each combination of sources (USB only, battery only, both), walk
   the power tree: which rails are up, which IC enables are reachable,
@@ -349,9 +349,37 @@ finding.
 Decided (2026-11-11): a state is each non-empty combination of the
 tree's sources, up to 3 sources; with more, each source alone and all.
 
-**Checks:** unit tests (a rail dead on battery, a back-powered IO);
-`rust-board-i2c-vbus` still caught.
-Effort: 4–6 h.
+Decided (2026-11-11, default taken in loop): the states are built in
+`power.build`, so the summary, the review prompt and the evals read one
+result. Which rails are up is run to a fixed point; a charger never
+brings its output up.
+Decided (2026-11-11, default taken in loop): an enable tied to a rail,
+pulled up or driven by a powered IC is on; tied to ground it holds the
+part off; floating it's taken as on, with a note to check for an
+internal pull. `~{EN}`, `/EN`, `nEN` and `SHDN` are active low.
+Decided (2026-11-11, default taken in loop): an IC counts as powered
+only when all its supply rails are up, and as dead only when all are
+down, so a header symbol on two rails (the rust board's U4) is neither.
+ESD back-powering is one entry per dead IC, listing its driven pins.
+Decided (2026-11-11, default taken in loop): power muxes and switches
+are taken to block reverse current; diodes and FETs are one-way. A FET
+with drain and source on two rails is a pass part, oriented from the
+battery when one side is one (the rust board's Q1 load-share was missing,
+which showed +3V3 down on battery).
+Decided (2026-11-11, default taken in loop): held-off and back-power
+texts are the backend's English in the prompt; the UI words back-power
+per locale from its rail and pins.
+
+**Checks:** `test_debug_states.py` (9: state order, a rail dead on
+battery, ESD and pull-up back-power, EN to ground, active-low and
+floating EN, a GPIO-driven EN, a slide switch back-feeding +BATT, the
+prompt lines, a load-sharing FET); `present.test.ts` `stateRows` (2);
+the service payload carries `states`. `make lint` and `make test`
+(run as their sub-targets on make 3.81): pass, 360 backend and 49
+frontend tests. `make eval-app case=rust-board-i2c-vbus`: still #1,
+"I2C pull-ups to VBUS, dead on LiPo - verified" (301 s); the battery
+state shows +BATT, +5V and +3V3 up, VBUS down, and R17/R18 back-feeding
+VBUS. `rp-micro-no-fault` in review mode: one state, no issues (188 s).
 
 ## 7. MCU pin rules from the datasheet: proposed
 

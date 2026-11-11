@@ -244,7 +244,11 @@ part that makes it and what it supplies; a voltage marked inferred is a \
 guess to check, not a fact; once the datasheets are read, each rail's load \
 from its parts' maximum supply currents against the rated current of the \
 part making it, where "at least" means some parts give no figure and OVER \
-BUDGET is a risk to weigh, may fail, not verified)."""
+BUDGET is a risk to weigh, may fail, not verified; then its operating \
+states: which rails are up from each combination of sources, which parts \
+their enables hold off, and where a rail that's down may be back-powered \
+through a pull-up or an unpowered IC's pin, a risk to weigh, may fail, not \
+verified; a rail that's down in some state is by itself no fault)."""
 
 REVIEW_DIAGNOSE = f"""\
 You are an expert hardware engineer reviewing a hobbyist's KiCad schematic \
