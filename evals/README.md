@@ -241,6 +241,14 @@ gateway settings:
 make eval-app case=rust-board-fb-swapped   # one case; run at most ~3 at once
 ```
 
+`sim=startup` (or a comma list of `startup,load_step,dropout`) also runs
+the vendor-model simulations alongside the prompts, as the app streams
+them: each IC's datasheet and SPICE model looked up by its value, then
+`spice_circuits.simulate`. A compact netlist drops the schematic's
+Datasheet field, so a case gives the URLs the finders start from in
+`parts.txt` (`U15 https://…` per line); without one, no part is found. It writes `app-simulations.json` and prints
+each verdict. Switching models take minutes per run.
+
 Answers go to `results/<case>/<model>/app-diagnosis.md` and
 `app-analysis.json`. The rank it prints is where the `Auto-check:`
 keywords first match in the structured hypotheses. `meta/muse-spark-1.3-contributor`, one run each, three at once.

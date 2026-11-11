@@ -19,6 +19,14 @@ picked becomes one deck:
   flagged when that happens within 10 % of the nominal input. Only for a
   regulator whose datasheet gives a dropout voltage.
 
+Ammeters (zero-volt sources) sit on the input and on each switch-node pin
+(LX, SW, a buck-boost's L1/L2; plan 006 step 1), and their peaks are
+measured in every deck: a burst into a switch-node pin above the
+datasheet's switch current limit (2× the rated current without one,
+labelled not cited) is flagged, whatever the voltages do. A PG pin on its
+own net is probed and its rise reported. A model with a switch-node pin
+gets the switching solver settings (gear, relaxed tolerances, ``uic``).
+
 The limits come from the datasheet facts (``facts.DatasheetReading.limits``):
 the regulator's rated current, accuracy (±5 % without one), start-up time,
 dropout and typical input; the downstream ICs' supply range (nominal ±10 %
@@ -32,6 +40,7 @@ with ngspice's error; it never fails the request.
 """
 
 import asyncio
+import math
 import re
 from collections import Counter
 from collections.abc import AsyncIterator, Iterable, Sequence
@@ -76,11 +85,21 @@ _DECK_CHARS = 4000  # Simulation.deck's limit
 _DEFAULT_ACCURACY = 0.05
 _DEFAULT_SUPPLY = 0.10  # downstream supply range without facts: nominal ±10 %
 _DROPOUT_HEADROOM = 0.10  # flagged when regulation is lost this close to nominal
+# Switching models (a switch-node pin) need the hand-built study's settings
+# (plan 006 step 1): gear integration and relaxed tolerances, or ngspice
+# stops with "timestep too small" in the first switching cycles; ``interp``
+# keeps the output on the print grid; ``uic`` skips the operating point,
+# which the models' internal state rarely solves.
+_SWITCHING_OPTIONS = ".options method=gear reltol=0.01 abstol=1e-9 vntol=1e-5 itl4=100 interp"
+_LINEAR_OPTIONS = ".options klu reltol=0.003"
+_UNCITED_SWITCH = 2.0  # without a switch current limit: this many times the rated current
 
 # Pin names, normalized to uppercase letters and digits.
 _IN_PIN = re.compile(r"P?V?IN\d*|VI")
 _OUT_PIN = re.compile(r"V?OUT\d*|VO")
-_SW_PIN = re.compile(r"LX\d*|SW\d*")
+# A switch node: a buck's LX/SW, a buck-boost's L1/L2 (TPS63070).
+_SW_PIN = re.compile(r"LX\d*|SW\d*|L\d")
+_PG_PIN = re.compile(r"PG|PGOOD|POWERGOOD|PWRGD")
 _ENABLE_PIN = re.compile(r"(EN|CE|SHDN|ON|ENABLE)\d*")
 _GROUND_PIN = re.compile(r"(A|D|P|S)?GND\d*|VSS\d*|EP|E?PAD|THERMALPAD")
 _IC_REF = re.compile(r"(U|IC)\d+", re.IGNORECASE)
@@ -88,6 +107,10 @@ _IC_REF = re.compile(r"(U|IC)\d+", re.IGNORECASE)
 # Facts, matched on LimitFact.parameter.
 _CURRENT = re.compile(r"(output|load)\s+current|^I_?OUT\b|^IO\b", re.IGNORECASE)
 _NOT_RATED = re.compile(r"sink|sourc|limit|short|leak|quiescent|shut|switch|protect", re.IGNORECASE)
+_SWITCH_LIMIT = re.compile(
+    r"(switch|inductor|peak|valley)\s+current\s+limit|current\s+limit.*switch|^I_?LIM",
+    re.IGNORECASE,
+)
 _ACCURACY = re.compile(r"(output|feedback)\s+voltage.*(accura|toleran)", re.IGNORECASE)
 _DROPOUT = re.compile(r"dropout", re.IGNORECASE)
 _STARTUP = re.compile(
@@ -114,11 +137,21 @@ class Ratings:
 
     current: float | None = None  # rated output current, A
     current_page: int | None = None  # the datasheet page it's on
+    switch_limit: float | None = None  # switch current limit, A
+    switch_page: int | None = None
     accuracy: float = _DEFAULT_ACCURACY  # output accuracy, as a fraction
     accuracy_cited: bool = False
     dropout: float | None = None  # V
     startup: float | None = None  # summed start-up times, s
     vin: float | None = None  # typical input, V
+
+
+@dataclass(frozen=True)
+class Switch:
+    """A switch-node pin routed through an ammeter, ``Vam_<name>``."""
+
+    name: str  # the ammeter's suffix, "l2"
+    label: str  # "U5.9 (L2) on +3V3"
 
 
 @dataclass(frozen=True)
@@ -140,6 +173,11 @@ class Limits:
     dropout: float | None = None
     vin_end: float | None = None
     reset: str | None = None  # the reset pin the RC drives, "U16.7 (NRST)"
+    probes: tuple[str, ...] = ("out", "vin")  # the wrdata columns, in order
+    switches: tuple[Switch, ...] = ()  # the switch-node pins with an ammeter
+    switch_limit: float = 0.0  # a burst into a switch pin above this is flagged
+    switch_label: str = ""
+    pg: str | None = None  # the power-good pin probed, "U5.11 (PG)"
 
 
 @dataclass(frozen=True)
@@ -173,6 +211,8 @@ class _Cut:
     nodes: dict[str, str]  # board net -> deck node
     lines: list[str]  # the regulator instance and the kept passives
     reset: str | None  # "U16.7 (NRST)" when a reset RC is kept (node ``rst``)
+    switches: tuple[Switch, ...] = ()
+    pg: tuple[str, str] | None = None  # (node, "U5.11 (PG)") when PG is on its own net
 
 
 # --- datasheet facts -------------------------------------------------------
@@ -192,6 +232,8 @@ def ratings(limits: Sequence[LimitFact]) -> Ratings:
     typical input, as its datasheet facts give them."""
     current = None
     current_page = None
+    switch_limit = None
+    switch_page = None
     accuracy = None
     dropout = None
     startup = 0.0
@@ -207,6 +249,11 @@ def ratings(limits: Sequence[LimitFact]) -> Ratings:
             rated = next((b for b in (lim.max, lim.typ, lim.min) if b is not None), None)
             current = scaled(rated, lim.unit, "A")
             current_page = lim.page
+        elif switch_limit is None and _SWITCH_LIMIT.search(p):
+            # the highest the part lets through: max, else typ, else min
+            got = next((b for b in (lim.max, lim.typ, lim.min) if b is not None), None)
+            switch_limit = scaled(got, lim.unit, "A")
+            switch_page = lim.page if switch_limit else None
         elif accuracy is None and _ACCURACY.search(p) and lim.unit.strip() == "%":
             bounds = [abs(b) for b in (lim.min, lim.max) if b is not None]
             accuracy = max(bounds) / 100 if bounds else None
@@ -224,6 +271,8 @@ def ratings(limits: Sequence[LimitFact]) -> Ratings:
     return Ratings(
         current=current if current and current > 0 else None,
         current_page=current_page if current and current > 0 else None,
+        switch_limit=switch_limit if switch_limit and switch_limit > 0 else None,
+        switch_page=switch_page if switch_limit and switch_limit > 0 else None,
         accuracy=accuracy or _DEFAULT_ACCURACY,
         accuracy_cited=accuracy is not None,
         dropout=dropout,
@@ -350,8 +399,10 @@ def _cut(
     model isn't a single-rail regulator's: no input and output pin, or input
     or output pins on more than one net (a driver's IN1/IN2, OUT1/OUT2)."""
     board: dict[str, str] = {}
+    number: dict[str, str] = {}  # normalized pin name -> the board's pin number
     for pin, on in _pins_of(design, ref):
         board.setdefault(_norm(design.pin_name(f"{ref}.{pin}")), on)
+        number.setdefault(_norm(design.pin_name(f"{ref}.{pin}")), pin)
     names = [_model_pin(board, p) for p in m.pins]
     pin_in = next((p for p in names if _IN_PIN.fullmatch(p)), None)
     pin_out = next((p for p in names if _OUT_PIN.fullmatch(p)), None)
@@ -381,7 +432,10 @@ def _cut(
         return "the datasheet facts give no rated output current"
     nodes: dict[str, str] = {net_in: "vin", net_out: "out"}
     pins_used: list[str] = []
-    for p in names:
+    ammeters: list[str] = []
+    switches: list[Switch] = []
+    pg = None
+    for raw, p in zip(m.pins, names, strict=True):
         net = board.get(p)
         if net is None:
             if _GROUND_PIN.fullmatch(p):
@@ -396,11 +450,23 @@ def _cut(
             others = sorted({n.ref for n in design.nets[net] if n.ref != ref and _is_ic(n.ref)})
             if others:
                 return f"its {p} is driven by {', '.join(others)}"
-        pins_used.append(nodes[net])
+        node = nodes[net]
+        if _SW_PIN.fullmatch(p) and node != "0":
+            # The pin through a zero-volt source: i(vam_<x>) is the current
+            # from the board's net into the pin.
+            name = _norm(raw).lower()
+            while any(s.name == name for s in switches):
+                name += "x"
+            ammeters.append(f"Vam_{name} {node} sw_{name} 0")
+            switches.append(Switch(name, f"{ref}.{number[p]} ({p}) on {net}"))
+            node = f"sw_{name}"
+        elif _PG_PIN.fullmatch(p) and node.startswith("n") and pg is None:
+            pg = (node, f"{ref}.{number[p]} ({p})")
+        pins_used.append(node)
     for net in design.nets:
         if is_ground(net):
             nodes[net] = "0"
-    lines = [f"X{re.sub(r'[^A-Za-z0-9_]', '_', ref)} {' '.join(pins_used)} {m.subckt}"]
+    lines = [f"X{re.sub(r'[^A-Za-z0-9_]', '_', ref)} {' '.join(pins_used)} {m.subckt}", *ammeters]
     reset = None
     for part in design.parts.values():
         letter = _head(part.ref)
@@ -430,7 +496,7 @@ def _cut(
         lines += extra
     if any(ln.split()[0].upper().startswith("D") for ln in lines[1:]):
         lines.append(".model hx_d D")
-    return _Cut(vin, vout, rate.current, nodes, lines, reset)
+    return _Cut(vin, vout, rate.current, nodes, lines, reset, tuple(switches), pg)
 
 
 def _diode_ends(
@@ -488,10 +554,19 @@ def _window(rate: Ratings) -> float:
     return min(_RAMP + 1.1 * rate.startup, _WINDOW_MAX)
 
 
+def _source(wave: str) -> list[str]:
+    """The input source, ``wave`` from 0 V, through the input ammeter:
+    i(vam_in) is the current into the regulator's input."""
+    return [f"Vsrc src 0 PWL({wave})", "Vam_in src vin 0"]
+
+
 def _deck(
-    title: str, name: str, cut: _Cut, sources: list[str], stop: float, probes: list[str]
+    title: str, name: str, cut: _Cut, sources: list[str], stop: float, probes: Sequence[str]
 ) -> str:
+    """The deck: the cut, ``sources``, and a transient to ``stop`` writing
+    ``probes`` to out.txt; each ammeter's peak goes to run.log as ``pk_<x>``."""
     comments = [f"* {node}: {one_line(net)}" for net, node in cut.nodes.items() if node != "0"]
+    comments += [f"* vam_{s.name}: into {one_line(s.label)}" for s in cut.switches]
     leaks = [
         f"Rleak_{node} {node} 0 1G"
         for node in sorted(
@@ -499,18 +574,22 @@ def _deck(
             | ({"rst"} if cut.reset else set())
         )
     ]
+    ammeters = ["in", *(s.name for s in cut.switches)]
+    switching = bool(cut.switches)
     return "\n".join(
         [
             one_line(title),
             *comments,
             f'.include "{name}"',
-            ".options klu reltol=0.003",
+            _SWITCHING_OPTIONS if switching else _LINEAR_OPTIONS,
             *sources,
             *cut.lines,
             *leaks,
             ".control",
-            f"save {' '.join(f'v({p})' for p in probes)}",
-            f"tran {_STEP:g} {stop:g}",
+            f"save {' '.join(f'v({p})' for p in probes)} "
+            + " ".join(f"i(vam_{a})" for a in ammeters),
+            f"tran {_STEP:g} {stop:g}" + (" uic" if switching else ""),
+            *(f"meas tran pk_{a} MAX i(vam_{a})" for a in ammeters),
             "linearize",
             f"wrdata out.txt {' '.join(f'v({p})' for p in probes)}",
             "quit",
@@ -543,7 +622,13 @@ def plan(
     pct = f"±{rate.accuracy * 100:g} %" + ("" if rate.accuracy_cited else ", not cited")
     over, over_label, droop, droop_label = _supply_limits(design, ref, cut, reading)
     window = _window(rate)
-    probes = ["out", "vin"] + (["rst"] if cut.reset else [])
+    probes = ("out", "vin", *(["rst"] if cut.reset else []), *([cut.pg[0]] if cut.pg else []))
+    if rate.switch_limit is not None:
+        page = f", p. {rate.switch_page}" if rate.switch_page else ""
+        limit, limit_label = rate.switch_limit, f"the switch current limit{page}"
+    else:
+        limit = _UNCITED_SWITCH * current
+        limit_label = f"{_UNCITED_SWITCH:g}× the rated {current:g} A, not cited"
     base = Limits(
         ref,
         vout,
@@ -559,18 +644,23 @@ def plan(
         window,
         dropout=rate.dropout,
         reset=cut.reset,
+        probes=probes,
+        switches=cut.switches,
+        switch_limit=limit,
+        switch_label=limit_label,
+        pg=cut.pg[1] if cut.pg else None,
     )
     jobs: list[Job] = []
     for analysis in analyses:
         if analysis == "startup":
             limits = base
-            sources = [f"Vin vin 0 PWL(0 0 {_RAMP:g} {vin:g})", f"Rload out 0 {vout / current:g}"]
+            sources = [*_source(f"0 0 {_RAMP:g} {vin:g}"), f"Rload out 0 {vout / current:g}"]
             what = "start-up"
         elif analysis == "load_step":
             t1 = window
             limits = replace(base, t_event=t1, stop=t1 + _LOAD_STEP_AFTER)
             sources = [
-                f"Vin vin 0 PWL(0 0 {_RAMP:g} {vin:g})",
+                *_source(f"0 0 {_RAMP:g} {vin:g}"),
                 f"Rload out 0 {vout / (_LIGHT * current):g}",
                 f"Istep out 0 PWL(0 0 {t1:g} 0 {t1 + 1e-6:g} {(1 - _LIGHT) * current:g})",
             ]
@@ -582,7 +672,7 @@ def plan(
             vend = vout * (1 - rate.accuracy) * 0.9
             limits = replace(base, t_event=t1, stop=t1 + _SWEEP, vin_end=vend)
             sources = [
-                f"Vin vin 0 PWL(0 0 {_RAMP:g} {vin:g} {t1:g} {vin:g} {t1 + _SWEEP:g} {vend:g})",
+                *_source(f"0 0 {_RAMP:g} {vin:g} {t1:g} {vin:g} {t1 + _SWEEP:g} {vend:g}"),
                 f"Rload out 0 {vout / current:g}",
             ]
             what = "dropout"
@@ -621,6 +711,10 @@ def _supply_limits(
 
 
 Rows = list[tuple[float, ...]]
+Peaks = dict[str, tuple[float, float]]  # ammeter -> (peak current, A; when, s)
+
+# ``meas tran pk_l2 MAX i(vam_l2)`` prints "pk_l2 = 1.77e+00 at= 3.75e-04".
+_PEAK = re.compile(r"^pk_(\w+)\s*=\s*(\S+)\s+at=\s*(\S+)", re.MULTILINE | re.IGNORECASE)
 
 
 def parse_columns(text: str, n: int) -> Rows:
@@ -639,6 +733,21 @@ def parse_columns(text: str, n: int) -> Rows:
     if len(rows) < 2:
         raise ValueError("no samples")
     return rows
+
+
+def parse_peaks(log: str) -> Peaks:
+    """Each ammeter's peak current and when, from the ``meas`` lines in
+    ngspice's log; an ammeter whose line is missing, unreadable or not a
+    number ("nan") is left out."""
+    peaks: Peaks = {}
+    for m in _PEAK.finditer(log):
+        try:
+            peak, at = float(m.group(2)), float(m.group(3))
+        except ValueError:
+            continue
+        if math.isfinite(peak) and math.isfinite(at):
+            peaks[m.group(1).lower()] = (peak, at)
+    return peaks
 
 
 def _crossing(rows: Rows, col: int, level: float, after: float = 0.0) -> float | None:
@@ -675,8 +784,46 @@ def _t(seconds: float) -> str:
     return format_seconds(seconds)
 
 
-def verdict(analysis: SimAnalysis, lim: Limits, rows: Rows) -> tuple[SimVerdict, str]:
-    """Whether the waveform (t, v(out), v(vin)[, v(rst)]) stays within
+def _a(amps: float) -> str:
+    return f"{amps:.2f} A"
+
+
+def _currents(lim: Limits, peaks: Peaks) -> tuple[list[str], str]:
+    """(what's wrong, what's said) about the ammeters' peaks: a burst into
+    a switch-node pin above the switch current limit is flagged."""
+    wrong = []
+    said = []
+    for sw in lim.switches:
+        if sw.name not in peaks:
+            continue
+        peak, at = peaks[sw.name]
+        said.append(f"into {sw.label} {_a(peak)} at {_t(at)}")
+        if peak > lim.switch_limit:
+            wrong.append(
+                f"draws {_a(peak)} into {sw.label} at {_t(at)}, above "
+                f"{_a(lim.switch_limit)} ({lim.switch_label})"
+            )
+    if "in" in peaks:
+        said.append(f"from the input {_a(peaks['in'][0])} at {_t(peaks['in'][1])}")
+    text = f" Peak currents: {'; '.join(said)}." if said else ""
+    return wrong, text
+
+
+def _pg(lim: Limits, rows: Rows) -> str:
+    """When the power-good pin rises (half its peak), if it's probed."""
+    if lim.pg is None:
+        return ""
+    col = len(lim.probes)  # PG is the last probe
+    top = max(r[col] for r in rows)
+    t_pg = _crossing(rows, col, top / 2) if top > 0.5 else None
+    return f" {lim.pg} rises at {_t(t_pg)}." if t_pg is not None else f" {lim.pg} stays low."
+
+
+def verdict(
+    analysis: SimAnalysis, lim: Limits, rows: Rows, peaks: Peaks | None = None
+) -> tuple[SimVerdict, str]:
+    """Whether the waveform (t, then a column per ``lim.probes``: v(out),
+    v(vin)[, v(rst)][, v(PG)]) and the ammeters' ``peaks`` stay within
     ``lim``, and a few sentences saying so with the numbers."""
     end = rows[-1][0]
     band = f"{_v(lim.lo)}–{_v(lim.hi)} ({lim.accuracy})"
@@ -691,8 +838,8 @@ def verdict(analysis: SimAnalysis, lim: Limits, rows: Rows) -> tuple[SimVerdict,
             wrong.append(f"settles at {_v(final)}, outside {band}")
         if peak > lim.over:
             wrong.append(f"peaks at {_v(peak)}, above {_v(lim.over)} ({lim.over_label})")
-        if lim.reset and len(rows[0]) > 3:
-            t_rst = _crossing(rows, 3, RESET_RELEASE * lim.vout)
+        if lim.reset and "rst" in lim.probes:
+            t_rst = _crossing(rows, lim.probes.index("rst") + 1, RESET_RELEASE * lim.vout)
             if t_rst is not None and (t_band is None or t_rst < t_band):
                 when = f"before the rail reaches {_v(lim.lo)}" + (
                     f" at {_t(t_band)}" if t_band is not None else ""
@@ -702,7 +849,7 @@ def verdict(analysis: SimAnalysis, lim: Limits, rows: Rows) -> tuple[SimVerdict,
         said = (
             f"{facts}, settles at {_v(final)} and peaks at {_v(peak)}; "
             f"band {band}, ceiling {_v(lim.over)} ({lim.over_label})."
-        )
+        ) + _pg(lim, rows)
     elif analysis == "load_step":
         t1 = lim.t_event
         before = _mean(rows, 1, 0.9 * t1, t1)
@@ -750,8 +897,13 @@ def verdict(analysis: SimAnalysis, lim: Limits, rows: Rows) -> tuple[SimVerdict,
                 f"Leaves its band ({band}) at {_v(drop[2])} in, {_v(headroom)} below the "
                 f"nominal {_v(lim.vin)}.{datasheet}"
             )
-    if wrong:
-        return "flagged", f"{lim.ref}'s output {'; '.join(wrong)}. {said}"
+    burst, currents = _currents(lim, peaks or {})
+    said += currents
+    if wrong or burst:
+        parts = ([f"{lim.ref}'s output {'; '.join(wrong)}"] if wrong else []) + [
+            f"{lim.ref} {b}" for b in burst
+        ]
+        return "flagged", f"{'. '.join(parts)}. {said}"
     return "passed", said
 
 
@@ -802,11 +954,11 @@ def result(sim_id: str, job: Job, run: Run) -> Simulation:
         error = ""
         if run.code == 0 and run.data:
             try:
-                rows = parse_columns(run.data, 3 if job.limits.reset else 2)
+                rows = parse_columns(run.data, len(job.limits.probes))
             except ValueError as e:
                 error = f"its output was unreadable ({e})"
         if rows:
-            got, text = verdict(job.analysis, job.limits, rows)
+            got, text = verdict(job.analysis, job.limits, rows, parse_peaks(run.log))
         else:
             error = error or ngspice_error(run.log) or f"ngspice exited with {run.code}"
             got, text = "failed", f"The run failed: {error}"

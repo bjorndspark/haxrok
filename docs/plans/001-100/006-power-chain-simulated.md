@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-11 | 2026-11-11 | Proposed | — | `004-datasheets-and-simulation.md`, `005-whole-board-static-review.md`, `DECISIONS.md` ("SPICE models are untrusted text") |
+| 2026-11-11 | 2026-11-11 | In progress | — | `004-datasheets-and-simulation.md`, `005-whole-board-static-review.md`, `DECISIONS.md` ("SPICE models are untrusted text") |
 
 Plan 005 made the private board's fault (the TPS63070's L2 pin wired to
 its own output, +3V3) a verified static finding. The simulation still
@@ -39,7 +39,7 @@ and convergence (plan 004 step 6 hit "timestep too small" with them).
 Decided (2026-11-11): fast-forward `main` to `dev` (plan 005 lands on
 `main`), then work on `dev`, as plans 004 and 005 did.
 
-## 1. Vendor-model runs that finish and look at currents: proposed
+## 1. Vendor-model runs that finish and look at currents: done
 
 - The study's solver settings for switching models: `method=gear`,
   relaxed tolerances, `interp`, `uic`, a 0.5 ms soft-start window.
@@ -56,11 +56,65 @@ stay out of the repo.
 Decided (2026-11-11): the reverse-current verdict flags a burst into a
 switch-node pin above the datasheet's switch current limit; without one,
 above 2× the rated output current, labelled as not cited.
+Decided (2026-11-11, default taken in step): a model counts as switching
+when it has a switch-node pin (LX, SW, or a buck-boost's L1/L2); only then
+does the deck get `method=gear reltol=0.01 abstol=1e-9 vntol=1e-5 itl4=100
+interp` and `uic`, so linear models keep `klu reltol=0.003`. The window
+stays the datasheet's start-up time plus the ramp (capped at 5 ms), not a
+fixed 0.5 ms, so a part with a slower soft start isn't cut short; the
+private runs below set their windows by hand.
+Decided (2026-11-11, default taken in step): ammeters are zero-volt
+sources (`Vam_in`, `Vam_<pin>`), and their peaks come from `meas tran ...
+MAX` lines in ngspice's log, so the waveform file keeps only voltages.
+The PG pin is probed when it sits on a net of its own, and its rise is
+reported, not judged.
+Decided (2026-11-11, default taken in step): `make eval-app` runs the
+simulations only with `sim=startup` (or a comma list): a switching run
+takes minutes, so the plain prompt eval stays quick.
+Decided (2026-11-11, default taken in step): a case's datasheet URLs go
+in an optional `evals/cases/<case>/parts.txt` ("REF URL" lines), standing
+in for the Datasheet field the compact netlist drops, so the eval finds
+datasheets and models by the app's own path.
 
-**Check:** a unit test per deck change and per verdict rule; the
-private board's U5 run shows the reverse-current burst (by hand);
-`orbit-l2-shorted` flagged through `make eval-app`, and
-`rp-micro-no-fault` not.
+**Checks:** 8 new or changed unit tests in `test_debug_spice_circuits.py`
+(25 there): the start-up deck's input and switch-pin ammeters, labels,
+switching options, `uic`, `meas` lines and PG probe; a switch current
+limit read apart from an output current limit, and cited as the burst
+limit; the uncited 2× limit; PG's rise and "stays low"; a burst into a
+switch pin above the limit flagged while the voltages pass; the `meas`
+lines parsed (a `nan` dropped); `result` reading the peaks from the log.
+The toy ngspice run keeps the linear options and no `uic`.
+
+The private board's U5 run (by hand, the app's deck at 4.8 V) finishes
+with the new settings but shows **no burst**: L2's ammeter peaks at about
+10 µA with L2 on +3V3, against 1.7–1.8 A from the inductor with L2 fixed.
+Runs: 1.65 Ω load for 0.5 ms (94 s) and 2 ms (439 s), 16.5 Ω for 1 ms
+(236 s), and 16.5 Ω with 0.5 Ω and 2 Ω in series with the input (218 s
+each); the input peaks at 2.9 A of inrush at 50 µs in each. With an ideal
+4.8 V source the TPS63070 stays in buck mode, and its L2 low-side FET,
+the one that shorts +3V3, never turns on. The study's burst came with
+the battery and the TPS2121 in front and the MCU as a load step, so
+reproducing it moves to step 2 (the chain from its source) and step 4
+(a current-limited supply). The output also isn't settled after 2 ms
+(1.6 V at 1.65 Ω), so the acceptance's 3.31 V needs a longer window or
+the study's lighter load: step 2's load from the budget.
+
+`make eval-app case=orbit-l2-shorted sim=startup`: U15 (TPS63802)
+`flagged` on the burst, **149.6 A into U15.7 (L2) on +3.3V at 578 µs**,
+above the 5.75 A switch current limit (p. 6); it also settles low (2.62 V)
+and PG stays low; the input peaks at 6.6 A. The prompts still rank the L2
+short #1. The first run simulated nothing: a compact netlist drops the
+schematic's Datasheet field, so the finders had no LCSC number, maker or
+URL. A case now gives those URLs in an optional `parts.txt` (orbit's
+U15 → TI's datasheet), read by `app_prompts.py`. `rp-micro-no-fault`:
+READ, not flagged, but only because nothing is simulated: its one
+regulator (RT9013, Richtek) has no vendor model the finder knows, so a
+clean board's simulation still has no eval case.
+
+Writing the tests found `nan` from a failed `meas` passing as a peak (now
+dropped) and the waveform helper giving a column count that varied with
+the probes (now fixed at five). `make lint` and `make test` pass
+(sub-targets, make 3.81): 381 backend tests, 49 frontend.
 Effort: 4–8 h.
 
 ## 2. The chain from its source: proposed

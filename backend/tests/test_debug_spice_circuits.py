@@ -159,6 +159,18 @@ def test_ratings_take_a_rated_current_given_only_as_a_minimum():
     assert sc.ratings([_fact("output current", 2, None, None, "A")]).current == 2
 
 
+def test_ratings_read_a_switch_current_limit_not_an_output_limit():
+    rate = sc.ratings(
+        [
+            _fact("Output current limit", None, 3, None, "A"),
+            _fact("Switch current limit", 3.5, 4.0, 4.5, "A"),
+        ]
+    )
+    assert (rate.switch_limit, rate.switch_page) == (4.5, 1)  # the most it lets through
+    assert sc.ratings([_fact("Output current limit", None, 3, None, "A")]).switch_limit is None
+    assert sc.ratings([_fact("Peak current limit", None, 1800, None, "mA")]).switch_limit == 1.8
+
+
 def test_supply_range_is_the_widest_that_holds_the_rail():
     facts = [
         _fact("Supply voltage VDD", 1.7, None, 3.6),
@@ -182,9 +194,13 @@ def test_the_startup_deck_ramps_the_input_and_loads_the_rated_current():
     lines = deck.splitlines()
     assert lines[0] == job.title
     assert '.include "tps63802.lib"' in lines
-    assert "Vin vin 0 PWL(0 0 5e-05 3.6)" in lines  # the datasheet's typical input
+    assert "Vsrc src 0 PWL(0 0 5e-05 3.6)" in lines  # the datasheet's typical input
+    assert "Vam_in src vin 0" in lines  # the input's ammeter
     assert "Rload out 0 1.65" in lines  # 3.3 V at the rated 2 A
-    assert "XU15 0 vin n1 0 n2 n3 0 n4 vin out TPS63802" in lines
+    # L1 and L2 are switch nodes: each goes through an ammeter from its net.
+    assert "XU15 0 vin n1 0 sw_l1 sw_l2 0 n4 vin out TPS63802" in lines
+    assert "Vam_l1 n2 sw_l1 0" in lines and "Vam_l2 n3 sw_l2 0" in lines
+    assert "* vam_l2: into U15.6 (L2) on /L2" in lines
     for part in ("R7 out n1 1e+06", "R8 n1 0 100000", "L1 n2 n3 4.7e-07", "C13 out 0 2.2e-05"):
         assert part in lines
     assert "R6 out n4 100000" in lines  # the PG pull-up
@@ -193,10 +209,26 @@ def test_the_startup_deck_ramps_the_input_and_loads_the_rated_current():
     assert "R9 out rst 10000" in lines and "C9 rst 0 1e-07" in lines
     assert not any(ln.startswith("XU16") for ln in lines)
     assert "Rleak_out out 0 1G" in lines and "Rleak_rst rst 0 1G" in lines
-    assert "save v(out) v(vin) v(rst)" in lines
-    assert "tran 2.5e-07 0.0006495" in lines  # the ramp, then 1.1 × (224 + 321) µs
-    assert "wrdata out.txt v(out) v(vin) v(rst)" in lines
-    assert job.limits.reset == "U16.7 (NRST)"
+    # A switching model gets the study's solver settings and skips the
+    # operating point; PG (n4) is probed, each ammeter's peak measured.
+    assert sc._SWITCHING_OPTIONS in lines and sc._LINEAR_OPTIONS not in lines
+    assert "save v(out) v(vin) v(rst) v(n4) i(vam_in) i(vam_l1) i(vam_l2)" in lines
+    assert "tran 2.5e-07 0.0006495 uic" in lines  # the ramp, then 1.1 × (224 + 321) µs
+    for a in ("in", "l1", "l2"):
+        assert f"meas tran pk_{a} MAX i(vam_{a})" in lines
+    assert "wrdata out.txt v(out) v(vin) v(rst) v(n4)" in lines
+    assert job.limits.reset == "U16.7 (NRST)" and job.limits.pg == "U15.8 (PG)"
+    assert job.limits.probes == ("out", "vin", "rst", "n4")
+    assert [s.name for s in job.limits.switches] == ["l1", "l2"]
+    assert job.limits.switch_limit == 4  # no switch current limit: 2 × the rated 2 A
+    assert job.limits.switch_label == "2× the rated 2 A, not cited"
+
+
+def test_a_cited_switch_current_limit_sets_the_burst_limit():
+    more = {"U15": [*_tps_facts(), _fact("Switch current limit", None, 4.0, 4.5, "A")]}
+    (job,) = _jobs(**more)
+    assert job.limits.switch_limit == 4.5
+    assert job.limits.switch_label == "the switch current limit, p. 1"
     assert job.limits.lo == pytest.approx(3.267) and job.limits.hi == pytest.approx(3.333)
     assert (job.limits.over, job.limits.over_label) == (3.6, "U16 supply max")
     assert (job.limits.droop, job.limits.droop_label) == (1.7, "U16 supply min")
@@ -215,7 +247,7 @@ def test_load_step_and_dropout_decks():
 
     (drop,) = _jobs(("dropout",), dropout=True)
     vend = 3.3 * 0.99 * 0.9
-    assert f"Vin vin 0 PWL(0 0 5e-05 3.6 0.0006495 3.6 0.0011495 {vend:g})" in drop.deck
+    assert f"Vsrc src 0 PWL(0 0 5e-05 3.6 0.0006495 3.6 0.0011495 {vend:g})" in drop.deck
     assert drop.limits.vin_end == pytest.approx(vend) and drop.limits.dropout == 0.2
 
 
@@ -275,7 +307,8 @@ def test_numbered_model_pins_meet_the_boards_repeated_pin_names():
     pins = [*TPS_PINS[:-2], "VIN_0", "VIN_1", "VOUT_0", "VOUT_1"]
     got = sc.plan(_orbit(), _status(), _files(pins), _reading(), ["startup"])
     assert isinstance(got, list)
-    assert "XU15 0 vin n1 0 n2 n3 0 n4 vin vin out out TPS63802" in got[0].deck.splitlines()
+    lines = got[0].deck.splitlines()
+    assert "XU15 0 vin n1 0 sw_l1 sw_l2 0 n4 vin vin out out TPS63802" in lines
 
 
 def test_a_driver_with_inputs_on_several_nets_isnt_a_regulator():
@@ -300,14 +333,11 @@ def test_a_driver_with_inputs_on_several_nets_isnt_a_regulator():
 
 
 def _rows(
-    stop: float, out, vin=lambda t: 3.6, rst=None, step: float = 5e-6
+    stop: float, out, vin=lambda t: 3.6, rst=lambda t: 0.0, pg=lambda t: 0.0, step: float = 5e-6
 ) -> list[tuple[float, ...]]:
+    """(t, out, vin, rst, pg) samples: the orbit decks' probes."""
     n = round(stop / step)
-    rows = []
-    for i in range(n + 1):
-        t = i * step
-        rows.append((t, out(t), vin(t)) + ((rst(t),) if rst else ()))
-    return rows
+    return [(t, out(t), vin(t), rst(t), pg(t)) for t in (i * step for i in range(n + 1))]
 
 
 def _ramp(t: float, rise: float = 200e-6, top: float = 3.3) -> float:
@@ -321,6 +351,36 @@ def test_a_clean_startup_passes():
     assert got == "passed"
     assert text.startswith("Reaches 3.267 V at ")
     assert "settles at 3.300 V" in text and "ceiling 3.600 V (U16 supply max)" in text
+    assert text.endswith(" U15.8 (PG) stays low.")
+
+    rows = _rows(649.5e-6, _ramp, rst=lambda t: _ramp(t, 500e-6), pg=lambda t: _ramp(t, 400e-6))
+    _, text = sc.verdict("startup", job.limits, rows)
+    assert "U15.8 (PG) rises at 200 µs." in text  # half its 3.3 V peak
+
+
+def test_a_burst_into_a_switch_pin_above_the_limit_is_flagged():
+    (job,) = _jobs()
+    rows = _rows(649.5e-6, _ramp, rst=lambda t: _ramp(t, 500e-6))
+    peaks = {"in": (1.2, 60e-6), "l1": (0.9, 300e-6), "l2": (12.5, 80e-6)}
+    got, text = sc.verdict("startup", job.limits, rows, peaks)
+    assert got == "flagged"
+    assert text.startswith(
+        "U15 draws 12.50 A into U15.6 (L2) on /L2 at 80 µs, above 4.00 A "
+        "(2× the rated 2 A, not cited). Reaches 3.267 V at "
+    )
+    assert text.endswith(
+        " Peak currents: into U15.5 (L1) on /L1 0.90 A at 300 µs; "
+        "into U15.6 (L2) on /L2 12.50 A at 80 µs; from the input 1.20 A at 60 µs."
+    )
+
+    got, text = sc.verdict("startup", job.limits, rows, {**peaks, "l2": (1.8, 80e-6)})
+    assert got == "passed" and "into U15.6 (L2) on /L2 1.80 A at 80 µs" in text
+
+    # A wrong output and a burst are both said.
+    low = _rows(649.5e-6, lambda t: _ramp(t, top=3.1))
+    got, text = sc.verdict("startup", job.limits, low, peaks)
+    assert got == "flagged" and text.startswith("U15's output never reaches 3.267 V")
+    assert ". U15 draws 12.50 A into U15.6 (L2)" in text
 
 
 def test_startup_flags_overshoot_a_missed_band_and_an_early_reset():
@@ -403,6 +463,18 @@ def test_parse_columns_takes_one_time_column():
         sc.parse_columns("No. of Data Rows : 0\n", 2)
 
 
+def test_parse_peaks_reads_the_meas_lines():
+    log = (
+        "pk_in               =  2.880005e+00 at=  5.000000e-05\n"
+        "pk_l2               =  1.772828e+00 at=  3.747500e-04\n"
+        "pk_l1 = nan at= nan\n"
+        "Error: measure  pk_x  (MAX) : out of interval\n"
+    )
+    peaks = sc.parse_peaks(log)
+    assert peaks["in"] == (2.880005, 5e-5) and peaks["l2"] == (1.772828, 3.7475e-4)
+    assert "x" not in peaks
+
+
 def test_result_says_passed_timed_out_or_failed():
     (job,) = _jobs()
     rows = _rows(649.5e-6, _ramp, rst=lambda t: _ramp(t, 500e-6), step=0.25e-6)
@@ -427,6 +499,13 @@ def test_result_says_passed_timed_out_or_failed():
     sim = sc.result("vm1", job, Run(0, "garbage\n", ""))
     assert sim.verdict == "failed"
     assert sim.text == "The run failed: its output was unreadable (no samples)"
+
+
+def test_result_reads_the_ammeters_peaks_from_the_log():
+    (job,) = _jobs()
+    rows = _rows(649.5e-6, _ramp, rst=lambda t: _ramp(t, 500e-6), step=0.25e-6)
+    sim = sc.result("vm1", job, Run(0, _wrdata(rows), "pk_l2 = 1.25e+01 at= 8.0e-05\n"))
+    assert sim.verdict == "flagged" and sim.text.startswith("U15 draws 12.50 A into U15.6 (L2)")
 
 
 def test_a_skip_becomes_a_simulation_without_samples():
@@ -520,3 +599,6 @@ async def test_a_toy_regulator_starts_up_in_real_ngspice():
     assert sim.verdict == "passed", sim.text
     assert sim.t_unit == "µs" and sim.t[-1] == pytest.approx(160)
     assert sim.v[-1] == pytest.approx(3.3, abs=0.01)
+    # No switch-node pin: the linear solver settings, the operating point solved.
+    assert sc._LINEAR_OPTIONS in sim.deck and " uic" not in sim.deck
+    assert "meas tran pk_in MAX i(vam_in)" in sim.deck

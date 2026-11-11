@@ -21,7 +21,7 @@ help:
 	@echo "  logs       tail app logs"
 	@echo "  docs       regenerate docs/architecture/api/routes.md"
 	@echo "  docs-serve browse docs/ with mkdocs at http://localhost:\$$DOCS_HOST_PORT"
-	@echo "  eval-app   run an eval case through the app's debug prompts: make eval-app case=rust-board-fb-swapped [mode=review]"
+	@echo "  eval-app   run an eval case through the app's debug prompts: make eval-app case=rust-board-fb-swapped [mode=review] [sim=startup]"
 	@echo "  spice-corpus  download TI's SPICE models (plus data/spice-corpus/manual/) and load-check each in ngspice"
 	@echo "  issues     list open GitHub issues"
 	@echo "  fix-issue  hand an issue to an AI agent: make fix-issue n=123 [agent=devin]"
@@ -107,7 +107,8 @@ docs:
 # --user keeps results host-owned; LOG_FILE= leaves the server's log alone.
 eval-app:
 	docker compose exec --user $(shell id -u):$(shell id -g) -e LOG_FILE= \
-		backend .venv/bin/python /evals/app_prompts.py --case $(or $(case),rust-board-fb-swapped) --mode $(or $(mode),debug)
+		backend .venv/bin/python /evals/app_prompts.py --case $(or $(case),rust-board-fb-swapped) --mode $(or $(mode),debug) \
+		$(if $(sim),--sim $(sim))
 
 # Real vendor models through the load check (backend/scripts/spice_corpus.py);
 # they're downloaded into data/spice-corpus/, not committed.

@@ -104,9 +104,10 @@ frontend/src/
   when debugging. Each holds the current session only; every backend (re)start
   rotates the previous file into `archive/<date>/`.
 - `make lint` / `make test` / `make format` — run inside containers
-- `make eval-app case=<name> [mode=review]` — run an `evals/cases/` case
-  through the app's debug (or pre-fab review) prompts
-  (`evals/app_prompts.py`); `evals/README.md` has the rest
+- `make eval-app case=<name> [mode=review] [sim=startup]` — run an
+  `evals/cases/` case through the app's debug (or pre-fab review) prompts
+  (`evals/app_prompts.py`), and with `sim=` its vendor-model simulations
+  too; `evals/README.md` has the rest
 - `make spice-corpus` — download TI's SPICE models through the app's finder
   (plus any put in `data/spice-corpus/manual/`) and load-check each in
   ngspice (`backend/scripts/spice_corpus.py`); not committed, not in CI
