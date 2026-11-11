@@ -169,5 +169,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-None. Plan 006 (the power chain simulated) is outlined at the end of
-`005-whole-board-static-review.md` but not yet written.
+1. `006-power-chain-simulated.md` steps 1–4.
+2. `006-power-chain-simulated.md` step 5: ask first.
