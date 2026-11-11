@@ -226,6 +226,17 @@ Effort: 4–6 h.
   recommended operating range from the facts. Today only pull-ups are
   checked (`calc.py` `_overvoltage`).
 
+Decided (2026-11-11): each datasheet limit lists the board pins it
+applies to (or all pins), added to the extraction, so every cached
+datasheet is read once more; no matching by name in the limit's text.
+Decided (2026-11-11): over the absolute maximum is flagged (verified)
+only when the rail's highest voltage is known (named, calculated, from a
+datasheet or the user's battery field); on an inferred voltage it's
+listed, not flagged, and says so. Above the recommended range but under
+the absolute maximum is listed, never flagged.
+Decided (2026-11-11): the pull-up check (`calc.py` `_overvoltage`)
+stays; this step covers pins on rails.
+
 **Checks:** unit tests (over abs max, above recommended only, within);
 the eval cases stay PASS.
 Effort: 2–4 h.
@@ -239,6 +250,14 @@ Effort: 2–4 h.
   coincide.
 - The same loads become plan 006's load model.
 
+Decided (2026-11-11): the budget shows in the review prompt, the board
+summary and the power-tree card in the UI (load against rated current per
+rail), so the step is big.
+Decided (2026-11-11): a part with no supply-current figure counts as
+unknown; the rail reads "at least X mA, N parts unknown".
+Decided (2026-11-11): the private board's +3V3 budget is checked by hand
+at the loop's final review, since its project isn't on this machine.
+
 **Checks:** unit tests; the private board's +3V3 budget checked by hand
 against the ESP32-S3, MAX98357 and INMP441 datasheets.
 Effort: 3–5 h.
@@ -251,6 +270,16 @@ Effort: 3–5 h.
   rail into a dead one, a mux's reverse path). Today back-powering is
   checked through pull-ups only.
 
+Decided (2026-11-11): the states show in the review prompt, the board
+summary and the power-tree card in the UI (which rails are up per
+state), so the step is big.
+Decided (2026-11-11): a back-powered IO is "may fail", not verified,
+since the netlist can't show whether the live side drives high while the
+other is off. A rail that's down in some state is information, not a
+finding.
+Decided (2026-11-11): a state is each non-empty combination of the
+tree's sources, up to 3 sources; with more, each source alone and all.
+
 **Checks:** unit tests (a rail dead on battery, a back-powered IO);
 `rust-board-i2c-vbus` still caught.
 Effort: 4–6 h.
@@ -261,6 +290,12 @@ Effort: 4–6 h.
   required levels, and pins with a fixed function (USB D+/D−), read from
   the datasheet into the facts. A pin used against its rule is verified.
   ESP32-S3 first; `reference.py`'s ESP32-C3 note stays.
+
+Decided (2026-11-11): a strapping pin tied or pulled to a level the
+datasheet says isn't normal boot is verified; one with a load but no
+defined level is "may fail".
+Decided (2026-11-11): the private board's ESP32-S3 pins are checked by
+hand at the loop's final review, since its project isn't on this machine.
 
 **Checks:** unit tests; the private board's ESP32-S3 pins checked by
 hand.
