@@ -217,14 +217,18 @@ class FactReader:
 def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> DatasheetFacts:
     """Drop what the model couldn't have read: facts on pages it wasn't
     sent, pins the board's part doesn't have (and duplicates of a pin),
-    application pins likewise."""
+    application and limit pins likewise."""
     seen: set[str] = set()
     kept = []
     for p in facts.pins:
         if p.page in pages and p.pin in board_pins and p.pin not in seen:
             seen.add(p.pin)
             kept.append(p)
-    limits = [lim for lim in facts.limits if lim.page in pages]
+    limits = [
+        lim.model_copy(update={"pins": [pin for pin in lim.pins if pin in board_pins]})
+        for lim in facts.limits
+        if lim.page in pages
+    ]
     application = [
         a.model_copy(
             update={"pins": [pin for pin in a.pins if pin in board_pins]}
@@ -260,7 +264,13 @@ def _fact_lines(facts: DatasheetFacts) -> list[tuple[int, str]]:
             if v is not None
         ]
         cond = f" ({lim.conditions})" if lim.conditions else ""
-        lines.append((lim.page, f"{lim.parameter}: {', '.join(bounds) or '?'} {lim.unit}{cond}"))
+        table = _LIMIT_TABLE[lim.kind]
+        on = (
+            " on every pin" if lim.all_pins else f", pins {', '.join(lim.pins)}" if lim.pins else ""
+        )
+        lines.append(
+            (lim.page, f"{table}{lim.parameter}: {', '.join(bounds) or '?'} {lim.unit}{cond}{on}")
+        )
     for a in facts.application:
         on = f", on pins {', '.join(a.pins)}" if a.pins else ""
         value = f" {a.value}" if a.value else ""
@@ -271,6 +281,13 @@ def _fact_lines(facts: DatasheetFacts) -> list[tuple[int, str]]:
             (a.page, f"typical application: {a.role}, {a.kind}{value}{on}{allowed}{optional}")
         )
     return lines
+
+
+_LIMIT_TABLE = {
+    "absolute_maximum": "absolute maximum: ",
+    "recommended": "recommended operating: ",
+    "characteristic": "",
+}
 
 
 def _num(v: float) -> str:

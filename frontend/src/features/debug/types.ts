@@ -271,6 +271,7 @@ export interface Calculation {
     | "uart"
     | "enable_pin"
     | "overvoltage_pullup"
+    | "pin_voltage"
   ic: string
   pins: string[]
   /** Null when the thing to measure is missing (no pull-up, no resistor). */
@@ -402,6 +403,9 @@ export interface DatasheetFacts {
   /** Rechecked with the datasheets' pin roles; replaces the summary's.
    *  Absent in older runs, which keep the summary's. */
   wiring?: WiringFinding[]
+  /** With each IC pin's rail checked against its datasheet limits;
+   *  replaces the summary's. Absent in older runs. */
+  calculations?: Calculation[]
 }
 
 export interface DesignSummary {

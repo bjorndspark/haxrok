@@ -30,10 +30,10 @@ from app.features.debug.schemas import (
 MAX_PINS = 6
 MAX_MEMBERS = 4
 
-# Calculations that are wiring faults, not values: each pin they name is
-# wired against its function (TX on TX, EN on its own output). The UI's
-# "miswired" badge is the same pair.
-_MISWIRED_KINDS = {"uart", "enable_pin"}
+# Calculations whose flagged pins are wired wrong: against their function
+# (TX on TX, EN on its own output; the UI's "miswired" badge), or onto a
+# rail above their absolute maximum (pin_voltage).
+_MISWIRED_KINDS = {"uart", "enable_pin", "pin_voltage"}
 
 
 def miswired_pins(findings: list[WiringFinding], calculations: list[Calculation]) -> set[str]:

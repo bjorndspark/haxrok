@@ -219,7 +219,7 @@ being flagged is left for the review. `make lint` and `make test` pass
 (sub-targets, make 3.81): 335 backend tests, 46 frontend.
 Effort: 4–6 h.
 
-## 4. Each pin's voltage against its datasheet limits (verified): proposed
+## 4. Each pin's voltage against its datasheet limits (verified): done
 
 - With the power tree's rail voltages (and their highest value across
   sources), compare every IC pin on a rail with its absolute maximum and
@@ -237,8 +237,42 @@ the absolute maximum is listed, never flagged.
 Decided (2026-11-11): the pull-up check (`calc.py` `_overvoltage`)
 stays; this step covers pins on rails.
 
-**Checks:** unit tests (over abs max, above recommended only, within);
-the eval cases stay PASS.
+Decided (2026-11-11, default taken in loop): each limit also says its
+table (`kind`: absolute maximum, recommended, characteristic); only the
+first two are checked. A bound relative to another pin ("VDD + 0.3 V") is
+read with no number and isn't checked.
+Decided (2026-11-11, default taken in loop): "known" is the power tree's
+own: not `inferred` and a basis other than unknown, so USB, a fixed
+regulator and rails made from known ones count.
+Decided (2026-11-11, default taken in loop): below a minimum is treated
+like above a maximum (below the absolute minimum flagged when known, below
+the recommended one listed).
+Decided (2026-11-11, default taken in loop): a pin's own limits win over
+the every-pin ones, and several lines of one table count as their widest
+range, so a transient rating never flags what a steady one allows.
+Decided (2026-11-11, default taken in loop): results are calculations
+(kind `pin_voltage`, `voltage.py`), not deviations, since deviations are
+always verified and these can be listed unflagged. They're numbered after
+the netlist's own and go to the prompt, the evidence check and the
+diagrams' miswired pins; the `datasheet_facts` event carries them as
+`calculations`, replacing the summary's.
+
+**Checks:** 9 unit tests in `test_debug_voltage.py`: a known rail over the
+absolute maximum flagged (with the bound as the expected value), an
+inferred battery over it listed and not flagged, above the recommended
+range only listed, below the recommended minimum listed, within (on the
+bound, every-pin limits, a characteristic line) quiet, a pin's own limit
+over the every-pin one, the widest line of a table and mV, unknown rails,
+relative limits and ground skipped, ids after the netlist's with flagged
+first. `test_debug_facts.py` checks the limit's pins filtered to the
+board and the table in the fact line; the service test expects the
+event's `calculations`. Writing it found the status line's text reusing
+the calculations' variable name; renamed. The eval path reads no
+datasheets, so it's unchanged by construction: `make eval-app
+case=rp-micro-no-fault mode=review` still READ, no issues (the cached
+answer, the prompt being the same). The private board's pins are left
+for the review. `make lint` and `make test` pass (sub-targets, make
+3.81): 344 backend tests, 46 frontend.
 Effort: 2–4 h.
 
 ## 5. A current budget per rail: proposed

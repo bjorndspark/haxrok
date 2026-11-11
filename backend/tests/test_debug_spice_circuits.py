@@ -22,7 +22,16 @@ TPS_LIB = b".SUBCKT TPS63802 AGND EN FB GND L1 L2 MODE PG VIN VOUT\nR1 VIN VOUT 
 
 def _fact(parameter: str, mn=None, typ=None, mx=None, unit="V", conditions="") -> LimitFact:
     return LimitFact(
-        parameter=parameter, min=mn, typ=typ, max=mx, unit=unit, conditions=conditions, page=1
+        parameter=parameter,
+        kind="characteristic",
+        pins=[],
+        all_pins=False,
+        min=mn,
+        typ=typ,
+        max=mx,
+        unit=unit,
+        conditions=conditions,
+        page=1,
     )
 
 

@@ -216,11 +216,32 @@ class PinFact(_Strict):
     page: int = Field(description="The page the pin is described on (=== Page N ===).")
 
 
+LimitKind = Literal["absolute_maximum", "recommended", "characteristic"]
+"""Which table a limit is from: absolute maximum ratings (exceeding them
+damages the part), recommended operating conditions, or any other
+characteristic (thresholds, timings, currents)."""
+
+
 class LimitFact(_Strict):
     """One threshold or limit a schematic review needs: absolute maximums,
-    operating ranges, thresholds, reset and start-up times."""
+    operating ranges, thresholds, reset and start-up times. ``pins`` and
+    ``all_pins`` say which board pins it applies to, so ``voltage.check``
+    can compare each pin's rail with it without matching names in text."""
 
     parameter: str = Field(description='What is limited, e.g. "VDD supply voltage".')
+    kind: LimitKind = Field(
+        description="absolute_maximum: from the absolute maximum ratings. recommended: "
+        "from the recommended operating conditions. characteristic: anything else."
+    )
+    pins: list[str] = Field(
+        description="The board pin numbers, as listed to you, whose voltage or current "
+        'this limits (every pin named VDD for "VDD supply voltage"); [] if it names no '
+        "pin or applies to every pin."
+    )
+    all_pins: bool = Field(
+        description='true when it applies to every pin or every I/O pin ("voltage on any '
+        'pin"); false otherwise.'
+    )
     min: float | None
     typ: float | None
     max: float | None
@@ -538,12 +559,14 @@ class Calculation(BaseModel):
     (``calc.py``): a regulator's output or headroom, a charge current, an LED
     current, an I²C pull-up, an RC delay, a divider, USB-C CC pull-downs,
     supply decoupling, a UART's TX/RX wiring, a regulator's enable or an
-    STM32's BOOT0, a pull-up above an IC's supply. Verified, not the model's.
+    STM32's BOOT0, a pull-up above an IC's supply, an IC pin's rail against
+    its datasheet limits (``voltage.check``, once the datasheets are read).
+    Verified, not the model's.
     ``flagged`` means the netlist as drawn contradicts itself or misses what
     every such circuit needs (+3V3 set to 0.73 V, an I²C line with no
     pull-up, CC1 and CC2 sharing one resistor, a supply rail with no
     capacitor, TX wired to TX, an enable pin on its own output, a BOOT0 with
-    no path to ground)."""
+    no path to ground, a pin on a rail above its absolute maximum)."""
 
     id: str
     kind: Literal[
@@ -559,6 +582,7 @@ class Calculation(BaseModel):
         "uart",
         "enable_pin",
         "overvoltage_pullup",
+        "pin_voltage",
     ]
     ic: str
     pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")
@@ -751,6 +775,10 @@ class DatasheetFactsEvent(BaseModel):
     wiring: list[WiringFinding] = Field(
         description="The verified wiring findings again, rechecked with the datasheets' "
         "pin roles and typical-application parts; they replace the summary's."
+    )
+    calculations: list[Calculation] = Field(
+        description="The calculations again, with each IC pin's rail checked against its "
+        "datasheet limits (kind pin_voltage); they replace the summary's."
     )
 
 

@@ -19,6 +19,7 @@ from app.features.debug.schemas import (
     DatasheetFacts,
     DatasheetStatus,
     LimitFact,
+    LimitKind,
     PinFact,
 )
 
@@ -143,9 +144,25 @@ def _sheet(ref: str, value: str, name: str) -> DatasheetStatus:
     )
 
 
-def _limit(parameter: str, lo: float | None, hi: float | None, page: int) -> LimitFact:
+def _limit(
+    parameter: str,
+    lo: float | None,
+    hi: float | None,
+    page: int,
+    kind: LimitKind = "recommended",
+    pins: tuple[str, ...] = (),
+) -> LimitFact:
     return LimitFact(
-        parameter=parameter, min=lo, typ=None, max=hi, unit="V", conditions="", page=page
+        parameter=parameter,
+        kind=kind,
+        pins=list(pins),
+        all_pins=False,
+        min=lo,
+        typ=None,
+        max=hi,
+        unit="V",
+        conditions="",
+        page=page,
     )
 
 
@@ -160,7 +177,7 @@ MCU_FACTS = DatasheetFacts(
         PinFact(pin="12", name="PA2", function="GPIO.", role="signal", page=33),  # not on the board
     ],
     limits=[
-        _limit("VDD supply voltage", 2.4, 3.6, 44),
+        _limit("VDD supply voltage", 2.4, 3.6, 44, pins=("1", "48")),  # 48 isn't wired
         _limit("VBAT supply voltage", 1.65, 3.6, 98),  # not sent
     ],
     application=[
@@ -251,13 +268,17 @@ async def test_reader_keeps_only_facts_on_sent_pages_and_board_pins():
         ("ds3", "U3"),
         ("ds4", "U4"),
     ]
-    assert reading.facts[0].text == "p.44 VDD supply voltage: min 2.4, max 3.6 V"
+    assert reading.facts[0].text == (
+        "p.44 recommended operating: VDD supply voltage: min 2.4, max 3.6 V, pins 1"
+    )
     assert reading.facts[1].text == (
         "p.44 typical application: decoupling capacitor, capacitor 100 nF, on pins 1"
     )
     assert reading.ids == {"ds1", "ds2", "ds3", "ds4"}
     assert [a.role for a in reading.application["U1"]] == ["decoupling capacitor"]
-    assert reading.text.startswith("U1, from https://example.com/stm32f030.pdf:\n  ds1 p.44 VDD")
+    assert reading.text.startswith(
+        "U1, from https://example.com/stm32f030.pdf:\n  ds1 p.44 recommended operating: VDD"
+    )
     assert not reading.failed
 
 
@@ -319,7 +340,8 @@ def test_check_filters_application_pins_to_the_board():
     checked = facts.check(MCU_FACTS, {33, 44}, {"1", "44", "47"})
     assert [p.pin for p in checked.pins] == ["44"]
     assert checked.application[0].pins == ["1"]
-    assert len(checked.limits) == 1
+    [vdd] = checked.limits
+    assert vdd.pins == ["1"]
 
 
 def test_check_keeps_a_part_but_drops_a_range_read_from_a_page_not_sent():

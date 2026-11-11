@@ -620,7 +620,11 @@ internal pull-up and pull-down resistance. For a regulator also its rated \
 percentage when printed so) and its dropout voltage, under those names \
 ("output current", "output voltage accuracy", "dropout voltage") at the \
 start of parameter. At most 30. Numbers and units as printed; null where \
-the table gives no min, typ or max.
+the table gives no min, typ or max, or gives it relative to another pin \
+("VDD + 0.3 V"; say so in conditions). kind is the table the limit is \
+from. pins are the board pins it limits: for a supply voltage every pin \
+with that supply's name, for a pin voltage that pin; all_pins is true for \
+a limit on any pin or any I/O pin.
 - application: the parts of the typical application circuit (the \
 datasheet's reference schematic, or its component-selection text): each \
 external resistor, capacitor, inductor, diode or crystal, its value, and \

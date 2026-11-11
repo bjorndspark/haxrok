@@ -169,5 +169,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `005-whole-board-static-review.md` step 4 (each pin's voltage against
-   its datasheet limits), then its steps in order.
+1. `005-whole-board-static-review.md` step 5 (a current budget per
+   rail), then its steps in order.

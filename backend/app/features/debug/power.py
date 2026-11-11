@@ -421,8 +421,8 @@ def _regulated(
     for lim in limits:
         if not _VOUT_FACT.search(lim.parameter) or _NOT_VOUT.search(lim.parameter):
             continue
-        typ = _volts(lim.typ, lim.unit)
-        lo, hi = _volts(lim.min, lim.unit), _volts(lim.max, lim.unit)
+        typ = to_volts(lim.typ, lim.unit)
+        lo, hi = to_volts(lim.min, lim.unit), to_volts(lim.max, lim.unit)
         if typ is None and lo is not None and hi is not None and hi - lo <= 0.1 * hi:
             typ = (lo + hi) / 2
         if typ is not None and typ > 0:
@@ -462,7 +462,7 @@ def _battery(
         for lim in limits.get(e.ref, ()):
             if not _CHARGE_FACT.search(lim.parameter) or _NOT_CHARGE.search(lim.parameter):
                 continue
-            v = _volts(lim.typ if lim.typ is not None else lim.max, lim.unit)
+            v = to_volts(lim.typ if lim.typ is not None else lim.max, lim.unit)
             if v is not None and 3.4 <= v <= 4.45:
                 low = 2.5 if v < 3.8 else LIION[0]  # LiFePO4 charges to 3.6 V
                 note = f"{e.ref} charge voltage, datasheet p.{lim.page}"
@@ -478,7 +478,8 @@ def _battery(
     return _Volts(LIION, "default", "Li-ion default; set it on the review form", True)
 
 
-def _volts(value: float | None, unit: str) -> float | None:
+def to_volts(value: float | None, unit: str) -> float | None:
+    """A datasheet value in volts, from "V" or "mV"; None for other units."""
     if value is None:
         return None
     u = unit.strip()

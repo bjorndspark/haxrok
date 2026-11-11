@@ -650,6 +650,9 @@ def _ldo_reading(startup_us: float | None = 1000) -> DatasheetReading:
     limits = [
         LimitFact(
             parameter="Output voltage accuracy",
+            kind="characteristic",
+            pins=[],
+            all_pins=False,
             min=-2,
             typ=None,
             max=2,
@@ -662,6 +665,9 @@ def _ldo_reading(startup_us: float | None = 1000) -> DatasheetReading:
         limits.append(
             LimitFact(
                 parameter="Start-up time",
+                kind="characteristic",
+                pins=[],
+                all_pins=False,
                 min=None,
                 typ=startup_us,
                 max=None,
@@ -770,7 +776,16 @@ def test_an_uncited_accuracy_is_assumed_and_an_absurd_start_up_time_dropped():
         "accuracy_cited": False,
     }
     slow = LimitFact(
-        parameter="Soft-start time", min=None, typ=3, max=None, unit="s", conditions="", page=1
+        parameter="Soft-start time",
+        kind="characteristic",
+        pins=[],
+        all_pins=False,
+        min=None,
+        typ=3,
+        max=None,
+        unit="s",
+        conditions="",
+        page=1,
     )
     assert ramp("U2", DatasheetReading(limits={"U2": [slow]})).t_s is None
 
@@ -1003,6 +1018,9 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
             limits=[
                 LimitFact(
                     parameter="VIN input voltage",
+                    kind="characteristic",
+                    pins=[],
+                    all_pins=False,
                     min=2.0,
                     typ=None,
                     max=16.0,
@@ -1139,6 +1157,7 @@ async def test_datasheet_facts_names_a_datasheet_that_couldnt_be_read():
         "datasheet_failures": [{"ref": "U2", "reason": "the PDF has no text (a scan?)"}],
         "power": {"rails": [], "parts": [], "battery_override": False},
         "wiring": [f.model_dump() for f in prepared.pin_lookup.findings],
+        "calculations": [c.model_dump() for c in prepared.calculations],
     }
 
 

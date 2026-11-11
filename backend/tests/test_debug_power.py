@@ -178,6 +178,9 @@ def test_charger_slide_switch_and_buck_through_its_inductor() -> None:
 def test_battery_from_the_charger_datasheet_and_from_the_user() -> None:
     lim = LimitFact(
         parameter="Regulated output voltage",
+        kind="characteristic",
+        pins=[],
+        all_pins=False,
         min=4.168,
         typ=4.2,
         max=4.232,
@@ -202,6 +205,9 @@ def test_regulator_output_from_its_datasheet() -> None:
     design.nets["/V3"] = design.nets.pop("+3V3")
     lim = LimitFact(
         parameter="Output voltage",
+        kind="characteristic",
+        pins=[],
+        all_pins=False,
         min=3.25,
         typ=None,
         max=3.35,

@@ -41,6 +41,7 @@ from app.features.debug import (
     spice,
     spice_circuits,
     spice_convert,
+    voltage,
 )
 from app.features.debug.datasheet import DatasheetFinder
 from app.features.debug.design import (
@@ -412,9 +413,17 @@ async def _review(
     n_warn = len(prepared.pin_lookup.warnings)
     if n_warn:
         found += f" {n_warn} transistor{'s' if n_warn > 1 else ''} with a pin order to check."
-    n_calcs = len(prepared.calculations)
-    flagged = sum(1 for c in prepared.calculations if c.flagged)
-    calcs = (
+    # Rebuilt with the datasheets' output and charge voltages, now they're read;
+    # its rails then meet each pin's datasheet limits.
+    tree = power.build(
+        prepared.design, prepared.calculations, reading.limits, battery=prepared.battery
+    )
+    calcs = prepared.calculations + voltage.check(
+        prepared.design, tree, reading.limits, first_id=len(prepared.calculations) + 1
+    )
+    n_calcs = len(calcs)
+    flagged = sum(1 for c in calcs if c.flagged)
+    calc_note = (
         f" {n_calcs} value{'s' if n_calcs != 1 else ''} calculated from the netlist"
         + (f", {flagged} flagged." if flagged else ".")
         if n_calcs
@@ -433,18 +442,14 @@ async def _review(
         read += (
             f" {n_dev} deviation{'s' if n_dev > 1 else ''} from a datasheet's typical application."
         )
-    # Rebuilt with the datasheets' output and charge voltages, now they're read.
-    tree = power.build(
-        prepared.design, prepared.calculations, reading.limits, battery=prepared.battery
-    )
     if facts is not None and found_sheets:
         yield _event(
             "datasheet_facts",
-            _datasheet_facts(reading, deviations, tree, table.findings).model_dump_json(),
+            _datasheet_facts(reading, deviations, tree, table.findings, calcs).model_dump_json(),
         )
     yield _progress(
         "pin_lookup",
-        f"Pin data for {with_data} of {len(table.ics)} ICs.{read}{found}{notes}{calcs}",
+        f"Pin data for {with_data} of {len(table.ics)} ICs.{read}{found}{notes}{calc_note}",
     )
     review = prepared.mode == "review"
     yield _progress(
@@ -463,7 +468,7 @@ async def _review(
         findings=pins.format_findings(table.findings),
         warnings=pins.format_warnings(prepared.pin_lookup.warnings),
         references=reference.format_notes(prepared.references),
-        calculations=calc.format_calculations(prepared.calculations),
+        calculations=calc.format_calculations(calcs),
         datasheet_facts=reading.text,
         deviations=application.format_deviations(deviations) if reading.application else "",
         power=power.format_power(tree),
@@ -512,13 +517,11 @@ async def _review(
         pin_data=table.pin_refs,
         symptom_ids=frozenset(s.id for s in prepared.symptoms),
         measurement_ids=frozenset(m.id for m in prepared.measurements),
-        reference_ids=frozenset(
-            [n.id for n in prepared.references] + [c.id for c in prepared.calculations]
-        ),
+        reference_ids=frozenset([n.id for n in prepared.references] + [c.id for c in calcs]),
         datasheet_ids=reading.ids | {d.id for d in deviations},
     )
     checked = check(analysis, ctx)
-    miswired = diagram.miswired_pins(table.findings, prepared.calculations)
+    miswired = diagram.miswired_pins(table.findings, calcs)
     checked.diagrams = {
         h.id: d for h in checked.hypotheses if (d := diagram.build(h, prepared.design, miswired))
     }
@@ -608,13 +611,15 @@ def _datasheet_facts(
     deviations: list[application.Deviation],
     tree: PowerTree,
     wiring: list[WiringFinding],
+    calculations: list[Calculation],
 ) -> DatasheetFactsEvent:
-    """The datasheet_facts event: what claims can cite, and the power tree
-    and wiring findings rebuilt with what the datasheets said, for the
-    browser."""
+    """The datasheet_facts event: what claims can cite, and the power tree,
+    wiring findings and calculations rebuilt with what the datasheets said,
+    for the browser."""
     return DatasheetFactsEvent(
         power=tree,
         wiring=wiring,
+        calculations=calculations,
         datasheet_facts=[
             DatasheetLine(id=f.id, ref=f.ref, page=f.page, text=f.body) for f in reading.facts
         ],
