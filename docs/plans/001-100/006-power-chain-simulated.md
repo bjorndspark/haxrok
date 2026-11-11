@@ -182,10 +182,27 @@ Effort: 6–10 h.
 - The chain runs as built and with the fix; both are drawn on one chart
   in the UI.
 
+Decided (2026-11-11): the fix comes from the backend, not the model:
+`roles.check` attaches a structured fix (pin leaves a net, joins
+another) to a WiringFinding when the fix is unambiguous (switch pins
+first: U5.9 leaves +3V3 for the inductor's free end on a net of its
+own). No prompt or output-schema change, and the with-fix run starts in
+parallel with the review, as the as-built one does.
+Decided (2026-11-11): the paired chart overlays the two runs' output
+voltages; each run's switch-pin and input current peaks show as numbers
+beside it (as built vs with the fix). The waveform stays voltages only.
+Decided (2026-11-11): step 3's check records the private board's pair
+(both runs finish, the fix lands on the right pins, the numbers); the
+acceptance (>10 A into U5.9 as built, none with the fix) moves to
+step 4's current-limited supply.
+Decided (2026-11-11, default): the with-fix run happens only for a
+chain a fixed finding touches, and keeps its own verdict; the pair is
+linked by the with-fix run naming the as-built run's id and the finding.
+
 **Check:** unit tests for applying a fix to the design; the private
-board's before/after pair (the acceptance numbers); a frontend test of
-the paired chart.
-Effort: 6–10 h. Big: backend and frontend, and the review's output schema.
+board's before/after pair, both runs finishing with their numbers
+recorded; a frontend test of the paired chart.
+Effort: 6–10 h. Big: backend and frontend.
 
 ## 4. Corners and tolerances: proposed
 
