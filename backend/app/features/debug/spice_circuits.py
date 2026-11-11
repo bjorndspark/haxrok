@@ -2,24 +2,31 @@
 checks the waveform against the datasheet limits (plan 004 step 6).
 
 For each IC whose model loads (``spice_convert.check``), ``plan`` cuts its
-circuit out of the netlist: the regulator's pin nets, with the passives
-(R, C, L, D) whose both ends are on them or on ground. The input is a
-source ramped up at power-on, the ICs on the output are replaced by a
-resistor drawing the datasheet's rated output current, and a reset RC on
-the output to another IC's pin is kept and probed. Each analysis the user
+circuit out of the netlist: the regulator's pin nets and the chain from
+its source (``chain``, plan 006 step 2), with the passives (R, C, L, D)
+whose both ends are on them or on ground. The chain follows the power
+tree upstream through muxes, load switches and pass parts to one source:
+the battery when one feeds it, else USB, else an input, else an upstream
+regulator's rail, each an ideal source at the middle of its range. A mux
+or load switch on it becomes an ideal switch, a fuse or ferrite a wire,
+both labelled. The source ramps up at power-on, the ICs on the output are
+replaced by a resistor drawing the rail's budget (plan 005 step 5; the
+datasheet's rated output current without one), and a reset RC on the
+output to another IC's pin is kept and probed. Each analysis the user
 picked becomes one deck:
 
-- ``startup``: the rail settles within the output accuracy, doesn't
-  overshoot the downstream ICs' maximum supply, and a reset RC releases
-  only after the rail is in band;
-- ``load_step``: from 10 % to the rated current once the rail is up; the
+- ``startup``: the load switches on once the rail passes the downstream
+  ICs' minimum supply; the rail settles within the output accuracy,
+  doesn't overshoot the downstream ICs' maximum supply, and a reset RC
+  releases only after the rail is in band;
+- ``load_step``: from 10 % to the load once the rail is up; the
   droop stays above the downstream ICs' minimum supply and the rail
   recovers into band;
 - ``dropout``: the input swept down until the output leaves its band;
   flagged when that happens within 10 % of the nominal input. Only for a
   regulator whose datasheet gives a dropout voltage.
 
-Ammeters (zero-volt sources) sit on the input and on each switch-node pin
+Ammeters (zero-volt sources) sit on the source and on each switch-node pin
 (LX, SW, a buck-boost's L1/L2; plan 006 step 1), and their peaks are
 measured in every deck: a burst into a switch-node pin above the
 datasheet's switch current limit (2× the rated current without one,
@@ -60,6 +67,8 @@ from app.features.debug.design import Design, is_inductor
 from app.features.debug.facts import DatasheetReading
 from app.features.debug.schemas import (
     LimitFact,
+    PowerPart,
+    PowerTree,
     SimAnalysis,
     SimLevel,
     SimRamp,
@@ -93,6 +102,10 @@ _DROPOUT_HEADROOM = 0.10  # flagged when regulation is lost this close to nomina
 _SWITCHING_OPTIONS = ".options method=gear reltol=0.01 abstol=1e-9 vntol=1e-5 itl4=100 interp"
 _LINEAR_OPTIONS = ".options klu reltol=0.003"
 _UNCITED_SWITCH = 2.0  # without a switch current limit: this many times the rated current
+_LOAD_HYSTERESIS = 0.02  # the start-up load's switch, as a share of the output voltage
+# The chain's source, best first (plan 006 step 2); an upstream regulator's
+# rail comes after these.
+_SOURCE_RANK = {"battery": 0, "usb": 1, "input": 2}
 
 # Pin names, normalized to uppercase letters and digits.
 _IN_PIN = re.compile(r"P?V?IN\d*|VI")
@@ -178,6 +191,7 @@ class Limits:
     switch_limit: float = 0.0  # a burst into a switch pin above this is flagged
     switch_label: str = ""
     pg: str | None = None  # the power-good pin probed, "U5.11 (PG)"
+    setup: str = ""  # the source, the parts between, and the load, said
 
 
 @dataclass(frozen=True)
@@ -207,12 +221,26 @@ class _Cut:
 
     vin: float
     vout: float
-    current: float  # the rated output current the load draws
+    current: float  # the load: the output rail's budget, else the rated output current
     nodes: dict[str, str]  # board net -> deck node
     lines: list[str]  # the regulator instance and the kept passives
     reset: str | None  # "U16.7 (NRST)" when a reset RC is kept (node ``rst``)
     switches: tuple[Switch, ...] = ()
     pg: tuple[str, str] | None = None  # (node, "U5.11 (PG)") when PG is on its own net
+    src: str = "vin"  # the node the source drives: the chain's top net
+    setup: str = ""  # the source, the chain's parts and the load, said
+    source_net: str | None = None  # the chain's top net, for the title
+
+
+@dataclass(frozen=True)
+class Chain:
+    """The path from a source to a regulator's input (plan 006 step 2):
+    the nets on it, source first, and the part between each two."""
+
+    nets: tuple[str, ...]  # the source's net first, the regulator's input last
+    parts: tuple[PowerPart, ...]  # parts[i] joins nets[i] to nets[i + 1]
+    kind: str  # "battery", "usb", "input", or "rail" (an upstream regulator's)
+    vin: float | None  # the source's nominal: the middle of its range
 
 
 # --- datasheet facts -------------------------------------------------------
@@ -392,8 +420,81 @@ def _nets_of(board: dict[str, str], names: Sequence[str], pattern: re.Pattern[st
     return {board[p] for p in names if pattern.fullmatch(p) and p in board}
 
 
+def chain(tree: PowerTree, net: str) -> Chain | None:
+    """The path from ``net`` (a regulator's input) up the power tree to its
+    source, through the switches and pass parts that make it: the best
+    source by ``_SOURCE_RANK`` (a battery first), then an upstream
+    regulator's or charger's rail, the shortest path breaking ties. None
+    when the tree doesn't have the net."""
+    rails = {r.net: r for r in tree.rails}
+    found: list[tuple[int, Chain]] = []
+
+    def walk(nets: tuple[str, ...], parts: tuple[PowerPart, ...]) -> None:
+        top = nets[0]
+        rail = rails.get(top)
+        if rail is None:
+            return
+        makers = [p for p in tree.parts if p.output == top]
+        if (
+            rail.source is not None
+            or not makers
+            or any(p.kind in ("regulator", "charger") for p in makers)
+        ):
+            kind = rail.source or "rail"
+            mid = (
+                (rail.min + rail.max) / 2 if rail.min is not None and rail.max is not None else None
+            )
+            found.append((_SOURCE_RANK.get(kind, len(_SOURCE_RANK)), Chain(nets, parts, kind, mid)))
+            return
+        for p in makers:
+            for up in p.inputs:
+                if up not in nets:
+                    walk((up, *nets), (p, *parts))
+
+    walk((net,), ())
+    if not found:
+        return None
+    return min(found, key=lambda f: (f[0], len(f[1].nets)))[1]
+
+
+def _is_wire(design: Design, part: PowerPart) -> bool:
+    """Whether a chain's pass part goes in as an ideal wire: a fuse,
+    ferrite, slide switch or 0 Ω part, anything but a diode or a resistor
+    with a value the passives keep as it is."""
+    letter = _head(part.ref)
+    if letter == "D":
+        return False
+    if letter == "R":
+        value = parse_ohms(part.value)
+        return value is None or value <= 0
+    return True
+
+
+def _source_said(tree: PowerTree, c: Chain, vin: float) -> str:
+    """The chain's source, said: "the battery VBAT at 4.8 V (the review form's)"."""
+    net = c.nets[0]
+    rail = next(r for r in tree.rails if r.net == net)
+    if c.kind == "battery" and tree.battery_override:
+        how = " (the review form's)"
+    elif rail.min is not None and rail.max is not None and rail.min != rail.max:
+        how = f" (the middle of {_v(rail.min)}–{_v(rail.max)})"
+    else:
+        how = ""
+    what = {
+        "battery": "the battery",
+        "usb": "USB",
+        "input": "the input",
+    }.get(c.kind, f"{', '.join(rail.fed_by)}'s output")
+    return f"{what} {net} at {_v(vin)}{how}, as an ideal source"
+
+
 def _cut(
-    design: Design, ref: str, m: ModelFiles, status: SpiceModelStatus, rate: Ratings
+    design: Design,
+    ref: str,
+    m: ModelFiles,
+    status: SpiceModelStatus,
+    rate: Ratings,
+    tree: PowerTree | None = None,
 ) -> _Cut | str | None:
     """The regulator's circuit, or why it can't be simulated; None when the
     model isn't a single-rail regulator's: no input and output pin, or input
@@ -420,7 +521,11 @@ def _cut(
     vout = named_voltage(net_out)
     if vout is None:
         return f"its output net {net_out} doesn't name a voltage"
-    vin = named_voltage(net_in) or rate.vin
+    up = chain(tree, net_in) if tree is not None else None
+    vin = up.vin if up is not None and up.vin is not None else None
+    if vin is None:
+        up = None  # a source with no voltage: the regulator alone, as before
+        vin = named_voltage(net_in) or rate.vin
     if vin is None:
         return (
             f"its input net {net_in} doesn't name a voltage and the datasheet gives no "
@@ -428,9 +533,42 @@ def _cut(
         )
     if "set by the schematic" in status.reason:
         return "its model needs parameters the schematic sets"
-    if rate.current is None:
-        return "the datasheet facts give no rated output current"
+    budget = next((r.budget for r in tree.rails if r.net == net_out), None) if tree else None
+    if budget is not None and budget.load_ma > 0:
+        current = budget.load_ma / 1e3
+        unknown = f", without {', '.join(budget.unknown)}" if budget.unknown else ""
+        load_said = f"{net_out}'s budget, {current * 1e3:g} mA{unknown}"
+    elif rate.current is not None:
+        current = rate.current
+        load_said = f"the rated {current * 1e3:g} mA, no budget for {net_out}"
+    else:
+        return "the datasheet facts give no rated output current and its rail has no budget"
     nodes: dict[str, str] = {net_in: "vin", net_out: "out"}
+    chain_lines: list[str] = []
+    via: list[str] = []
+    handled: set[str] = set()
+    if up is not None:
+        for i, link in enumerate(up.nets[:-1]):
+            nodes.setdefault(link, f"c{i}")
+        for i, step in enumerate(up.parts):
+            a, b = nodes[up.nets[i]], nodes[up.nets[i + 1]]
+            said = f"{step.ref} ({step.value})" if step.value else step.ref
+            if step.kind == "switch" or (step.kind == "pass" and _is_wire(design, step)):
+                # Zero volts: the mux's or fuse's own drop isn't modelled,
+                # and i(v_sw_<ref>) is the current through it.
+                chain_lines.append(f"{_element('V', 'sw_' + step.ref)} {a} {b} 0")
+                handled.add(step.ref)
+                kind = "switch" if step.kind == "switch" else "wire"
+                said += f" as an ideal {kind}"
+            via.append(said)
+    source_said = (
+        _source_said(tree, up, vin)
+        if up is not None and tree is not None
+        else f"an ideal {_v(vin)} source on {net_in}"
+        + (" (its name)" if named_voltage(net_in) else " (the datasheet's typical input)")
+    )
+    through = f" through {', '.join(via)}" if via else ""
+    setup = f"From {source_said}{through}; load {load_said}."
     pins_used: list[str] = []
     ammeters: list[str] = []
     switches: list[Switch] = []
@@ -446,7 +584,8 @@ def _cut(
             nodes[net] = "0"
         if net not in nodes:
             nodes[net] = f"n{sum(1 for v in nodes.values() if v.startswith('n')) + 1}"
-        if _ENABLE_PIN.fullmatch(p) and nodes[net] not in ("vin", "out", "0"):
+        on_chain = up is not None and net in up.nets
+        if _ENABLE_PIN.fullmatch(p) and nodes[net] not in ("vin", "out", "0") and not on_chain:
             others = sorted({n.ref for n in design.nets[net] if n.ref != ref and _is_ic(n.ref)})
             if others:
                 return f"its {p} is driven by {', '.join(others)}"
@@ -466,11 +605,15 @@ def _cut(
     for net in design.nets:
         if is_ground(net):
             nodes[net] = "0"
-    lines = [f"X{re.sub(r'[^A-Za-z0-9_]', '_', ref)} {' '.join(pins_used)} {m.subckt}", *ammeters]
+    lines = [
+        f"X{re.sub(r'[^A-Za-z0-9_]', '_', ref)} {' '.join(pins_used)} {m.subckt}",
+        *ammeters,
+        *chain_lines,
+    ]
     reset = None
     for part in design.parts.values():
         letter = _head(part.ref)
-        if letter not in ("R", "C", "L", "D") or part.ref == ref:
+        if letter not in ("R", "C", "L", "D") or part.ref == ref or part.ref in handled:
             continue
         ends = _pins_of(design, part.ref)
         if len(ends) != 2 or not all(net in nodes for _, net in ends):
@@ -496,7 +639,19 @@ def _cut(
         lines += extra
     if any(ln.split()[0].upper().startswith("D") for ln in lines[1:]):
         lines.append(".model hx_d D")
-    return _Cut(vin, vout, rate.current, nodes, lines, reset, tuple(switches), pg)
+    return _Cut(
+        vin,
+        vout,
+        current,
+        nodes,
+        lines,
+        reset,
+        tuple(switches),
+        pg,
+        src=nodes[up.nets[0]] if up is not None else "vin",
+        setup=setup,
+        source_net=up.nets[0] if up is not None else None,
+    )
 
 
 def _diode_ends(
@@ -554,10 +709,23 @@ def _window(rate: Ratings) -> float:
     return min(_RAMP + 1.1 * rate.startup, _WINDOW_MAX)
 
 
-def _source(wave: str) -> list[str]:
-    """The input source, ``wave`` from 0 V, through the input ammeter:
-    i(vam_in) is the current into the regulator's input."""
-    return [f"Vsrc src 0 PWL({wave})", "Vam_in src vin 0"]
+def _source(wave: str, node: str = "vin") -> list[str]:
+    """The source, ``wave`` from 0 V, through the input ammeter onto
+    ``node`` (the chain's top net): i(vam_in) is the current it gives."""
+    return [f"Vsrc src 0 PWL({wave})", f"Vam_in src {node} 0"]
+
+
+def _switched_load(ohms: float, on: float, vout: float) -> list[str]:
+    """The start-up load: ``ohms`` from the output, switched on once it
+    rises past ``on`` (the downstream ICs' minimum supply), as those ICs
+    start drawing only once their supply is up. Hysteresis keeps it on
+    through the ripple."""
+    vh = _LOAD_HYSTERESIS * vout
+    return [
+        f"Rload out lsw {ohms:g}",
+        "Sload lsw 0 out 0 hx_load",
+        f".model hx_load sw vt={on - vh:g} vh={vh:g} ron=0.01 roff=1e9",
+    ]
 
 
 def _deck(
@@ -570,7 +738,7 @@ def _deck(
     leaks = [
         f"Rleak_{node} {node} 0 1G"
         for node in sorted(
-            {n for n in cut.nodes.values() if n not in ("0", "vin")}
+            {n for n in cut.nodes.values() if n not in ("0", "vin", cut.src)}
             | ({"rst"} if cut.reset else set())
         )
     ]
@@ -606,12 +774,15 @@ def plan(
     m: ModelFiles,
     reading: DatasheetReading,
     analyses: Sequence[SimAnalysis],
+    tree: PowerTree | None = None,
 ) -> list[Job] | Skip | None:
     """The decks for one regulator, or why it's skipped; None when the
-    model isn't a regulator's. Pure; nothing runs yet."""
+    model isn't a regulator's. ``tree`` (budgeted, ``budget.apply``) gives
+    the chain from the source and the load; without it, the regulator
+    alone from its input. Pure; nothing runs yet."""
     ref = status.ref
     rate = ratings(reading.limits.get(ref, []))
-    cut = _cut(design, ref, m, status, rate)
+    cut = _cut(design, ref, m, status, rate, tree)
     title = f"{ref} ({status.value[:60]})"
     if cut is None:
         return None
@@ -627,8 +798,10 @@ def plan(
         page = f", p. {rate.switch_page}" if rate.switch_page else ""
         limit, limit_label = rate.switch_limit, f"the switch current limit{page}"
     else:
-        limit = _UNCITED_SWITCH * current
-        limit_label = f"{_UNCITED_SWITCH:g}× the rated {current:g} A, not cited"
+        rated = rate.current if rate.current is not None else current
+        what = "rated" if rate.current is not None else "load's"
+        limit = _UNCITED_SWITCH * rated
+        limit_label = f"{_UNCITED_SWITCH:g}× the {what} {rated:g} A, not cited"
     base = Limits(
         ref,
         vout,
@@ -649,18 +822,23 @@ def plan(
         switch_limit=limit,
         switch_label=limit_label,
         pg=cut.pg[1] if cut.pg else None,
+        setup=cut.setup,
     )
+    src = cut.src
     jobs: list[Job] = []
     for analysis in analyses:
         if analysis == "startup":
             limits = base
-            sources = [*_source(f"0 0 {_RAMP:g} {vin:g}"), f"Rload out 0 {vout / current:g}"]
+            sources = [
+                *_source(f"0 0 {_RAMP:g} {vin:g}", src),
+                *_switched_load(vout / current, droop, vout),
+            ]
             what = "start-up"
         elif analysis == "load_step":
             t1 = window
             limits = replace(base, t_event=t1, stop=t1 + _LOAD_STEP_AFTER)
             sources = [
-                *_source(f"0 0 {_RAMP:g} {vin:g}"),
+                *_source(f"0 0 {_RAMP:g} {vin:g}", src),
                 f"Rload out 0 {vout / (_LIGHT * current):g}",
                 f"Istep out 0 PWL(0 0 {t1:g} 0 {t1 + 1e-6:g} {(1 - _LIGHT) * current:g})",
             ]
@@ -672,11 +850,12 @@ def plan(
             vend = vout * (1 - rate.accuracy) * 0.9
             limits = replace(base, t_event=t1, stop=t1 + _SWEEP, vin_end=vend)
             sources = [
-                *_source(f"0 0 {_RAMP:g} {vin:g} {t1:g} {vin:g} {t1 + _SWEEP:g} {vend:g}"),
+                *_source(f"0 0 {_RAMP:g} {vin:g} {t1:g} {vin:g} {t1 + _SWEEP:g} {vend:g}", src),
                 f"Rload out 0 {vout / current:g}",
             ]
             what = "dropout"
-        full = f"{title} {what}, vendor model"
+        start = f" from {cut.source_net}" if cut.source_net else ""
+        full = f"{title} {what}{start}, vendor model"
         deck = _deck(full, m.name, cut, sources, limits.stop, probes)
         jobs.append(Job(ref, analysis, full, deck, limits, m.files))
     return jobs
@@ -898,7 +1077,7 @@ def verdict(
                 f"nominal {_v(lim.vin)}.{datasheet}"
             )
     burst, currents = _currents(lim, peaks or {})
-    said += currents
+    said += currents + (f" {lim.setup}" if lim.setup else "")
     if wrong or burst:
         parts = ([f"{lim.ref}'s output {'; '.join(wrong)}"] if wrong else []) + [
             f"{lim.ref} {b}" for b in burst
@@ -1008,9 +1187,11 @@ async def simulate(
     reading: DatasheetReading,
     analyses: Sequence[SimAnalysis],
     runner: ModelRunner,
+    tree: PowerTree | None = None,
 ) -> AsyncIterator[Simulation]:
     """Plan each loading model's decks and run them (``_PARALLEL`` at once),
     yielding the skipped ones first, then each verdict as it finishes.
+    ``tree`` is the budgeted power tree each chain and load come from.
     Closing the iterator early cancels the runs still going."""
     if not analyses:
         return
@@ -1021,7 +1202,7 @@ async def simulate(
         if not isinstance(m, ModelFiles):
             logger.info("spice circuits: %s's model isn't ready: %s", s.ref, m[1])
             continue
-        got = plan(design, s, m, reading, analyses)
+        got = plan(design, s, m, reading, analyses, tree)
         if got is None:
             continue
         if isinstance(got, Skip):

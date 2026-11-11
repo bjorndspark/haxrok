@@ -10,7 +10,14 @@ import pytest
 from app.features.debug import spice_circuits as sc
 from app.features.debug.design import Design, Node, Part
 from app.features.debug.facts import DatasheetReading
-from app.features.debug.schemas import LimitFact, SpiceModelStatus
+from app.features.debug.schemas import (
+    LimitFact,
+    PowerPart,
+    PowerRail,
+    PowerTree,
+    RailBudget,
+    SpiceModelStatus,
+)
 from app.features.debug.spice import Ngspice, Run
 from app.features.debug.spice_convert import ModelFiles
 
@@ -128,6 +135,13 @@ def _files(pins: list[str] = TPS_PINS) -> ModelFiles:
     return ModelFiles("tps63802.lib", "TPS63802", pins, {}, {"tps63802.lib": TPS_LIB})
 
 
+# How the orbit decks' verdicts end when no power tree is given.
+ORBIT_SETUP = (
+    " From an ideal 3.600 V source on +BATT (the datasheet's typical input);"
+    " load the rated 2000 mA, no budget for +3.3V."
+)
+
+
 def _jobs(analyses=("startup",), design: Design | None = None, **kw) -> list[sc.Job]:
     got = sc.plan(design or _orbit(), _status(), _files(), _reading(**kw), analyses)
     assert isinstance(got, list)
@@ -185,7 +199,7 @@ def test_supply_range_is_the_widest_that_holds_the_rail():
 # --- decks -------------------------------------------------------------------
 
 
-def test_the_startup_deck_ramps_the_input_and_loads_the_rated_current():
+def test_the_startup_deck_ramps_the_input_and_switches_on_the_rated_load():
     (job,) = _jobs()
     deck = job.deck
     assert job.ref == "U15" and job.analysis == "startup"
@@ -196,7 +210,11 @@ def test_the_startup_deck_ramps_the_input_and_loads_the_rated_current():
     assert '.include "tps63802.lib"' in lines
     assert "Vsrc src 0 PWL(0 0 5e-05 3.6)" in lines  # the datasheet's typical input
     assert "Vam_in src vin 0" in lines  # the input's ammeter
-    assert "Rload out 0 1.65" in lines  # 3.3 V at the rated 2 A
+    # 3.3 V at the rated 2 A, switched on once the output passes U16's
+    # 1.7 V minimum supply (with 2 % of 3.3 V hysteresis).
+    assert "Rload out lsw 1.65" in lines and "Sload lsw 0 out 0 hx_load" in lines
+    assert ".model hx_load sw vt=1.634 vh=0.066 ron=0.01 roff=1e9" in lines
+    assert job.limits.setup == ORBIT_SETUP.strip()
     # L1 and L2 are switch nodes: each goes through an ammeter from its net.
     assert "XU15 0 vin n1 0 sw_l1 sw_l2 0 n4 vin out TPS63802" in lines
     assert "Vam_l1 n2 sw_l1 0" in lines and "Vam_l2 n3 sw_l2 0" in lines
@@ -277,7 +295,9 @@ def test_regulators_that_cant_be_set_up_are_skipped_with_the_reason():
     no_current = dataclasses.replace(
         no_current, limits={"U15": [f for f in _tps_facts() if "current" not in f.parameter]}
     )
-    assert skip(reading=no_current) == "the datasheet facts give no rated output current"
+    assert skip(reading=no_current) == (
+        "the datasheet facts give no rated output current and its rail has no budget"
+    )
     assert skip(files=_files([*TPS_PINS, "SYNC"])) == (
         "its model's pin SYNC has no pin of that name on U15"
     )
@@ -295,6 +315,165 @@ def test_regulators_that_cant_be_set_up_are_skipped_with_the_reason():
     gated.nets["+BATT"] = [n for n in gated.nets["+BATT"] if n.pin != "2"]
     gated.nets["/EN"] = [Node("U15", "2", "EN"), Node("U16", "9", "PA0")]
     assert skip(design=Design(gated.parts, gated.nets)) == "its EN is driven by U16"
+
+
+# --- the chain from its source ----------------------------------------------
+
+
+def _muxed() -> Design:
+    """The orbit board behind a fused battery and USB through a power mux
+    (U3); U15's EN sits on the mux's battery input."""
+    d = _orbit()
+    nets = {
+        **d.nets,
+        "VBAT": [Node("J2", "1", ""), Node("F1", "1", "")],
+        "/IN2": [
+            Node("F1", "2", ""),
+            Node("U3", "2", "IN2"),
+            Node("C7", "1", ""),
+            Node("U15", "2", "EN"),
+        ],
+        "VBUS": [Node("J1", "1", "VBUS"), Node("U3", "1", "IN1")],
+        "+BATT": [Node("U3", "3", "OUT"), Node("U15", "1", "VIN"), Node("C14", "1", "")],
+        "GND": [*d.nets["GND"], Node("C7", "2", ""), Node("U3", "4", "GND")],
+    }
+    parts = {
+        **d.parts,
+        "U3": Part("U3", "TPS2121", "", ""),
+        "F1": Part("F1", "1A", "Device:Fuse", ""),
+        "C7": Part("C7", "10u", "", ""),
+        "J1": Part("J1", "USB_C", "", ""),
+        "J2": Part("J2", "BATT", "", ""),
+    }
+    return Design(parts, nets)
+
+
+def _rail(net: str, lo: float, hi: float, source=None, fed_by=(), budget=None) -> PowerRail:
+    return PowerRail(
+        net=net,
+        source=source,
+        min=lo,
+        max=hi,
+        basis="named",
+        inferred=False,
+        note="",
+        fed_by=list(fed_by),
+        loads=[],
+        budget=budget,
+    )
+
+
+def _budget(ma: float, unknown=()) -> RailBudget:
+    return RailBudget(
+        load_ma=ma, unknown=list(unknown), loads=[], rated_ma=2000, rated_note="", over=False
+    )
+
+
+def _muxed_tree(battery=(3.0, 4.2), budget: RailBudget | None = None, **kw) -> PowerTree:
+    return PowerTree(
+        rails=[
+            _rail("VBAT", *battery, source="battery"),
+            _rail("VBUS", 5.0, 5.0, source="usb"),
+            _rail("/IN2", *battery, fed_by=["F1"]),
+            _rail("+BATT", battery[0], 5.0, fed_by=["U3"]),
+            _rail("+3.3V", 3.3, 3.3, fed_by=["U15"], budget=budget),
+        ],
+        parts=[
+            PowerPart(ref="F1", value="1A", kind="pass", inputs=["VBAT"], output="/IN2"),
+            PowerPart(
+                ref="U3", value="TPS2121", kind="switch", inputs=["VBUS", "/IN2"], output="+BATT"
+            ),
+            PowerPart(
+                ref="U15", value="TPS63802", kind="regulator", inputs=["+BATT"], output="+3.3V"
+            ),
+        ],
+        **kw,
+    )
+
+
+def _chain_jobs(
+    tree: PowerTree, analyses=("startup",), design: Design | None = None
+) -> list[sc.Job]:
+    got = sc.plan(design or _muxed(), _status(), _files(), _reading(), analyses, tree)
+    assert isinstance(got, list), got
+    return got
+
+
+def test_the_chain_runs_from_the_battery_through_the_fuse_and_mux():
+    assert sc.chain(_muxed_tree(), "+BATT") == sc.Chain(
+        ("VBAT", "/IN2", "+BATT"),
+        tuple(_muxed_tree().parts[:2]),
+        "battery",
+        3.6,
+    )
+    (job,) = _chain_jobs(_muxed_tree(budget=_budget(150, ["U16"])))
+    lines = job.deck.splitlines()
+    assert job.title == "U15 (TPS63802) start-up from VBAT, vendor model"
+    # The battery at the middle of its range, its ammeter at the source.
+    assert "Vsrc src 0 PWL(0 0 5e-05 3.6)" in lines and "Vam_in src c0 0" in lines
+    assert "V_sw_F1 c0 c1 0" in lines and "V_sw_U3 c1 vin 0" in lines
+    assert "C7 0 c1 1e-05" in lines  # the mux input's capacitor stays
+    assert not any(ln.startswith(("F1 ", "XU3")) for ln in lines)
+    # EN on the chain's /IN2 is powered, not driven by U3.
+    assert "XU15 0 c1 n1 0 sw_l1 sw_l2 0 n4 vin out TPS63802" in lines
+    # 150 mA at 3.3 V from the budget.
+    assert "Rload out lsw 22" in lines
+    assert job.limits.setup == (
+        "From the battery VBAT at 3.600 V (the middle of 3.000 V–4.200 V), as an ideal "
+        "source through F1 (1A) as an ideal wire, U3 (TPS2121) as an ideal switch; "
+        "load +3.3V's budget, 150 mA, without U16."
+    )
+    _, text = sc.verdict("startup", job.limits, _rows(649.5e-6, _ramp))
+    assert text.endswith(" " + job.limits.setup)
+
+
+def test_the_chain_takes_the_review_forms_battery_and_falls_back_to_the_rated_load():
+    (job,) = _chain_jobs(_muxed_tree(battery=(4.8, 4.8), battery_override=True))
+    assert "Vsrc src 0 PWL(0 0 5e-05 4.8)" in job.deck
+    assert "Rload out lsw 1.65" in job.deck
+    assert job.limits.setup.startswith("From the battery VBAT at 4.800 V (the review form's),")
+    assert job.limits.setup.endswith("; load the rated 2000 mA, no budget for +3.3V.")
+
+
+def test_without_a_battery_the_chain_runs_from_usb():
+    tree = _muxed_tree()
+    tree = tree.model_copy(update={"rails": [r for r in tree.rails if r.net != "VBAT"]})
+    c = sc.chain(tree, "+BATT")
+    assert c is not None and (c.nets, c.kind, c.vin) == (("VBUS", "+BATT"), "usb", 5.0)
+    # EN on /IN2 is off this chain now: U3 drives it, as far as the cut knows.
+    got = sc.plan(_muxed(), _status(), _files(), _reading(), ["startup"], tree)
+    assert isinstance(got, sc.Skip) and got.reason == "its EN is driven by U3"
+
+    d = _muxed()
+    d.nets["/IN2"].pop()
+    d.nets["+BATT"].append(Node("U15", "2", "EN"))
+    (job,) = _chain_jobs(tree, design=Design(d.parts, d.nets))
+    assert "V_sw_U3 c0 vin 0" in job.deck.splitlines()
+    assert job.limits.setup.startswith("From USB VBUS at 5.000 V, as an ideal source through U3")
+
+
+def test_the_chain_stops_at_an_upstream_regulators_rail():
+    tree = PowerTree(
+        rails=[
+            _rail("VBUS", 5.0, 5.0, source="usb"),
+            _rail("+5V", 5.0, 5.0, fed_by=["U2"]),
+            _rail("+BATT", 5.0, 5.0, fed_by=["FB1"]),
+            _rail("+3.3V", 3.3, 3.3, fed_by=["U15"], budget=_budget(330)),
+        ],
+        parts=[
+            PowerPart(ref="U2", value="BOOST", kind="regulator", inputs=["VBUS"], output="+5V"),
+            PowerPart(ref="FB1", value="600R", kind="pass", inputs=["+5V"], output="+BATT"),
+            PowerPart(
+                ref="U15", value="TPS63802", kind="regulator", inputs=["+BATT"], output="+3.3V"
+            ),
+        ],
+    )
+    c = sc.chain(tree, "+BATT")
+    assert c is not None and (c.nets, c.kind, c.vin) == (("+5V", "+BATT"), "rail", 5.0)
+    got = sc.plan(_orbit(), _status(), _files(), _reading(), ["startup"], tree)
+    assert isinstance(got, list)
+    assert "Rload out lsw 10" in got[0].deck
+    assert got[0].limits.setup.startswith("From U2's output +5V at 5.000 V, as an ideal source")
 
 
 def test_a_model_without_input_and_output_pins_isnt_a_regulator():
@@ -351,7 +530,7 @@ def test_a_clean_startup_passes():
     assert got == "passed"
     assert text.startswith("Reaches 3.267 V at ")
     assert "settles at 3.300 V" in text and "ceiling 3.600 V (U16 supply max)" in text
-    assert text.endswith(" U15.8 (PG) stays low.")
+    assert text.endswith(" U15.8 (PG) stays low." + ORBIT_SETUP)
 
     rows = _rows(649.5e-6, _ramp, rst=lambda t: _ramp(t, 500e-6), pg=lambda t: _ramp(t, 400e-6))
     _, text = sc.verdict("startup", job.limits, rows)
@@ -370,7 +549,7 @@ def test_a_burst_into_a_switch_pin_above_the_limit_is_flagged():
     )
     assert text.endswith(
         " Peak currents: into U15.5 (L1) on /L1 0.90 A at 300 µs; "
-        "into U15.6 (L2) on /L2 12.50 A at 80 µs; from the input 1.20 A at 60 µs."
+        "into U15.6 (L2) on /L2 12.50 A at 80 µs; from the input 1.20 A at 60 µs." + ORBIT_SETUP
     )
 
     got, text = sc.verdict("startup", job.limits, rows, {**peaks, "l2": (1.8, 80e-6)})
@@ -434,7 +613,7 @@ def test_dropout_flags_regulation_lost_close_to_the_nominal_input():
     assert got == "passed"
     assert text == (
         "Stays in band (3.267 V–3.333 V (±1 %)) down to 2.940 V in. "
-        "The datasheet's dropout puts it near 3.500 V."
+        "The datasheet's dropout puts it near 3.500 V." + ORBIT_SETUP
     )
 
     got, text = sc.verdict("dropout", lim, _rows(stop, follows(0.2), vin))

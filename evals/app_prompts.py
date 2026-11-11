@@ -19,7 +19,7 @@ structured hypotheses; read the answer to judge it. The gateway can't take
 much concurrency, so run at most ~3 at once.
 
 ``--sim startup[,load_step,dropout]`` also runs the vendor-model
-simulations as the app streams them (plan 006 step 1), alongside the
+simulations as the app streams them (plan 006 steps 1–2), alongside the
 prompts: each IC's datasheet and SPICE model looked up by its value and
 the case's ``parts.txt`` (the datasheet URLs a compact netlist drops),
 the facts read through the gateway, then ``spice_circuits.simulate``.
@@ -44,6 +44,7 @@ from app.core.ai.chat import complete_text  # noqa: E402
 from app.core.ai.structured import complete_structured  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.features.debug import (  # noqa: E402
+    budget,
     calc,
     mcu,
     pins,
@@ -192,10 +193,18 @@ async def simulate(
     finder = SpiceModels(fetcher, SpiceModelStore(pathlib.Path(settings.SPICE_MODEL_DIR)))
     models = await spice_convert.check(await finder.find(parts, sheets, {}, ""), {}, Ngspice())
     reading = await FactReader(_extract, RedisFactsCache()).read(design, sheets)
+    calcs = calc.lookup(design)
+    # The budgeted tree, as the review rebuilds it once the facts are read:
+    # each regulator's chain from its source, and its rail's load.
+    tree = budget.apply(
+        design, power.build(design, calcs, reading.limits), reading.limits, calcs
+    )
     runner = Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S)
     return [
         sim
-        async for sim in spice_circuits.simulate(models, {}, design, reading, analyses, runner)
+        async for sim in spice_circuits.simulate(
+            models, {}, design, reading, analyses, runner, tree
+        )
     ]
 
 

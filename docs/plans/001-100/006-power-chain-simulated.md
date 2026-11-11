@@ -117,7 +117,7 @@ the probes (now fixed at five). `make lint` and `make test` pass
 (sub-targets, make 3.81): 381 backend tests, 49 frontend.
 Effort: 4–8 h.
 
-## 2. The chain from its source: proposed
+## 2. The chain from its source: done
 
 - The cut follows the power tree upstream from the regulator to its
   sources: muxes with no usable model (the TPS2121) become labelled
@@ -126,6 +126,51 @@ Effort: 4–8 h.
   datasheet's test conditions.
 - The load comes from the rail's budget (plan 005 step 5) as a step,
   not a resistor at the rated current.
+
+Decided (2026-11-11): one chain per regulator, from the battery when one
+feeds it, else USB, else an unnamed input, at its nominal: the user's
+value from the review form, else the middle of its range. Step 4 adds the
+min/max corners and the other sources.
+Decided (2026-11-11): the load is the rail's budget current as a resistor
+switched on (an ngspice voltage-controlled switch with hysteresis) once
+the output passes the downstream ICs' minimum supply; with no budget
+figure, the rated current, labelled.
+Decided (2026-11-11, default taken in step): a mux or load switch on the
+chain is a zero-volt source labelled "as an ideal switch"; a fuse,
+ferrite or 0 Ω part is a labelled ideal wire, while diodes and resistors
+with a value stay as they are. The chain stops at an upstream regulator's
+output, which becomes an ideal source at that rail's voltage.
+`load_step` and `dropout` use the budget load too, and the input ammeter
+sits at the source.
+
+**Checks:** 4 new tests in `test_debug_spice_circuits.py` (29 there):
+the chain from the battery through a fuse (an ideal wire) and the mux (an
+ideal switch), its title, deck nodes and setup sentence; the review form's
+battery voltage and the rated-load fallback, labelled; USB when no battery
+feeds the chain (and an EN driven from off the chain still skips); the
+chain stopping at an upstream regulator's rail as an ideal source. The
+existing start-up, burst and dropout tests now expect the switched load
+(`Sload` with hysteresis at the downstream minimum) and the setup
+sentence at the end of the verdict. 1 new test in `test_debug_power.py`:
+a fuse from the battery into the mux feeds it one way.
+
+The private board's chain (by hand: its 4.8 V study netlist read back
+into a Design, with U5's output current and start-up time and the
+ESP32-S3's supply given as facts) runs **from VBAT through U3 (TPS2121)
+as an ideal switch to U5**, loaded with +3V3's 500 mA budget, in 60 s for
+545 µs. It comes back `flagged` on the voltage: 1.65 V at the window's
+end, PG low; the input peaks at 3.85 A at 50 µs; L2 shows **no burst**
+(0.00 A), as in step 1. The ideal battery and switch hold the TPS63070
+in buck mode, so the burst still waits on step 4's current-limited
+supply, and the 3.31 V on a longer window.
+
+Writing the tests found `power.build` giving a fuse between the battery
+and the mux a second, reverse edge (/IN2 → VBAT), since it ranked the
+fuse's own pins against themselves; it now ranks only the other parts'
+edges. mypy caught two loop names reused across types in the cut (now
+renamed), and the service tests' fake simulator gained the tree argument.
+`make lint` and `make test` pass (sub-targets, make 3.81): 386 backend
+tests, 49 frontend.
 
 **Check:** unit tests on the chain's cut and its labels; the private
 board's chain runs from its battery through U3 to U5.

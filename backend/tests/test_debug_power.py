@@ -130,6 +130,22 @@ def test_mux_takes_its_range_from_both_sources() -> None:
     assert (v33.min, v33.basis, v33.fed_by, v33.loads) == (3.3, "named", ["U5"], ["U1"])
 
 
+def test_a_fuse_from_the_battery_feeds_the_mux_one_way() -> None:
+    """A fuse between the battery and the mux's input is oriented once:
+    flipped back, it made the battery a rail fed from the mux side and it
+    lost its source."""
+    d = _mux_buck_boost()
+    d.parts["F1"] = Part("F1", "1A", "Device:Fuse", "")
+    d.nets["VBAT"] = [Node("J2", "1", ""), Node("F1", "1", "")]
+    d.nets["/IN2"] = [Node("F1", "2", ""), Node("U3", "8", "IN2")]
+    tree = power.build(Design(d.parts, d.nets))
+    assert [(p.ref, p.inputs, p.output) for p in tree.parts if p.ref == "F1"] == [
+        ("F1", ["VBAT"], "/IN2")
+    ]
+    assert _rail(tree, "VBAT").source == "battery"
+    assert _rail(tree, "/IN2").fed_by == ["F1"]
+
+
 def test_buck_boost_output_is_its_vout_pin_not_the_inductor_net() -> None:
     """L2 wired to +3V3 (the bug) adds no edge: the switch-node pins don't
     make a rail when VOUT already names one."""

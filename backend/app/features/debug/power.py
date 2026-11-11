@@ -382,7 +382,10 @@ def _pass_edges(design: Design, index: _Pins, power: set[str], edges: list[_Edge
             # A load-sharing FET passes the battery on to the system rail.
             found.append(_Edge(ref, "pass", (cells[0],), b if cells[0] == a else a))
             continue
-        rank_a, rank_b = _rank(design, index, a, edges), _rank(design, index, b, edges)
+        # Ranked without this part's own edge: once oriented, the side it
+        # feeds would count as made and flip it on the next pass of _edges.
+        others = [e for e in edges if e.ref != ref]
+        rank_a, rank_b = _rank(design, index, a, others), _rank(design, index, b, others)
         if b not in power | on_tree or rank_a > rank_b:
             found.append(_Edge(ref, "pass", (a,), b))
         elif a not in power | on_tree or rank_b > rank_a:

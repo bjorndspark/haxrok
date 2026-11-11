@@ -275,6 +275,21 @@ async def _read(prepared: Prepared, facts: FactReader | None) -> DatasheetReadin
     return await facts.read(prepared.design, prepared.datasheets)
 
 
+def _budgeted_tree(prepared: Prepared, reading: DatasheetReading) -> PowerTree:
+    """The power tree rebuilt with the datasheets' output and charge
+    voltages, now they're read, and each rail's current budget: the review
+    meets its rails against each pin's limits, and the vendor-model
+    simulations run each regulator's chain and load from it."""
+    return budget.apply(
+        prepared.design,
+        power.build(
+            prepared.design, prepared.calculations, reading.limits, battery=prepared.battery
+        ),
+        reading.limits,
+        prepared.calculations,
+    )
+
+
 async def _vendor_simulations(
     prepared: Prepared,
     reading: Awaitable[DatasheetReading],
@@ -294,6 +309,7 @@ async def _vendor_simulations(
             got,
             prepared.analyses,
             runner,
+            _budgeted_tree(prepared, got),
         ):
             n += 1
             await out.put(_event("simulation", sim.model_dump_json()))
@@ -420,16 +436,7 @@ async def _review(
     n_warn = len(prepared.pin_lookup.warnings)
     if n_warn:
         found += f" {n_warn} transistor{'s' if n_warn > 1 else ''} with a pin order to check."
-    # Rebuilt with the datasheets' output and charge voltages, now they're read,
-    # with each rail's current budget; its rails then meet each pin's limits.
-    tree = budget.apply(
-        prepared.design,
-        power.build(
-            prepared.design, prepared.calculations, reading.limits, battery=prepared.battery
-        ),
-        reading.limits,
-        prepared.calculations,
-    )
+    tree = _budgeted_tree(prepared, reading)
     calcs = prepared.calculations + voltage.check(
         prepared.design, tree, reading.limits, first_id=len(prepared.calculations) + 1
     )
