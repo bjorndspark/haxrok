@@ -155,8 +155,14 @@ export function useDebugActions(): DebugActions {
     const a = document.createElement("a")
     a.href = url
     a.download = `${run.summary.project}-run${String(run.number)}.md`
+    // Firefox ignores clicks on a detached anchor, and Safari cancels the
+    // download if the blob URL is revoked before it has started reading it.
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 1000)
   }, [])
 
   return { analyze, rerunWithMeasurement, cancel, pickFiles, dropFiles, downloadReport }
