@@ -16,12 +16,14 @@ lines here; this table is the fallback where no datasheet was read. Its
 ``inductor_pins`` give those pins the switch role ``roles.check`` holds them
 to when no datasheet says otherwise, and its ``rules`` are the
 microcontroller pin rules ``mcu.check`` holds the board to when no
-datasheet gave any.
+datasheet gave any. Its ``strap_timing`` gives a strapping pin's internal
+pull, input threshold and hold time, for ``mcu.check``'s RC check, to the
+table's rules and to a datasheet's alike.
 """
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.features.debug import roles
 from app.features.debug.design import Design, Label, Part, is_ic
@@ -39,6 +41,18 @@ from app.features.debug.schemas import (
 
 
 @dataclass(frozen=True)
+class StrapTiming:
+    """What sets how fast a strapping pin reaches its boot level once the
+    chip comes out of reset: its internal pull, the input threshold it must
+    pass, and how long after reset the chip latches it."""
+
+    pull: BootLevel  # the internal pull's way, "high" or "low"
+    pull_ohms: float  # typical
+    threshold: float  # VIH (boot level high) or VIL (low), as a fraction of VDD
+    hold_s: float  # the strapping hold time tH after EN rises
+
+
+@dataclass(frozen=True)
 class PartPins:
     """One part's pin table. ``pins`` maps pin number to (datasheet name,
     function). ``inductor_pins`` are the pins the datasheet says connect
@@ -51,6 +65,7 @@ class PartPins:
     pins: dict[str, tuple[str, str]]
     inductor_pins: frozenset[str] = frozenset()
     rules: tuple[PinRuleFact, ...] = ()  # for ``mcu.check``; page 0 = this table
+    strap_timing: Mapping[str, StrapTiming] = field(default_factory=dict)  # pin -> numbers
 
     def matches(self, value: str, lib_part: str, footprint: str) -> bool:
         if not value.upper().startswith(self.value_prefix):
@@ -232,6 +247,12 @@ def _esp32_s3_wroom_1() -> PartPins:
                 condition="on modules with octal PSRAM (the R8/R16V variants)",
             ),
         ),
+        # Internal pulls typ 45 kΩ (p.27), VIH 0.75 / VIL 0.25 × VDD (DC
+        # characteristics), strapping hold time tH 3 ms after EN rises (p.14).
+        strap_timing={
+            "27": StrapTiming(pull="high", pull_ohms=45e3, threshold=0.75, hold_s=3e-3),
+            "26": StrapTiming(pull="low", pull_ohms=45e3, threshold=0.25, hold_s=3e-3),
+        },
     )
 
 

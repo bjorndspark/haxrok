@@ -173,4 +173,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `009-strapping-pin-rc.md` step 1.
+1. `009-strapping-pin-rc.md` step 2.

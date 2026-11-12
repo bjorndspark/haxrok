@@ -3,6 +3,7 @@ the rules come from (``mcu.rules``). Hand-built designs; pure functions."""
 
 from app.features.debug import mcu
 from app.features.debug.design import Design, Node, Part
+from app.features.debug.pins import StrapTiming
 from app.features.debug.schemas import (
     BootLevel,
     Calculation,
@@ -193,3 +194,89 @@ def test_rules_come_from_the_pin_table_unless_the_datasheet_gave_some():
     )
     [only] = mcu.rules(design, {"U1": [read]})["U1"]
     assert (only.kind, only.source) == ("input_only", "datasheet p.12")
+
+
+# --- strapping pins: the RC against the hold time ------------------------------------
+
+TIMING = StrapTiming(pull="high", pull_ohms=45e3, threshold=0.75, hold_s=3e-3)
+STRAP_RC = mcu.Rule(
+    kind="strapping",
+    pins=("27",),
+    text="The rule.",
+    source="datasheet p.9",
+    boot_level="high",
+    timing=TIMING,
+)
+CAP = _part("C5", "100n", "Device:C")
+
+
+def _boot(*extra: Node) -> dict[str, list[Node]]:
+    """furby-boot-cap's GPIO0: C5 to GND and the BOOT button, plus ``extra``."""
+    return {
+        "BOOT": [IO0, Node("C5", "1", ""), Node("SW2", "2", ""), *extra],
+        "GND": [Node("C5", "2", ""), Node("SW2", "1", "")],
+    }
+
+
+def test_a_cap_the_internal_pull_up_cant_charge_in_the_hold_time_is_flagged():
+    [found] = _check(_design(_boot(), CAP), STRAP_RC)
+    assert found.flagged and found.pins == ["U1.27", "C5.1", "C5.2"]
+    assert (found.value, found.unit, found.expected) == (6.238, "ms", 3.0)
+    assert "internal pull-up (45 kΩ)" in found.text and "C5 (100 nF) to GND" in found.text
+    assert "τ = 4.5 ms" in found.text and "VIH (0.75 × VDD) 6.24 ms after EN" in found.text
+    assert "a pull-up under 41.7 kΩ to the supply, or shrink C5 to under 48.1 nF" in found.text
+    assert "May fail" not in found.text
+
+
+def test_a_10k_pull_up_charges_it_in_time():
+    nets = {**_boot(Node("R1", "1", "")), "+3V3": [Node("R1", "2", "")]}
+    assert _check(_design(nets, CAP, _part("R1", "10k", "Device:R")), STRAP_RC) == []
+
+
+def test_a_weak_external_pull_up_is_listed_not_flagged():
+    nets = {**_boot(Node("R1", "1", "")), "+3V3": [Node("R1", "2", "")]}
+    [found] = _check(_design(nets, CAP, _part("R1", "100k", "Device:R")), STRAP_RC)
+    assert not found.flagged and found.pins[-2:] == ["R1.1", "R1.2"]
+    assert "and R1 (100 kΩ)" in found.text
+    assert "stronger pull-ups (21.6 kΩ in all, with the internal one)" in found.text
+    assert "May fail, not verified: R1 runs from the rail before EN rises" in found.text
+
+
+def test_no_cap_or_no_numbers_give_no_rc_calculation():
+    no_cap = {"BOOT": [IO0, Node("SW2", "2", "")], "GND": [Node("SW2", "1", "")]}
+    assert _check(_design(no_cap), STRAP_RC) == []
+    assert _check(_design(_boot(), CAP), STRAP_HIGH) == []
+
+
+def test_a_pull_down_strapping_pin_with_a_cap_to_the_supply_is_flagged():
+    io45 = Node("U1", "26", "IO45")
+    rule = mcu.Rule(
+        kind="strapping",
+        pins=("26",),
+        text="The rule.",
+        source="datasheet p.9",
+        boot_level="low",
+        timing=StrapTiming(pull="low", pull_ohms=45e3, threshold=0.25, hold_s=3e-3),
+    )
+    nets = {"VSPI": [io45, Node("C5", "1", "")], "+3V3": [Node("C5", "2", "")]}
+    [found] = _check(_design(nets, CAP), rule)
+    assert found.flagged and found.value == 6.238
+    assert "internal pull-down" in found.text and "to the supply holds it high" in found.text
+    assert "VIL (0.25 × VDD)" in found.text and "a pull-down under 41.7 kΩ to GND" in found.text
+
+
+def test_the_pin_tables_timing_reaches_a_datasheets_strapping_rule():
+    design = _design(_boot(), CAP)
+    [io0] = [r for r in mcu.rules(design)["U1"] if r.pins == ("27",)]
+    assert io0.timing == TIMING
+
+    read = PinRuleFact(
+        kind="strapping", pins=["27"], boot_level="high", condition="", text="Hi.", page=14
+    )
+    [rule] = mcu.rules(design, {"U1": [read]})["U1"]
+    assert rule.timing == TIMING and rule.source == "datasheet p.14"
+    [found] = mcu.check(design, PowerTree(rails=[], parts=[]), {"U1": [rule]})
+    assert found.flagged and found.value == 6.238
+
+    other_way = read.model_copy(update={"boot_level": "low"})
+    assert mcu.rules(design, {"U1": [other_way]})["U1"][0].timing is None

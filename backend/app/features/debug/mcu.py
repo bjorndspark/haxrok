@@ -17,6 +17,17 @@ gave any. Each is checked on the netlist alone:
   connector, a resistor to anything else) with no defined level is "may
   fail". A pin the normal boot doesn't depend on (``either``) isn't
   checked.
+- strapping, RC: a pin left at its boot level (by external pulls toward
+  it, or by its internal pull alone) whose rule carries the pin table's
+  timing (``pins.StrapTiming``): the internal pull and the pulls toward
+  the boot level in parallel, against the capacitors straight from its net
+  to the other level, τ = R × C, and the time t = τ·ln(1/(1 − f)) to cover
+  the fraction f of VDD up to the input threshold. Past the hold time is
+  flagged when the internal pull is alone: the chip and its pull are off
+  until EN rises, so the cap charges from the other level then. With an
+  external pull it's "may fail": that pull runs from the rail before EN
+  rises and may precharge the cap, which the netlist doesn't show; with a
+  load on the net too, since that may drive it.
 - USB D+ / D-: the pin's net (directly or through one series resistor)
   reaches a pin named for the other line (a connector's D-), and none
   named for its own. Flagged: the lines are swapped.
@@ -27,13 +38,22 @@ never flagged, only listed with its condition. Results are
 Pure functions, no I/O.
 """
 
+import math
 import re
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 
-from app.features.debug.calc import is_ground, named_voltage
+from app.features.debug.calc import (
+    format_farads,
+    format_ohms,
+    format_seconds,
+    is_ground,
+    named_voltage,
+    parse_farads,
+    parse_ohms,
+)
 from app.features.debug.design import Design, Node, is_ic
-from app.features.debug.pins import PIN_TABLE, pin_order
+from app.features.debug.pins import PIN_TABLE, PartPins, StrapTiming, pin_order
 from app.features.debug.schemas import (
     BootLevel,
     Calculation,
@@ -53,6 +73,7 @@ class Rule:
     source: str  # "datasheet p.12", or the pin table's document
     boot_level: BootLevel = "either"
     condition: str = ""
+    timing: StrapTiming | None = None  # strapping only, for the RC check
 
 
 def rules(
@@ -64,18 +85,17 @@ def rules(
     for ref, part in design.parts.items():
         if not is_ic(ref):
             continue
-        if read := (datasheet or {}).get(ref):
-            out[ref] = [_rule(f, f"datasheet p.{f.page}") for f in read]
-            continue
         entry = next(
             (e for e in PIN_TABLE if e.matches(part.value, part.lib_part, part.footprint)), None
         )
-        if entry is not None and entry.rules:
-            out[ref] = [_rule(f, entry.source) for f in entry.rules]
+        if read := (datasheet or {}).get(ref):
+            out[ref] = [_rule(f, f"datasheet p.{f.page}", entry) for f in read]
+        elif entry is not None and entry.rules:
+            out[ref] = [_rule(f, entry.source, entry) for f in entry.rules]
     return out
 
 
-def _rule(fact: PinRuleFact, source: str) -> Rule:
+def _rule(fact: PinRuleFact, source: str, entry: PartPins | None) -> Rule:
     return Rule(
         kind=fact.kind,
         pins=tuple(fact.pins),
@@ -83,7 +103,18 @@ def _rule(fact: PinRuleFact, source: str) -> Rule:
         source=source,
         boot_level=fact.boot_level,
         condition=fact.condition,
+        timing=_timing(fact, entry),
     )
+
+
+def _timing(fact: PinRuleFact, entry: PartPins | None) -> StrapTiming | None:
+    """The pin table's timing for a strapping rule, when every pin it names
+    has the same entry there and its pull is toward the rule's boot level."""
+    if fact.kind != "strapping" or entry is None or not fact.pins:
+        return None
+    found = {entry.strap_timing.get(p) for p in fact.pins}
+    timing = found.pop() if len(found) == 1 else None
+    return timing if timing is not None and timing.pull == fact.boot_level else None
 
 
 @dataclass
@@ -200,6 +231,8 @@ def _strapping(
         how = f" ({', '.join(pulls)} pull both ways)" if pulls else ""
         what = f"has no defined level at reset{how}, and {', '.join(at.loads)} on {net} may set it"
         flagged = False
+    elif rule.timing is not None and not at.tied and all(w == want for w in at.pulls.values()):
+        return _rc(design, rails, rule, rule.timing, pin_ref, net, at)
     else:
         return None
     resistors = [f"{r}.{p}" for r in pulls for p in ("1", "2")]
@@ -215,8 +248,92 @@ def _strapping(
         resistors,
         f"is a strapping pin and {what}.",
         fix + ".",
-        may_fail=not flagged,
+        unsure="" if flagged else "the netlist doesn't show the level during reset",
     )
+
+
+def _rc(
+    design: Design,
+    rails: Collection[str],
+    rule: Rule,
+    timing: StrapTiming,
+    pin_ref: str,
+    net: str,
+    at: _Level,
+) -> Calculation | None:
+    """A strapping pin at its boot level, against the time its pulls take
+    to bring it there from the other level; None when it's in time or the
+    netlist lacks a value (module docstring, "strapping, RC")."""
+    want = rule.boot_level
+    pulls = sorted(at.pulls)  # all toward ``want``: the caller checked
+    away = is_ground if want == "high" else (lambda far: _is_rail(far, rails))
+    caps = [
+        n.ref
+        for n in design.nets[net]
+        if _head(n.ref) == "C" and (far := _other_end(design, n.ref, net)) and away(far)
+    ]
+    ohms = [parse_ohms(design.parts[r].value) or 0.0 for r in pulls]
+    farads = [parse_farads(design.parts[c].value) or 0.0 for c in caps]
+    if not caps or not all(ohms) or not all(farads):
+        return None  # no cap, or a value the netlist doesn't give
+    c_all = sum(farads)
+    r_all = 1 / (1 / timing.pull_ohms + sum(1 / r for r in ohms))
+    span = timing.threshold if want == "high" else 1 - timing.threshold
+    per_tau = math.log(1 / (1 - span))  # the crossing time in units of τ
+    tau = r_all * c_all
+    t = tau * per_tau
+    if t <= timing.hold_s:
+        return None
+    way, low_high, other, toward = (
+        ("up", "low", "GND", "the supply")
+        if want == "high"
+        else ("down", "high", "the supply", "GND")
+    )
+    vth = f"{'VIH' if want == 'high' else 'VIL'} ({timing.threshold:g} × VDD)"
+    by = f"its internal pull-{way} ({format_ohms(timing.pull_ohms)})" + "".join(
+        f" and {r} ({format_ohms(o)})" for r, o in zip(pulls, ohms, strict=True)
+    )
+    held = ", ".join(f"{c} ({format_farads(f)})" for c, f in zip(caps, farads, strict=True))
+    # What brings it there in time: the pull in all, an added resistor beside
+    # the internal pull alone, or the most capacitance the pulls charge in time.
+    r_need = timing.hold_s / (c_all * per_tau)
+    added = 1 / (1 / r_need - 1 / timing.pull_ohms)  # beside the internal pull alone
+    stronger = (
+        f"a pull-{way} under {format_ohms(_round3(added))} to {toward}"
+        if not pulls
+        else f"stronger pull-{way}s ({format_ohms(_round3(r_need))} in all, with the internal one)"
+    )
+    c_max = format_farads(_round3(timing.hold_s / (r_all * per_tau)))
+    smaller = f"shrink {caps[0]} to under {c_max}" if len(caps) == 1 else f"under {c_max} in all"
+    if pulls:
+        unsure = (
+            f"{', '.join(pulls)} run{'s' if len(pulls) == 1 else ''} from the rail before EN "
+            "rises, and an EN delay much longer than τ charges the pin before the chip starts"
+        )
+    elif at.loads:
+        unsure = f"{', '.join(at.loads)} on {net} may drive it during reset"
+    else:
+        unsure = ""
+    return _calc(
+        design,
+        rule,
+        pin_ref,
+        [f"{ref}.{p}" for ref in (*caps, *pulls) for p in ("1", "2")],
+        f"is a strapping pin brought {want} by {by}, and {held} to {other} holds it "
+        f"{low_high} until then: τ = {format_seconds(tau)}, so it reaches {vth} "
+        f"{format_seconds(t)} after EN rises, past the {format_seconds(timing.hold_s)} "
+        "hold time in which the chip latches it.",
+        f"It must be {want} at reset for the normal boot from flash; add {stronger}, or {smaller}.",
+        unsure=unsure,
+        value=round(t * 1e3, 3),
+        unit="ms",
+        expected=timing.hold_s * 1e3,
+    )
+
+
+def _round3(x: float) -> float:
+    """``x`` to three significant figures, for a limit in the text."""
+    return float(f"{x:.3g}")
 
 
 def _calc(
@@ -226,28 +343,31 @@ def _calc(
     others: list[str],
     what: str,
     fix: str,
-    may_fail: bool = False,
+    unsure: str = "",
+    value: float | None = None,
+    unit: str = "",
+    expected: float | None = None,
 ) -> Calculation:
     ref = pin_ref.split(".")[0]
     name = design.pin_name(pin_ref)
     named = f"{pin_ref} ({name})" if name else pin_ref
-    flagged = not may_fail and not rule.condition
+    flagged = not unsure and not rule.condition
     text = (
         f"{ref} ({design.parts[ref].value}): {named} {what} {fix} "
         f'Rule ({rule.source}): "{rule.text}"'
     )
     if rule.condition:
         text += f" Not flagged: it applies {rule.condition}; check that it applies to this part."
-    elif may_fail:
-        text += " May fail, not verified: the netlist doesn't show the level during reset."
+    elif unsure:
+        text += f" May fail, not verified: {unsure}."
     return Calculation(
         id="",
         kind="mcu_pin",
         ic=ref,
         pins=[pin_ref, *others],
-        value=None,
-        unit="",
-        expected=None,
+        value=value,
+        unit=unit,
+        expected=expected,
         flagged=flagged,
         text=text,
     )

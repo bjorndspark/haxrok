@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-12 | 2026-11-12 | proposed | — | `005-whole-board-static-review.md` (step 7: MCU pin rules), `evals/cases/furby-boot-cap/` |
+| 2026-11-12 | 2026-11-12 | in progress | — | `005-whole-board-static-review.md` (step 7: MCU pin rules), `evals/cases/furby-boot-cap/` |
 
 Plan 005 step 7 reads a strapping pin's level at reset from the netlist
 with capacitors ignored (`mcu._level`). That misses the bug in
@@ -39,10 +39,10 @@ Effort: about 4–8 h.
 
 | Step | What | |
 |---|---|---|
-| 1 | The RC check, with the pin table's numbers | proposed |
+| 1 | The RC check, with the pin table's numbers | done |
 | 2 | The same numbers from the datasheet | proposed |
 
-## 1. The RC check, with the pin table's numbers: proposed
+## 1. The RC check, with the pin table's numbers: done
 
 - `mcu.Rule` carries a strapping pin's internal pull (way and ohms), the
   hold time, and the input threshold as a fraction of VDD. The pin
@@ -73,9 +73,34 @@ Decided (2026-11-12, default): the internal pull is its typical value
 capacitors counted are those straight from the pin's net to the
 opposite level, not behind a resistor. Pulls toward the boot level
 (internal and external) combine in parallel.
+Decided (2026-11-12, default): the numbers live in the pin table as
+`PartPins.strap_timing` (pin -> `StrapTiming`), not on `PinRuleFact`,
+which step 2 changes. `mcu.rules` attaches them to any strapping rule,
+from the table or a datasheet, whose pins share one entry whose pull is
+toward the rule's boot level. A load on the net with the pull alone is
+"may fail" too, since the load may drive the pin during reset. The fix
+names the largest added pull (beside the internal one) or the total pull,
+and the largest capacitance, that meet the hold time, to 3 figures.
 
 **Check:** `make lint`, `make test`, `make eval-app case=furby-boot-cap`
 in debug and review mode, before and after.
+
+**Checks:** six new tests in `test_debug_mcu.py` (furby GPIO0 flagged at
+6.238 ms against 3 ms, with "a pull-up under 41.7 kΩ … or shrink C5 to
+under 48.1 nF"; a 10 kΩ pull-up gives nothing; a 100 kΩ one is listed
+with the precharge caveat; no cap or no timing gives nothing; IO45 with a
+cap to +3V3 flagged; the table's timing reaching a datasheet rule, and not
+one whose boot level is the other way). The real `furby-boot-cap`
+netlist through `mcu.rules` + `mcu.check` gives U1.27 flagged, τ 4.5 ms,
+6.24 ms vs 3 ms. Backend 443 passed, ruff/mypy clean; frontend 55
+passed, lint clean. `make eval-app case=furby-boot-cap`: before, debug #1 (328 s,
+"missing pull on GPIO0") and review #1 (291 s, may_fail "BOOT strapping
+hold violated by C5"); after, both inputs carry the check as cf8 FLAGGED
+and both answers cite it: debug #1 (333 s, "C5 + weak internal pull-up
+misses 3 ms window"), review #1 with the same five items (0 s: the
+gateway's answer cache, from an earlier run on the same new input).
+Bugs found: hand arithmetic in the first test had the added pull-up at
+41.6 kΩ; it is 1/(1/21.64k − 1/45k) = 41.7 kΩ, the code was right.
 
 ## 2. The same numbers from the datasheet: proposed
 
