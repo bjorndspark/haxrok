@@ -6,6 +6,7 @@ kicad-cli and the model are faked.
 
 import dataclasses
 import json
+import pathlib
 from collections.abc import Sequence
 
 import pytest
@@ -994,10 +995,10 @@ async def test_stream_sends_summary_progress_then_checked_result():
     assert claims[2]["downgraded"] and "m2" in claims[2]["reason"]
 
 
-async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
-    prepared = await service.prepare(
-        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
-    )
+def _tps63070_facts() -> tuple[DatasheetStatus, FactReader]:
+    """U2's datasheet, found, and a reader that gets one pin, one limit and
+    one typical-application inductor (which L1 is outside: deviation dv1)
+    from it, with no cache hit."""
     found = DatasheetStatus(
         ref="U2",
         value="TPS63070RNMR",
@@ -1005,7 +1006,6 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
         url="https://example.com/tps63070.pdf",
         path="/app/data/datasheets/tps63070.pdf",
     )
-    prepared = dataclasses.replace(prepared, datasheets=[found, prepared.datasheets[1]])
 
     async def extract(system: str, user: str) -> DatasheetFacts:
         assert "9: L2" in user and "=== Page 4 ===" in user
@@ -1055,6 +1055,15 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
             pass
 
     reader = FactReader(extract, Cache(), lambda path: [Page(4, "pins"), Page(5, "limits")])
+    return found, reader
+
+
+async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
+    found, reader = _tps63070_facts()
+    prepared = dataclasses.replace(prepared, datasheets=[found, prepared.datasheets[1]])
     seen: list[str] = []
 
     async def diagnose(system: str, user: str) -> str:
@@ -1123,6 +1132,45 @@ async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
     assert [d["id"] for d in sheet["deviations"]] == ["dv1"]
     assert sheet["deviations"][0]["page"] == 5
     assert sheet["datasheet_failures"] == []
+
+
+GOLDEN = pathlib.Path(__file__).parent / "golden"
+
+
+async def _first_user_message(prepared: service.Prepared, facts: FactReader | None) -> str:
+    seen: list[str] = []
+
+    async def diagnose(system: str, user: str) -> str:
+        seen.append(user)
+        return "1. L2 tied to VOUT."
+
+    model = service.Model(diagnose=diagnose, structure=_structure)
+    _ = [e async for e in service.stream(prepared, model, facts=facts)]
+    return seen[0]
+
+
+@pytest.mark.parametrize("mode", ["debug", "review"])
+async def test_the_review_input_is_pinned_byte_for_byte(mode: str):
+    """The first call's user message, whole, for the fixture board: in debug
+    mode with a measurement and U2's datasheet read, in review mode with no
+    datasheet. It is the prompt's cache key, so a change here is a change to
+    what every run sends; when one is meant, check the diff and write the new
+    message to the golden file."""
+    prepared = await service.prepare(
+        _files(),
+        "Dead\n3V3 rail at 0 V",
+        [MeasurementInput(step_id="h1-c1", context="Ohms L2 to VOUT", value="0.2 ohm")],
+        FakeKicad(),
+        FakeDatasheets(),
+        FakeSpiceModels(),
+        mode=mode,
+    )
+    reader = None
+    if mode == "debug":
+        found, reader = _tps63070_facts()
+        prepared = dataclasses.replace(prepared, datasheets=[found, prepared.datasheets[1]])
+    user = await _first_user_message(prepared, reader)
+    assert user == (GOLDEN / f"review_input_{mode}.txt").read_text()
 
 
 async def test_datasheet_facts_names_a_datasheet_that_couldnt_be_read():

@@ -31,32 +31,27 @@ from dataclasses import dataclass, field
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
 from app.features.debug import (
-    application,
-    budget,
     calc,
+    context,
     diagram,
     mcu,
     pins,
     power,
     prompt,
     reference,
-    roles,
     spice,
     spice_circuits,
     spice_convert,
-    voltage,
 )
 from app.features.debug.datasheet import DatasheetFinder
 from app.features.debug.design import (
     Design,
     Label,
-    compact,
-    format_erc,
     parse_erc,
     parse_labels,
     parse_netlist,
 )
-from app.features.debug.evidence import EvidenceContext, check
+from app.features.debug.evidence import check
 from app.features.debug.facts import DatasheetReading, FactReader
 from app.features.debug.kicad import KicadRunner
 from app.features.debug.project import load_project
@@ -65,9 +60,6 @@ from app.features.debug.schemas import (
     AskRequest,
     Calculation,
     Claim,
-    DatasheetFactsEvent,
-    DatasheetLine,
-    DatasheetReadFailure,
     DatasheetStatus,
     DesignSummary,
     ErcEntry,
@@ -76,7 +68,6 @@ from app.features.debug.schemas import (
     Measurement,
     MeasurementInput,
     Mode,
-    PowerTree,
     ProgressEvent,
     ReferenceNote,
     RerunRequest,
@@ -84,7 +75,6 @@ from app.features.debug.schemas import (
     SimAnalysis,
     Simulation,
     Symptom,
-    WiringFinding,
 )
 from app.features.debug.spice_models import SpiceModelFinder
 
@@ -276,54 +266,6 @@ async def _read(prepared: Prepared, facts: FactReader | None) -> DatasheetReadin
     return await facts.read(prepared.design, prepared.datasheets)
 
 
-def _budgeted_tree(
-    prepared: Prepared, reading: DatasheetReading, design: Design | None = None
-) -> PowerTree:
-    """The power tree rebuilt with the datasheets' output and charge
-    voltages, now they're read, and each rail's current budget: the review
-    meets its rails against each pin's limits, and the vendor-model
-    simulations run each regulator's chain and load from it. ``design``
-    is the board with a wiring fix applied; the as-built board without."""
-    board = design if design is not None else prepared.design
-    return budget.apply(
-        board,
-        power.build(board, prepared.calculations, reading.limits, battery=prepared.battery),
-        reading.limits,
-        prepared.calculations,
-    )
-
-
-def _wiring(prepared: Prepared, reading: DatasheetReading) -> pins.PinLookup:
-    """The pin table and wiring findings: pins read from a datasheet
-    replace that IC's hand-written table lines, and its pin roles and
-    typical application recheck the wiring. The review and the vendor-model
-    runs both use it, so a with-fix run names the review's finding id."""
-    if not (reading.pins or reading.application):
-        return prepared.pin_lookup
-    return pins.lookup(
-        prepared.design,
-        prepared.erc,
-        prepared.labels,
-        datasheet_pins=reading.pins,
-        datasheet_roles=reading.roles,
-        application=reading.application,
-    )
-
-
-def _fixes(prepared: Prepared, reading: DatasheetReading) -> list[spice_circuits.Fixed]:
-    """Each wiring finding with an unambiguous fix, applied to the board
-    with its own budgeted tree, for the with-fix vendor-model runs."""
-    got = []
-    for f in _wiring(prepared, reading).findings:
-        if f.fix is None:
-            continue
-        fixed = roles.apply_fix(prepared.design, f.fix)
-        got.append(
-            spice_circuits.Fixed(f.id, f.fix, fixed, _budgeted_tree(prepared, reading, fixed))
-        )
-    return got
-
-
 async def _vendor_simulations(
     prepared: Prepared,
     reading: Awaitable[DatasheetReading],
@@ -343,8 +285,15 @@ async def _vendor_simulations(
             got,
             prepared.analyses,
             runner,
-            _budgeted_tree(prepared, got),
-            _fixes(prepared, got),
+            context.budgeted_tree(prepared.design, prepared.calculations, got, prepared.battery),
+            context.fixes(
+                prepared.design,
+                prepared.calculations,
+                got,
+                prepared.erc,
+                prepared.labels,
+                prepared.battery,
+            ),
         ):
             n += 1
             await out.put(_event("simulation", sim.model_dump_json()))
@@ -450,51 +399,21 @@ async def _review(
             "(once per part, then cached).",
         )
     reading = await reading_task
-    table = _wiring(prepared, reading)
-    with_data = sum(1 for ic in table.ics if ic.pin_data)
-    conflicts = len(table.findings)
-    plural = "s" if conflicts > 1 else ""
-    found = f" {conflicts} pin{plural} wired against the datasheet." if conflicts else ""
-    n_warn = len(prepared.pin_lookup.warnings)
-    if n_warn:
-        found += f" {n_warn} transistor{'s' if n_warn > 1 else ''} with a pin order to check."
-    tree = _budgeted_tree(prepared, reading)
-    calcs = prepared.calculations + voltage.check(
-        prepared.design, tree, reading.limits, first_id=len(prepared.calculations) + 1
+    ctx = context.build(
+        mode=prepared.mode,
+        design=prepared.design,
+        reading=reading,
+        symptoms=prepared.symptoms,
+        measurements=prepared.measurements,
+        references=prepared.references,
+        calculations=prepared.calculations,
+        erc=prepared.erc,
+        labels=prepared.labels,
+        battery=prepared.battery,
     )
-    calcs += mcu.check(
-        prepared.design, tree, mcu.rules(prepared.design, reading.rules), first_id=len(calcs) + 1
-    )
-    n_calcs = len(calcs)
-    flagged = sum(1 for c in calcs if c.flagged)
-    calc_note = (
-        f" {n_calcs} value{'s' if n_calcs != 1 else ''} calculated from the netlist"
-        + (f", {flagged} flagged." if flagged else ".")
-        if n_calcs
-        else ""
-    )
-    notes = f" {len(prepared.references)} reference-design notes." if prepared.references else ""
-    read = (
-        f" {len(reading.sources)} datasheet{'s' if len(reading.sources) > 1 else ''} read,"
-        f" {len(reading.facts)} fact{'' if len(reading.facts) == 1 else 's'}."
-        if reading.sources
-        else ""
-    )
-    deviations = application.check(prepared.design, reading.application)
-    if deviations:
-        n_dev = len(deviations)
-        read += (
-            f" {n_dev} deviation{'s' if n_dev > 1 else ''} from a datasheet's typical application."
-        )
     if facts is not None and found_sheets:
-        yield _event(
-            "datasheet_facts",
-            _datasheet_facts(reading, deviations, tree, table.findings, calcs).model_dump_json(),
-        )
-    yield _progress(
-        "pin_lookup",
-        f"Pin data for {with_data} of {len(table.ics)} ICs.{read}{found}{notes}{calc_note}",
-    )
+        yield _event("datasheet_facts", context.facts_event(ctx).model_dump_json())
+    yield _progress("pin_lookup", context.progress_note(ctx))
     review = prepared.mode == "review"
     yield _progress(
         "reasoning",
@@ -502,25 +421,10 @@ async def _review(
         if review
         else "The model is tracing the circuit against your symptoms. About 2 minutes.",
     )
-    user = prompt.build_user_message(
-        mode=prepared.mode,
-        symptoms=prepared.symptoms,
-        measurements=prepared.measurements,
-        netlist=compact(prepared.design),
-        erc=format_erc(prepared.erc),
-        pin_table=table.text,
-        findings=pins.format_findings(table.findings),
-        warnings=pins.format_warnings(prepared.pin_lookup.warnings),
-        references=reference.format_notes(prepared.references),
-        calculations=calc.format_calculations(calcs),
-        datasheet_facts=reading.text,
-        deviations=application.format_deviations(deviations) if reading.application else "",
-        power=power.format_power(tree),
-    )
     start = time.monotonic()
     try:
         diagnosis = await model.diagnose(
-            prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE, user
+            prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE, ctx.user
         )
         # Logged whole: it's the reasoning the structured answer must follow,
         # and the first thing to read when a result looks wrong.
@@ -543,7 +447,7 @@ async def _review(
             prompt.in_language(
                 prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE, prepared.language
             ),
-            prompt.build_structure_message(diagnosis=diagnosis, user=user),
+            prompt.build_structure_message(diagnosis=diagnosis, user=ctx.user),
         )
     except AppError as e:
         yield _event("error", ErrorEvent(message=e.detail).model_dump_json())
@@ -555,17 +459,8 @@ async def _review(
         time.monotonic() - start,
     )
     yield _progress("checking", "Checking every citation against your schematic.")
-    ctx = EvidenceContext(
-        design=prepared.design,
-        erc={e.id: e for e in prepared.erc},
-        pin_data=table.pin_refs,
-        symptom_ids=frozenset(s.id for s in prepared.symptoms),
-        measurement_ids=frozenset(m.id for m in prepared.measurements),
-        reference_ids=frozenset([n.id for n in prepared.references] + [c.id for c in calcs]),
-        datasheet_ids=reading.ids | {d.id for d in deviations},
-    )
-    checked = check(analysis, ctx)
-    miswired = diagram.miswired_pins(table.findings, calcs)
+    checked = check(analysis, ctx.evidence)
+    miswired = diagram.miswired_pins(ctx.table.findings, ctx.calculations)
     checked.diagrams = {
         h.id: d for h in checked.hypotheses if (d := diagram.build(h, prepared.design, miswired))
     }
@@ -647,32 +542,6 @@ def _progress(stage: str, message: str) -> SseEvent:
     return _event(
         "progress",
         ProgressEvent.model_validate({"stage": stage, "message": message}).model_dump_json(),
-    )
-
-
-def _datasheet_facts(
-    reading: DatasheetReading,
-    deviations: list[application.Deviation],
-    tree: PowerTree,
-    wiring: list[WiringFinding],
-    calculations: list[Calculation],
-) -> DatasheetFactsEvent:
-    """The datasheet_facts event: what claims can cite, and the power tree,
-    wiring findings and calculations rebuilt with what the datasheets said,
-    for the browser."""
-    return DatasheetFactsEvent(
-        power=tree,
-        wiring=wiring,
-        calculations=calculations,
-        datasheet_facts=[
-            DatasheetLine(id=f.id, ref=f.ref, page=f.page, text=f.body) for f in reading.facts
-        ],
-        deviations=[
-            DatasheetLine(id=d.id, ref=d.ref, page=d.page, text=d.text) for d in deviations
-        ],
-        datasheet_failures=[
-            DatasheetReadFailure(ref=ref, reason=why) for ref, why in reading.failed.items()
-        ],
     )
 
 

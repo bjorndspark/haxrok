@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-12 | 2026-11-12 | open | — | `DECISIONS.md` ("No database", "Evidence labels are checked references", "Debug analysis is two model calls"), `evals/app_prompts.py` |
+| 2026-11-12 | 2026-11-12 | in progress (step 1 done) | — | `DECISIONS.md` ("No database", "Evidence labels are checked references", "Debug analysis is two model calls"), `evals/app_prompts.py` |
 
 A review of the debug pipeline against the usual advice for apps built
 around a model ("keep the core small, keep one append-only log as the
@@ -63,7 +63,7 @@ append the turn to the run's record. Loading the result from the record
 would make follow-ups fail once a record is deleted, and with no auth
 the client can only mislead its own answer.
 
-## 1. One function builds the review's input
+## 1. One function builds the review's input: done
 
 - A pure `context.build(...)` (new `features/debug/context.py`) takes
   what `_review` reads today (the design, ERC, symptoms, measurements,
@@ -86,6 +86,31 @@ can't change it). Then `make eval-app` on one case whose answer is
 already cached: "served from cache" for both calls proves the prompt is
 byte-for-byte the same, since the cache key hashes the messages.
 Effort: 4–6 h.
+
+Decided (2026-11-12), default taken in loop: `context.build` takes an
+optional `erc_report` text, used in place of the formatted `erc` entries.
+An eval case's ERC is kicad-cli's text report, not parsed entries, and
+the eval prompt had to stay byte-for-byte the same.
+Decided (2026-11-12), default taken in loop: `_fixes` moved into
+`context.fixes` along with `_wiring` and `_budgeted_tree`, since the
+eval's `simulate` copied it too ("as `service._fixes` does").
+Decided (2026-11-12), default taken in loop: the pin lookup is always
+rebuilt with the reading, dropping `_wiring`'s shortcut back to
+`prepare`'s table when nothing was read. With nothing read the two are
+equal (checked on all 8 eval cases), and the warnings never depended on
+the reading.
+Decided (2026-11-12), default taken in loop: the pinned messages are
+golden files, `backend/tests/golden/review_input_{debug,review}.txt`,
+written from the code before the move.
+
+**Checks:** `make lint` passes (one ESLint warning, in frontend code
+this step doesn't touch). `make test`: 410 backend tests and 52 frontend
+tests pass, including the two new golden tests, debug mode with a datasheet
+read and review mode. `make eval-app` served both calls from cache for
+`rust-board-fb-swapped` (no datasheet found) and for `orbit-l2-shorted`
+(U15's datasheet read, wiring finding U15.7). (Both `make lint` and
+`make test` ran target by target, since make 3.81 lacks
+`--output-sync`.)
 
 ## 2. Every run appends to its own record
 

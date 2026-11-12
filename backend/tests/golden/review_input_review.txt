@@ -1,0 +1,49 @@
+## Designer's notes on what the board is for
+s1: Dead
+s2: 3V3 rail at 0 V
+
+## Bench measurements
+m1: 0.2 ohm  (for the step: Ohms L2 to VOUT)
+
+## Netlist
+# Components
+U2  TPS63070RNMR  (TPS63070RNMR:TPS63070RNMR)  [VQFN-15]
+U9  LM358  (Amplifier:LM358)  [SOIC-8]
+L1  1u5  (Device:L)  [L_1210]
+
+# Nets
++3V3: L1.2 U2.7(VOUT) U2.9(L2)
+/Power/SW1: L1.1 U2.11(L1)
+
+
+## ERC report
+erc-1 [multiple_net_names] (warning, sheet /Power/): Both +3V3 and SW2 are attached to the same items
+    Label 'SW2'
+
+
+## Pin table (from datasheets)
+U2 (TPS63070RNMR), from TI TPS63070 datasheet SLVSC58B, Pin Functions:
+  U2.7 VOUT: Buck-boost converter output.
+  U2.9 L2: Inductor connection (output side of the power stage).
+  U2.11 L1: Inductor connection (input side of the power stage).
+No pin table for: U9.
+
+
+## Verified findings (netlist checked against the pins' roles)
+wf1: U2.9 (L2) is an inductor connection, a switch node (TI TPS63070 datasheet SLVSC58B, Pin Functions), but its net +3V3 also connects U2.7(VOUT). It should connect only to its inductor. Likely cause: erc-1 reports the label SW2 attached to +3V3 items on sheet /Power/; a misplaced label joins nets without any wire.
+
+
+## Pin warnings (UNVERIFIED: a common package pinout, not this part's datasheet)
+(none)
+
+
+## Reference notes (copied from the manufacturers' documents)
+(none for the parts on this board)
+
+
+## Calculated from the netlist (verified arithmetic)
+(none: no regulator divider or headroom, charger, LED, I²C, RC, divider, decoupling, USB-C CC, over-voltage pull-up, enable loop, stuck BOOT0 or miswired UART circuit recognised)
+
+
+## Power tree (built from the netlist; inferred voltages marked)
+(no power rails found: no regulator, power switch or pass part)

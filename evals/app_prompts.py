@@ -8,10 +8,9 @@ symptoms, netlist and ERC through both calls with the app's own gateway
 client and AI_CHAT_MODEL, with what the app adds once the datasheets are
 read: each IC's datasheet found from its value and the case's
 ``parts.txt`` (the datasheet URLs a compact netlist drops) and read
-through the gateway, then the pin table and wiring findings from those
-pins, roles and typical applications (the hand-written pin table only
-where no datasheet was read), the datasheet facts, deviations, limit
-checks and budgeted power tree, as ``service._review`` builds them.
+through the gateway, then the review's input built by the app's own
+``context.build`` (pin table, wiring findings, datasheet facts,
+deviations, limit checks, budgeted power tree).
 
 Runs inside the backend container, which mounts evals/ at /evals:
   make eval-app case=rust-board-fb-swapped
@@ -48,29 +47,22 @@ from app.core.ai.chat import complete_text  # noqa: E402
 from app.core.ai.structured import complete_structured  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.features.debug import (  # noqa: E402
-    application,
-    budget,
     calc,
-    mcu,
+    context,
     pins,
-    power,
     prompt,
     reference,
-    roles,
     spice_circuits,
     spice_convert,
-    voltage,
 )
 from app.features.debug.datasheet import Datasheets, DatasheetStore, HttpFetcher  # noqa: E402
 from app.features.debug.design import Design, Node, Part  # noqa: E402
 from app.features.debug.facts import DatasheetReading, FactReader, RedisFactsCache  # noqa: E402
 from app.features.debug.schemas import (  # noqa: E402
     Analysis,
-    Calculation,
     Claim,
     DatasheetFacts,
     DatasheetStatus,
-    PowerTree,
     SimAnalysis,
     Simulation,
 )
@@ -108,68 +100,26 @@ def parse_compact(text: str) -> Design:
     return Design(parts, nets)
 
 
-def budgeted(
-    design: Design, calcs: list[Calculation], reading: DatasheetReading
-) -> PowerTree:
-    """The power tree rebuilt with the datasheets' limits and each rail's
-    budget, as ``service._budgeted_tree`` does once the facts are read."""
-    return budget.apply(
-        design, power.build(design, calcs, reading.limits), reading.limits, calcs
-    )
-
-
-def wiring(design: Design, reading: DatasheetReading) -> pins.PinLookup:
-    """The pin table and wiring findings, as ``service._wiring`` builds them:
-    pins read from a datasheet replace that IC's hand-written table lines,
-    and its pin roles and typical application recheck the wiring."""
-    return pins.lookup(
-        design,
-        datasheet_pins=reading.pins,
-        datasheet_roles=reading.roles,
-        application=reading.application,
-    )
-
-
 def build_input(
     case_dir: pathlib.Path, reading: DatasheetReading, mode: str = "debug"
-) -> tuple[str, pins.PinLookup]:
-    """The first call's user message, built as ``service._review`` builds it
-    from the datasheets' ``reading``, and the pin lookup it includes.
-    Review mode drops the symptoms."""
+) -> context.ReviewContext:
+    """The review's input for the case, built by ``context.build`` as the
+    app builds it from the datasheets' ``reading``. Review mode drops the
+    symptoms; the ERC goes in as the case's text report."""
     erc = case_dir / "erc.txt"
-    netlist = (case_dir / "netlist.txt").read_text()
-    design = parse_compact(netlist)
-    lookup = wiring(design, reading)
-    calcs = calc.lookup(design)
-    tree = budgeted(design, calcs, reading)
-    calcs = calcs + voltage.check(design, tree, reading.limits, first_id=len(calcs) + 1)
-    calcs += mcu.check(
-        design, tree, mcu.rules(design, reading.rules), first_id=len(calcs) + 1
-    )
-    deviations = application.check(design, reading.application)
-    symptoms = (
-        []
-        if mode == "review"
-        else prompt.number_symptoms((case_dir / "symptom.md").read_text())
-    )
-    user = prompt.build_user_message(
+    design = parse_compact((case_dir / "netlist.txt").read_text())
+    return context.build(
         mode="review" if mode == "review" else "debug",
-        symptoms=symptoms,
+        design=design,
+        reading=reading,
+        symptoms=[]
+        if mode == "review"
+        else prompt.number_symptoms((case_dir / "symptom.md").read_text()),
         measurements=[],
-        netlist=netlist,
-        erc=erc.read_text() if erc.exists() else "(none)",
-        pin_table=lookup.text,
-        findings=pins.format_findings(lookup.findings),
-        warnings=pins.format_warnings(lookup.warnings),
-        references=reference.format_notes(reference.lookup(design)),
-        calculations=calc.format_calculations(calcs),
-        datasheet_facts=reading.text,
-        deviations=application.format_deviations(deviations)
-        if reading.application
-        else "",
-        power=power.format_power(tree),
+        references=reference.lookup(design),
+        calculations=calc.lookup(design),
+        erc_report=erc.read_text() if erc.exists() else "(none)",
     )
-    return user, lookup
 
 
 def keyword_rank(analysis: Analysis[Claim], groups: list[list[str]] | None) -> str:
@@ -229,8 +179,8 @@ def ic_parts(case_dir: pathlib.Path, design: Design) -> list[Part]:
 async def read_datasheets(
     design: Design, parts: list[Part], fetcher: HttpFetcher
 ) -> tuple[list[DatasheetStatus], DatasheetReading]:
-    """Each IC's datasheet found and its facts read through the gateway, as
-    ``service.prepare`` and ``service._read`` do; read once per part, then
+    """Each IC's datasheet found and its facts read through the gateway with
+    the app's finder and reader, as for an upload; read once per part, then
     cached in Redis."""
     sheets = await Datasheets(
         fetcher, DatasheetStore(pathlib.Path(settings.DATASHEET_DIR))
@@ -257,17 +207,6 @@ async def simulate(
         await finder.find(parts, sheets, {}, ""), {}, Ngspice()
     )
     calcs = calc.lookup(design)
-    # Each wiring finding with a fix runs its chains again with it applied
-    # (plan 006 step 3), as service._fixes does.
-    fixes = []
-    for f in wiring(design, reading).findings:
-        if f.fix is not None:
-            fixed = roles.apply_fix(design, f.fix)
-            fixes.append(
-                spice_circuits.Fixed(
-                    f.id, f.fix, fixed, budgeted(fixed, calcs, reading)
-                )
-            )
     runner = CachedRunner(Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S))
     return [
         sim
@@ -278,8 +217,9 @@ async def simulate(
             reading,
             analyses,
             runner,
-            budgeted(design, calcs, reading),
-            fixes,
+            context.budgeted_tree(design, calcs, reading),
+            # each wiring finding with a fix runs its chains again with it applied
+            context.fixes(design, calcs, reading),
         )
     ]
 
@@ -302,7 +242,8 @@ async def run(
         if sim
         else None
     )
-    user, lookup = build_input(case_dir, reading, mode)
+    ctx = build_input(case_dir, reading, mode)
+    user = ctx.user
     review = mode == "review"
     diagnose_prompt = prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE
     structure_prompt = prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE
@@ -343,7 +284,7 @@ async def run(
         )
         or "(no issues)"
     )
-    findings = ",".join(f.pin for f in lookup.findings) or "-"
+    findings = ",".join(f.pin for f in ctx.table.findings) or "-"
     read = ",".join(reading.sources) or "-"
     print(
         f"{case:22} {mark}  datasheets {read}  findings {findings}  diagnose {diagnosed:4.0f}s  "

@@ -1,0 +1,57 @@
+## Symptoms
+s1: Dead
+s2: 3V3 rail at 0 V
+
+## Bench measurements
+m1: 0.2 ohm  (for the step: Ohms L2 to VOUT)
+
+## Netlist
+# Components
+U2  TPS63070RNMR  (TPS63070RNMR:TPS63070RNMR)  [VQFN-15]
+U9  LM358  (Amplifier:LM358)  [SOIC-8]
+L1  1u5  (Device:L)  [L_1210]
+
+# Nets
++3V3: L1.2 U2.7(VOUT) U2.9(L2)
+/Power/SW1: L1.1 U2.11(L1)
+
+
+## ERC report
+erc-1 [multiple_net_names] (warning, sheet /Power/): Both +3V3 and SW2 are attached to the same items
+    Label 'SW2'
+
+
+## Pin table (from datasheets)
+U2 (TPS63070RNMR), from its datasheet:
+  U2.9 L2: Output-side switch node. (p.4)
+No pin table for: U9.
+
+
+## Datasheet facts (read from each IC's datasheet; p.N is the PDF's page)
+U2, from https://example.com/tps63070.pdf:
+  ds1 p.5 VIN input voltage: min 2, max 16 V
+  ds2 p.4 typical application: inductor, inductor 1 µH, on pins 11, 9, allowed min 0.47, max 1 µH (p.5)
+
+
+## Deviations from the datasheets' typical applications (netlist checked against them, verified)
+dv1: U2 (TPS63070RNMR): inductor L1 1.5 µH is outside the datasheet's 0.47–1 µH (p.5).
+
+
+## Verified findings (netlist checked against the pins' roles)
+wf1: U2.9 (L2) is an inductor connection, a switch node (its datasheet: Output-side switch node. (p.4)), but its net +3V3 also connects U2.7(VOUT). It should connect only to its inductor. Likely cause: erc-1 reports the label SW2 attached to +3V3 items on sheet /Power/; a misplaced label joins nets without any wire.
+
+
+## Pin warnings (UNVERIFIED: a common package pinout, not this part's datasheet)
+(none)
+
+
+## Reference notes (copied from the manufacturers' documents)
+(none for the parts on this board)
+
+
+## Calculated from the netlist (verified arithmetic)
+(none: no regulator divider or headroom, charger, LED, I²C, RC, divider, decoupling, USB-C CC, over-voltage pull-up, enable loop, stuck BOOT0 or miswired UART circuit recognised)
+
+
+## Power tree (built from the netlist; inferred voltages marked)
+(no power rails found: no regulator, power switch or pass part)
