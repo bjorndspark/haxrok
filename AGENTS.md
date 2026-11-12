@@ -170,4 +170,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-None.
+1. `007-one-review-path-recorded.md`
