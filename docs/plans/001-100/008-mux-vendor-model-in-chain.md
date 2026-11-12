@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-12 | 2026-11-12 | in progress | — | `006-power-chain-simulated.md` (step 2: a mux is an ideal switch), `DECISIONS.md` ("SPICE models are untrusted text") |
+| 2026-11-12 | 2026-11-12 | done | — | `006-power-chain-simulated.md` (step 2: a mux is an ideal switch), `DECISIONS.md` ("SPICE models are untrusted text") |
 
 Plan 006 step 2 cuts the chain from its source and turns a mux or load
 switch on it into a zero-volt source, "as an ideal switch"
@@ -171,7 +171,7 @@ window would time out and run again as the ideal switch, labelled.
 The timeout wasn't raised.
 Effort: 3–5 h.
 
-## 3. Switchover: open
+## 3. Switchover: dropped
 
 - A run that plugs in USB (VBUS 0 → 5 V) while on the battery, and one
   that removes it, through the mux's model. The verdict reads the VDD
@@ -185,6 +185,27 @@ length are reported either way.
 
 Big: a new analysis the frontend labels, so it touches both sides.
 
-**Check:** the private board's switchover runs; a unit test for the
-verdict on a recorded dip.
-Effort: 3–5 h.
+Decided (2026-11-12): dropped, no switchover analysis (user's answer at
+the loop's blocker). TI's TPS2121 model picks its input at start-up and
+never switches after it, so a switchover run would show nothing the
+model backs up.
+
+**Checks:** hand-built runs of the private board's chain (backend
+container, ngspice 44.2, the app's nominal deck with the wrapper), rails
+pre-settled with `.ic` and `uic` (+3V3 stays at 3.27–3.31 V, PG up by
+120 µs). The model's wiring selects VBUS (IN1) when present: PR1 1.69 V
+over its 1.1 V threshold, CP2 grounded, OV1 0.88 V and OV2 0.70 V under
+their 1.1 V trip.
+
+| Run (0.8 ms, event at 150 µs) | VDD after the event | Time |
+|---|---|---|
+| VBUS 0 → 5 V in 1 µs, on VBAT | 4.796 V (VBAT) to 800 µs | 702 s |
+| VBUS 0 → 5 V in 20 µs, on VBAT | 4.796 V (VBAT) to 800 µs | 704 s |
+| VBUS on from 0 s, then opened | 4.796 V (VBAT) throughout; VBUS never drawn, held at 4.97 V by C6 | 704 s |
+
+Earlier 0.3 ms runs agreed: a VBUS stepped on at 0 s together with VBAT
+gave VDD 5.0 V, and forcing VBUS to 0 V then let VDD decay to 4.51 V in
+180 µs with no switch to VBAT. A cold start through the model (needed
+without `.ic`) takes ~1 ms of simulated time, and a 2 ms run took
+1139 s, past `NGSPICE_MODEL_TIMEOUT_S`. No code changed in this step.
+Effort: 2 h.

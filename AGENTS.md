@@ -173,4 +173,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `008-mux-vendor-model-in-chain.md`
+None.
