@@ -51,8 +51,10 @@ it stays an ideal switch, labelled as today.
 Acceptance:
 
 - The private board's chain runs from VBAT through U3's TI model to U5,
-  labelled as such. With L2 shorted, the burst into U5.9 shows; with
-  the fix, it doesn't.
+  labelled as such, as built and with the fix, both within the budget.
+  Their peaks into U5.9 go in the step's section as evidence; no burst
+  is required (`DECISIONS.md`, "Wiring faults are judged by the wiring
+  check, not a simulation's waveform").
 - In that run, the input ammeter reads the load current plus the mux's
   quiescent current (within 5 %), and the bench-supply corner can reach
   its limit.
@@ -61,7 +63,7 @@ Acceptance:
 
 Effort: about 14–22 h.
 
-## 1. The mux's model in the cut, its input current conserved: later
+## 1. The mux's model in the cut, its input current conserved: open
 
 - In `_cut`, a mux or load switch with a runnable model is instantiated
   with its board pins (`_model_pin`), like the regulator.
@@ -74,29 +76,50 @@ Effort: about 14–22 h.
 - Falls back to the ideal switch, labelled with the reason, when the
   model fails to load or converge.
 
+Decided (2026-11-12): whether a mux model needs the wrapper comes from a
+short probe run per model (a fixed load, input current against output
+current), cached by the model's digest in the run cache
+(`spice_cache.py`). It wraps only when the input current is below 10 %
+of the output current. A probe that fails to load or converge means the
+ideal-switch fallback. Not "always wrap": a model that conserves current
+would then draw it twice from the source.
+Decided (2026-11-12, default): the wrapper and its probe are a trade-off
+worth a `DECISIONS.md` entry, written in this step's commit.
+
 **Check:** unit tests for the cut with a mux model and with the
 fallback; the private board's 0.5 ms chain, shorted and fixed, against
 the table above, with `Vam_in` ≈ load current.
 Effort: 8–12 h.
 
-## 2. Fit the budget and the window: later
+## 2. Fit the budget and the window: open
 
-- Decide which runs get the mux's model: as-built and with-fix at the
-  nominal corner, and the bench supply; or every corner. Measure them
-  against `SPICE_BUDGET_S` on the private board.
+- Which runs get the mux's model, measured against `SPICE_BUDGET_S` on
+  the private board.
 - Keep long windows from running out of memory: a coarser save step
   or fewer saved vectors when the window passes 0.5 ms.
+
+Decided (2026-11-12): the nominal and bench-supply runs, as built and
+with the fix, get the mux's model first. The min/max corners get it only
+when the measured total still fits `SPICE_BUDGET_S`; otherwise they use
+the ideal switch, labelled with why.
 
 **Check:** the private board's full set of runs fits the budget; a 2 ms
 run of the shorted chain finishes.
 Effort: 3–5 h.
 
-## 3. Switchover: later
+## 3. Switchover: open
 
 - A run that plugs in USB (VBUS 0 → 5 V) while on the battery, and one
   that removes it, through the mux's model. The verdict reads the VDD
   dip and whether downstream regulators' PG drops.
 - Only with a mux model; an ideal switch would show nothing.
+
+Decided (2026-11-12): a switchover run is flagged when the mux's output
+dips below the downstream ICs' minimum supply (the level the switched
+load uses) or a downstream regulator's PG drops. The dip's depth and
+length are reported either way.
+
+Big: a new analysis the frontend labels, so it touches both sides.
 
 **Check:** the private board's switchover runs; a unit test for the
 verdict on a recorded dip.
