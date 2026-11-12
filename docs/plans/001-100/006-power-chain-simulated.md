@@ -351,8 +351,13 @@ Decided (2026-11-11): later. Its condition doesn't hold: after steps
 1–4 every planted fault in the eval cases ranks #1 (`orbit-l2-shorted`
 #1 VERIFIED, and its start-up flags the fault at the min corner). The
 no-fault case's occasional R3 suspicion is a trust problem that tool
-calls wouldn't fix. Reopen when a case's fault is missed; whether the
-gateway accepts tool calls is still unchecked.
+calls wouldn't fix. Reopen when a case's fault is missed.
+Decided (2026-11-12): still later; only the gateway question was
+answered. It accepts tool calls: through `app.core.ai`'s client and
+`AI_CHAT_MODEL`, one `add` tool came back as `finish_reason=tool_calls`
+with `{"a":17,"b":25}` (3.9 s), and the `tool` reply was answered "42"
+(2.7 s). Not checked: streaming, parallel calls, or a long loop under
+the ~90 s calls and 503s.
 
 Alternative to weigh then (not decided): expose the checks (pin table,
 datasheet, reference calculations, SPICE runs) as an MCP server instead of
