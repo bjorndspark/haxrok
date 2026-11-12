@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-11 | 2026-11-11 | In progress | — | `004-datasheets-and-simulation.md`, `005-whole-board-static-review.md`, `DECISIONS.md` ("SPICE models are untrusted text") |
+| 2026-11-11 | 2026-11-12 | done | — | `004-datasheets-and-simulation.md`, `005-whole-board-static-review.md`, `DECISIONS.md` ("SPICE models are untrusted text") |
 
 Plan 005 made the private board's fault (the TPS63070's L2 pin wired to
 its own output, +3V3) a verified static finding. The simulation still
@@ -31,6 +31,16 @@ board as built and with the fix, so the fault shows as a number. Plan
 Acceptance: the private board's chain reproduces the hand-built study:
 it settles at about 3.31 V, with bursts of more than 10 A into U5.9 at
 4.8 V, and none with L2 fixed.
+
+Decided (2026-11-12): the acceptance is that the wiring check catches
+the L2 short, not that a simulation shows its burst. The study's burst
+into U5.9 reproduces only in macOS libngspice (45.2, as KiCad 10 ships
+it, where the study ran); Linux ngspice 43 and 44.2 show none, so a
+verdict on it depends on the engine. The wiring check holds: the private
+board's U5.9 is a verified finding (plan 005), and `orbit-l2-shorted`'s
+U15.7 (a TPS63802, no hand-written pin table) comes from its datasheet
+alone, unchanged with the pin table emptied. The simulations stay as
+evidence beside the finding (step 4's min corner flags the orbit board).
 
 Effort, at plan 005's pace: about 28–46 h, roughly 4–6 working days.
 Most of the uncertainty is ngspice with TI's switching models: run time
@@ -329,7 +339,7 @@ frontend.
 board at 4.8 V and 6 V; a repeat run served from the cache.
 Effort: 4–6 h.
 
-## 5. The model plans simulations itself through tool calls: proposed
+## 5. The model plans simulations itself through tool calls: later
 
 - Only if the gateway allows tool calls and steps 1–4 leave faults in the
   eval cases uncaught.
@@ -337,6 +347,12 @@ Effort: 4–6 h.
 Decided (2026-11-11): kept as the last step, marked "ask first" in
 `AGENTS.md`'s "Current work", so a loop stops before it and the user
 decides with steps 1–4's eval results in hand.
+Decided (2026-11-11): later. Its condition doesn't hold: after steps
+1–4 every planted fault in the eval cases ranks #1 (`orbit-l2-shorted`
+#1 VERIFIED, and its start-up flags the fault at the min corner). The
+no-fault case's occasional R3 suspicion is a trust problem that tool
+calls wouldn't fix. Reopen when a case's fault is missed; whether the
+gateway accepts tool calls is still unchecked.
 
 Alternative to weigh then (not decided): expose the checks (pin table,
 datasheet, reference calculations, SPICE runs) as an MCP server instead of

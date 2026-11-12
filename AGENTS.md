@@ -170,4 +170,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `006-power-chain-simulated.md` step 5: ask first.
+None.
