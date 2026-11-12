@@ -117,7 +117,7 @@ reaching regulation in 490 µs happens with the ideal switch as well —
 the window, step 2's subject.
 Effort: 8–12 h.
 
-## 2. Fit the budget and the window: open
+## 2. Fit the budget and the window: done
 
 - Which runs get the mux's model, measured against `SPICE_BUDGET_S` on
   the private board.
@@ -129,8 +129,46 @@ with the fix, get the mux's model first. The min/max corners get it only
 when the measured total still fits `SPICE_BUDGET_S`; otherwise they use
 the ideal switch, labelled with why.
 
-**Check:** the private board's full set of runs fits the budget; a 2 ms
-run of the shorted chain finishes.
+Decided (2026-11-12, default taken in loop): `simulate` measures the
+runs with the model (seconds per simulated second). A min/max pair
+(as built and with its fix) gets the model when the time spent plus the
+pair's model runs plus every other run still queued, at its cheapest,
+divided by the two parallel slots, fits `SPICE_BUDGET_S`. Otherwise it
+gets the ideal switch, and the setup says why: the measured rate against
+what's left of the budget, no measured run, or an earlier timeout. A run
+with the model that times out (`NGSPICE_MODEL_TIMEOUT_S`) runs again as
+the ideal switch while the budget lasts, labelled "its model's run timed
+out after N s". Written up in `DECISIONS.md`.
+Decided (2026-11-12, default taken in loop): no coarser save step and no
+cut to the saved vectors. The deck already writes with `interp` at
+0.25 µs and saves six vectors. A 2 ms run of the shorted chain held
+ngspice at 15 MB peak RSS. The exit 137 above came from the study's
+deck, which wrote every vector at 20 ns.
+
+**Check:** `make lint` clean (the one old eslint warning in
+`button.tsx`); `make test` 437 backend + 52 frontend passed. The private
+board's full set through `simulate`, with the app's 900 s model timeout,
+the 1800 s budget, and VBAT given an assumed 4.0–5.6 V range so that
+min and max exist, took 968 s in all. Every run was flagged.
+
+| Run | U3 | Done at | Peak L1 / L2 | Peak in |
+|---|---|---|---|---|
+| nominal, shorted | model | 297 s | −1.79 A / 0.00 A | 2.77 A at 50.5 µs |
+| nominal, fixed | model | 299 s | −1.85 / 1.85 A at 208 µs | 2.77 A |
+| bench, shorted | ideal (step-only) | 369 s | −1.78 A / 0.00 A | 1.0 A (limit) from 157 µs |
+| bench, fixed | ideal (step-only) | 371 s | −1.73 / 1.73 A | 1.0 A (limit) |
+| min 4.0 V, shorted | model | 667 s | −1.70 A / **17.28 A at 356 µs** | 2.77 A |
+| min 4.0 V, fixed | model | 670 s | −1.73 / 1.73 A | 2.77 A |
+| max 5.6 V, shorted | model | 966 s | −2.13 A / 0.00 A | 4.14 A at 2 µs |
+| max 5.6 V, fixed | model | 968 s | −2.16 / 2.16 A | 4.14 A |
+
+The as-built min corner shows the L2 burst through U3's model. A 2 ms
+run of the shorted chain (nominal, through the app's deck) finished:
+code 0, 1139 s, 15 MB peak RSS, flagged. L1 1.79 A at 375 µs; +3V3
+reaches 3.135 V at 939 µs and settles at 3.307 V; PG rises at 1 ms.
+1139 s is past the app's 900 s model timeout, so in the app a 2 ms
+window would time out and run again as the ideal switch, labelled.
+The timeout wasn't raised.
 Effort: 3–5 h.
 
 ## 3. Switchover: open

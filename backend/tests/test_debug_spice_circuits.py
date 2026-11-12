@@ -19,6 +19,7 @@ from app.features.debug.schemas import (
     PowerRail,
     PowerTree,
     RailBudget,
+    Simulation,
     SpiceModelStatus,
     WiringFix,
 )
@@ -1308,3 +1309,106 @@ async def test_a_failed_probe_is_not_run_again_stepped():
     got = await sc.probe_muxes([_mux_status(), _status()], upload, _muxed(), _muxed_tree(), runner)
     assert isinstance(got["U3"], str) and got["U3"].startswith("its model's probe run failed")
     assert len(runner.decks) == 1
+
+
+# --- which runs get the mux's model, against the budget (plan 008 step 2) ---
+
+
+def test_a_run_with_a_mux_model_carries_its_ideal_switch_twin():
+    job = _muxed_job(sc.Mux(_mux_files(), wrap=True, share=0.02))
+    assert job.ideal is not None and job.ideal.ideal is None
+    assert '.include "tps2121.lib"' not in job.ideal.deck
+    assert any(ln.startswith("V_sw_U3") for ln in job.ideal.deck.splitlines())
+    assert f"U3 (TPS2121) as an ideal switch ({sc._FOR_TIME})" in job.ideal.limits.setup
+    because = sc._because(job.ideal, "a reason")
+    assert "as an ideal switch (a reason)" in because.limits.setup
+    # Already an ideal switch: nothing to fall back to.
+    assert _muxed_job("its model didn't load").ideal is None
+
+
+class TimedRunner(ProbeRunner):
+    """``ProbeRunner`` on a fake clock: a run with the mux's model takes
+    ``model_s``, one without it ``ideal_s``; ``timeout`` answers a model's
+    run as stopped for taking too long."""
+
+    def __init__(self, model_s: float, ideal_s: float = 50.0, timeout: bool = False) -> None:
+        super().__init__()
+        self.now, self.model_s, self.ideal_s, self.timeout = 0.0, model_s, ideal_s, timeout
+
+    async def transient(self, netlist: str, files: dict[str, bytes]) -> Run | None:
+        if "model probe" in netlist.splitlines()[0]:
+            return await super().transient(netlist, files)
+        model = "FU3 " in netlist
+        self.now += self.model_s if model else self.ideal_s
+        if model and self.timeout:
+            self.decks.append(netlist)
+            return Run(None, None, "")
+        return await super().transient(netlist, files)
+
+
+async def _timed(runner: TimedRunner, budget_s: float) -> list[Simulation]:
+    sims = [
+        s
+        async for s in sc.simulate(
+            [_mux_status(), _status()],
+            {"tps2121.lib": MUX_LIB, "tps63802.lib": TPS_LIB},
+            _muxed(),
+            _reading(),
+            ["startup"],
+            runner,
+            _muxed_tree(),
+            budget_s=budget_s,
+            clock=lambda: runner.now,
+        )
+    ]
+    return sorted(sims, key=lambda s: s.id)
+
+
+def _with_model(runner: TimedRunner) -> list[str]:
+    """Each chain deck's corner, marked by whether the mux's model was in."""
+    return [
+        ("model " if "FU3 " in d else "ideal ") + d.splitlines()[0].split(" from ")[-1]
+        for d in runner.decks
+        if "model probe" not in d.splitlines()[0]
+    ]
+
+
+async def test_the_min_and_max_runs_get_the_mux_model_when_it_fits():
+    runner = TimedRunner(model_s=400)
+    sims = await _timed(runner, budget_s=3000)
+    # nominal and bench first (800 s); min then max still fit at 400 s each.
+    assert [d.split()[0] for d in _with_model(runner)] == ["model"] * 4
+    assert len(sims) == 4 and all(s.verdict == "passed" for s in sims)
+
+
+async def test_the_min_and_max_runs_fall_back_to_the_ideal_switch_saying_why():
+    runner = TimedRunner(model_s=400)
+    sims = await _timed(runner, budget_s=1000)
+    # After 800 s, a 400 s model run (and the other corner's 50 s) leaves
+    # 1025 s: over the 1000 s; each corner then fits as an ideal switch.
+    assert [d.split()[0] for d in _with_model(runner)] == ["model", "model", "ideal", "ideal"]
+    assert [s.verdict for s in sims] == ["passed"] * 4
+    why = "its model's runs take"
+    assert [why in s.text for s in sims] == [False, False, True, True]
+    assert "more than what's left of the 16.6667 min time budget" in sims[3].text
+
+
+async def test_a_mux_model_run_that_times_out_runs_again_as_an_ideal_switch():
+    runner = TimedRunner(model_s=900, timeout=True)
+    sims = await _timed(runner, budget_s=3000)
+    marks = [d.split()[0] for d in _with_model(runner)]
+    # nominal and bench time out and run again; min and max go straight to
+    # the ideal switch.
+    assert marks == ["model", "ideal", "model", "ideal", "ideal", "ideal"]
+    assert [s.verdict for s in sims] == ["passed"] * 4
+    assert "as an ideal switch (its model's run timed out after 900 s)" in sims[0].text
+    assert "its model's run at another corner timed out after 900 s" in sims[2].text
+
+
+async def test_the_min_and_max_runs_dont_wait_on_a_measurement_that_never_comes():
+    runner = TimedRunner(model_s=400)
+    # The budget is spent by nominal: bench is skipped unmeasured, and min
+    # and max, waiting on a measurement, are skipped rather than left hanging.
+    sims = await _timed(runner, budget_s=300)
+    assert [d.split()[0] for d in _with_model(runner)] == ["model"]
+    assert [s.verdict for s in sims] == ["passed", "skipped", "skipped", "skipped"]

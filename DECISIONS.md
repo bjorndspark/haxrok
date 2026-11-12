@@ -720,3 +720,33 @@ stepped chain the inrush the source sees is the step's, through the
 mux's own soft start, not a 50 µs ramp's. The bench corner doesn't run
 such a model: on the private board, TI's TPS2121 behind a 1 A limit
 stayed off even with its input held at 4.8 V by an initial condition.
+
+## The min and max corners get a mux's model only when it fits the budget
+
+**Decision:** the nominal and bench runs on a chain with a mux's model
+run with it (as built and with each fix). Each run with the model also
+carries its ideal-switch twin (`Job.ideal`). The min and max runs wait
+until a run with the model has finished, then go with the model only
+when the run times measured so far say the pair (as built and its fixes)
+plus everything still queued at its cheapest still fits
+`SPICE_BUDGET_S` (`simulate`); otherwise they run the twin, the setup
+saying why. A run with the model that times out runs again as its twin
+while the budget lasts, and then no min or max run tries the model.
+
+**Why:** a vendor mux model roughly triples a run's time (TI's TPS2121
+in front of TI's TPS63070: about 420 s per simulated ms against about
+120 s with an ideal switch, plan 008), and the min and max corners
+double the count again. The nominal and bench runs carry the plan's
+evidence; the corners add the source's range on top.
+
+**Alternatives rejected:** the model in every run (the private board's
+full set would pass the budget on a longer window or a slower machine,
+and runs at the queue's end would be skipped outright); a fixed rule
+from the window's length (the cost depends on the model, the regulator
+and the machine, none of which the window says).
+
+**Consequence:** whether a min or max run had the mux's model depends on
+how fast this request's earlier runs went, so the same board can come
+back once with it and once without; the setup always says which. The
+estimate counts the runs still going and queued, at two at once, but
+not a run that would itself time out.

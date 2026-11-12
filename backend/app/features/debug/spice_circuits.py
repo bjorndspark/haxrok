@@ -57,7 +57,11 @@ nominal only.
 as built before its fix) and yields each verdict as it finishes. A run
 that times out or fails is ``timed_out`` or ``failed``, with ngspice's
 error; it never fails the request. A run still queued when the request's
-``SPICE_BUDGET_S`` is spent is ``skipped``.
+``SPICE_BUDGET_S`` is spent is ``skipped``. A mux's model goes in the
+nominal and bench runs; the min and max runs get it only when the
+measured run times still fit the budget (plan 008 step 2), else an ideal
+switch, saying why, as does a model's run that timed out and ran again
+without it.
 """
 
 import asyncio
@@ -128,6 +132,13 @@ _PROBE_STOP = 1e-3
 _PROBE_AVERAGE = 0.2e-3
 _PROBE_UP = 0.5  # the output came up: it draws at least this share of the load
 _WRAP_BELOW = 0.1
+# The corners whose runs take a mux's model only when the runs with it so
+# far, measured, say it still fits the time budget (plan 008 step 2);
+# nominal and bench take it whenever it's planned.
+_MEASURED = ("min", "max")
+# A mux's reason, in an ideal-switch twin's setup, until ``simulate`` says
+# why it ran that one (``_because``).
+_FOR_TIME = "its model is left out of this run for time"
 # ``meas tran iin AVG …`` prints "iin = 1.000e-01 from= … to= …".
 _PROBE_MEAS = re.compile(r"^(iin|iout)\s*=\s*(\S+)", re.MULTILINE | re.IGNORECASE)
 # The chain's source, best first (plan 006 step 2); an upstream regulator's
@@ -244,6 +255,11 @@ class Job:
     corner: str = "nominal"  # Corner.name
     fix_of: str | None = None  # a with-fix run: the as-built run it pairs with
     finding: str | None = None  # and the WiringFinding whose fix it applies
+    # The same run with each mux on its chain as an ideal switch, the reason
+    # said as ``_FOR_TIME``: set when a mux's model is in this one (plan 008
+    # step 2). ``simulate`` runs it instead when the model doesn't fit the
+    # time budget or its run times out.
+    ideal: "Job | None" = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
@@ -1206,7 +1222,20 @@ def plan(
         return None
     if isinstance(cut, str):
         return Skip(ref, title, cut)
-    jobs = _jobs(ref, design, m, reading, analyses, rate, cut, title, NOMINAL)
+
+    def twinned(at: _Cut, corner: Corner, what: Sequence[SimAnalysis]) -> list[Job]:
+        """The corner's jobs, each with its ideal-switch twin when a mux's
+        model is in its cut."""
+        jobs = _jobs(ref, design, m, reading, what, rate, at, title, corner)
+        if not at.files:
+            return jobs
+        plain = _cut(design, ref, m, status, rate, tree, corner, _without_models(muxes))
+        if not isinstance(plain, _Cut):
+            return jobs
+        twins = _jobs(ref, design, m, reading, what, rate, plain, title, corner)
+        return [replace(j, ideal=t) for j, t in zip(jobs, twins, strict=True)]
+
+    jobs = twinned(cut, NOMINAL, analyses)
     if "startup" not in analyses:
         return jobs
     corners = [Corner("bench", limit=settings.BENCH_CURRENT_LIMIT_A)]
@@ -1220,8 +1249,20 @@ def plan(
         if not isinstance(at, _Cut):
             logger.info("spice circuits: %s at %s isn't planned: %s", ref, corner.name, at)
             continue
-        jobs += _jobs(ref, design, m, reading, ["startup"], rate, at, title, corner)
+        jobs += twinned(at, corner, ["startup"])
     return jobs
+
+
+def _without_models(muxes: Mapping[str, Mux | str] | None) -> dict[str, Mux | str]:
+    """``muxes`` with each model left out for time (``_FOR_TIME``)."""
+    return {ref: _FOR_TIME if isinstance(m, Mux) else m for ref, m in (muxes or {}).items()}
+
+
+def _because(job: Job, reason: str) -> Job:
+    """An ideal-switch twin, its setup saying ``reason`` for leaving the
+    mux's model out instead of ``_FOR_TIME``."""
+    setup = job.limits.setup.replace(_FOR_TIME, reason)
+    return replace(job, limits=replace(job.limits, setup=setup))
 
 
 def _jobs(
@@ -1727,6 +1768,41 @@ def _queued(jobs: list[tuple[str, Job]]) -> list[tuple[str, Job]]:
     return sorted(jobs, key=rank)
 
 
+class _Took:
+    """The measured run times of a request's runs, to judge whether the
+    min/max runs can have a mux's model (plan 008 step 2)."""
+
+    def __init__(self) -> None:
+        self._s: dict[bool, float] = {True: 0.0, False: 0.0}
+        self._stop: dict[bool, float] = {True: 0.0, False: 0.0}
+        self.timed_out: float | None = None  # a model's run stopped after this long
+
+    def add(self, job: Job, seconds: float) -> None:
+        """Count ``job``'s run, ``seconds`` long."""
+        model = job.ideal is not None
+        self._s[model] += seconds
+        self._stop[model] += job.limits.stop
+
+    def rate(self, model: bool) -> float | None:
+        """Seconds per simulated second of the runs with (or without) a
+        mux's model; None before one finished."""
+        return self._s[model] / self._stop[model] if self._stop[model] else None
+
+    def cost(self, job: Job) -> float:
+        """``job``'s expected run time: its own kind's rate, else the
+        model's (the slower), else nothing measured yet."""
+        model = job.ideal is not None
+        rate = self.rate(model)
+        if rate is None:
+            rate = self.rate(model=True) or 0.0
+        return rate * job.limits.stop
+
+
+def _cheapest(job: Job) -> Job:
+    """The run ``job`` becomes at the least: a min/max run's ideal twin."""
+    return job.ideal if job.ideal is not None and job.corner in _MEASURED else job
+
+
 def _runnable(statuses: Iterable[SpiceModelStatus]) -> list[SpiceModelStatus]:
     return [s for s in statuses if s.loads and s.status in MODES and s.subckt]
 
@@ -1752,7 +1828,12 @@ async def simulate(
     (nominal, bench, min, max), each as built before its fix; one still
     queued after ``budget_s`` (default ``SPICE_BUDGET_S``) of ``clock`` is
     skipped. Each mux on a chain is probed first (``probe_muxes``), inside
-    the budget. Closing the iterator early cancels the runs still going."""
+    the budget. A run with a mux's model that times out runs again with
+    the mux as an ideal switch. The min and max runs get the model only
+    when the measured run times say it still fits the budget (plan 008
+    step 2); otherwise, or with nothing measured, the ideal switch, the
+    setup saying why. Closing the iterator early cancels the runs still
+    going."""
     if not analyses:
         return
     start = clock()
@@ -1798,16 +1879,87 @@ async def simulate(
     jobs = _queued(jobs)
     budget = settings.SPICE_BUDGET_S if budget_s is None else budget_s
     gate = asyncio.Semaphore(_PARALLEL)
+    took = _Took()
+    measure = any(j.ideal is not None for _, j in jobs)  # only with a mux's model
+    # A min or max run that could have a mux's model waits until a run with
+    # it is measured: the event is set once one finishes, or none is left to.
+    first = [i for i, j in jobs if j.ideal is not None and j.corner not in _MEASURED]
+    measured = asyncio.Event()
+    if not first:
+        measured.set()
+    unstarted = dict(jobs)
+    running: dict[str, tuple[float, Job]] = {}
+    decided: dict[str, str | None] = {}  # pair's anchor id -> why not the model
+
+    def fits(key: str) -> str | None:
+        """None when the pair ``key`` (an as-built run and its fixes) can
+        have the mux's model within the budget, else why not."""
+        if took.timed_out is not None:
+            return f"its model's run at another corner timed out after {took.timed_out:.0f} s"
+        rate = took.rate(model=True)
+        if rate is None:
+            return "no run with its model finished, to measure it against the time budget"
+        pair = {i for i, j in unstarted.items() if key in (i, j.fix_of)}
+        now = clock()
+        own = sum(rate * unstarted[i].limits.stop for i in pair)
+        rest = sum(took.cost(_cheapest(j)) for i, j in unstarted.items() if i not in pair)
+        going = sum(max(0.0, took.cost(j) - (now - at)) for at, j in running.values())
+        if now - start + (own + rest + going) / _PARALLEL <= budget:
+            return None
+        return (
+            f"its model's runs take {rate * 1e-3:.0f} s per simulated ms, more than "
+            f"what's left of the {budget / 60:g} min time budget"
+        )
+
+    def choose(sim_id: str, job: Job) -> Job:
+        """The run to start for ``job``: itself, or its ideal twin when a
+        min/max pair's model doesn't fit the budget."""
+        if job.ideal is None or job.corner not in _MEASURED:
+            return job
+        key = job.fix_of or sim_id
+        if key not in decided:
+            decided[key] = fits(key)
+        why = decided[key]
+        return job if why is None else _because(job.ideal, why)
 
     async def one(sim_id: str, job: Job) -> Simulation | None:
-        async with gate:
-            if clock() - start >= budget:
-                logger.info("spice circuits: %s %s over the time budget", job.ref, job.title)
-                return over_budget(sim_id, job, budget)
-            run = await runner.transient(job.deck, job.files)
+        if job.ideal is not None and job.corner in _MEASURED:
+            await measured.wait()
+        try:
+            async with gate:
+                at = clock()
+                if at - start >= budget:
+                    logger.info("spice circuits: %s %s over the time budget", job.ref, job.title)
+                    return over_budget(sim_id, job, budget)
+                go = choose(sim_id, job)
+                del unstarted[sim_id]
+                running[sim_id] = (at, go)
+                run = await runner.transient(go.deck, go.files)
+                if measure:
+                    spent = clock() - at
+                    took.add(go, spent)
+                if run is not None and run.code is None and go.ideal is not None:
+                    # Its model's run timed out: the ideal switch, while the
+                    # budget lasts.
+                    logger.info(
+                        "spice circuits: %s %s timed out with a mux's model", job.ref, job.title
+                    )
+                    took.timed_out = spent
+                    if clock() - start < budget:
+                        go = _because(go.ideal, f"its model's run timed out after {spent:.0f} s")
+                        at = clock()
+                        running[sim_id] = (at, go)
+                        run = await runner.transient(go.deck, go.files)
+                        took.add(go, clock() - at)  # measure is set: go had a twin
+                del running[sim_id]
+        finally:
+            if sim_id in first:
+                first.remove(sim_id)
+                if not first or took.rate(model=True) is not None:
+                    measured.set()
         if run is None:
             return None  # ngspice isn't installed
-        sim = result(sim_id, job, run)
+        sim = result(sim_id, go, run)
         logger.info("spice circuits: %s %s %s", job.ref, job.analysis, sim.verdict)
         return sim
 
