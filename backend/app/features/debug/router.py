@@ -205,5 +205,6 @@ async def rerun(req: RerunRequest) -> SuccessResponse[Simulation]:
 async def ask_result(req: ResultAskRequest) -> SuccessResponse[AskAnswer]:
     """Answer a follow-up question about a finished run. The browser sends
     the design summary, the checked result and the conversation so far each
-    time; nothing is stored."""
-    return ok(AskAnswer(answer=await service.ask_result(req, _answer)))
+    time. With the run's ``run_id`` the turn is appended to its record."""
+    rec = record.existing(Path(settings.DEBUG_RUN_DIR), req.run_id)
+    return ok(AskAnswer(answer=await service.ask_result(req, _answer, rec)))

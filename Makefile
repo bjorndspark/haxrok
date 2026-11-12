@@ -1,7 +1,7 @@
 .PHONY: help infra infra-down infra-logs dev build install \
 	test test-backend test-frontend \
 	lint lint-ruff lint-ruff-format lint-mypy lint-eslint lint-tsc lint-prettier format \
-	down logs clean purge issues fix-issue docs docs-serve eval-app spice-corpus
+	down logs clean purge issues fix-issue docs docs-serve eval-app spice-corpus replay
 
 help:
 	@echo "Usage: make <target>"
@@ -23,6 +23,7 @@ help:
 	@echo "  docs-serve browse docs/ with mkdocs at http://localhost:\$$DOCS_HOST_PORT"
 	@echo "  eval-app   run an eval case through the app's debug prompts: make eval-app case=rust-board-fb-swapped [mode=review] [sim=startup]"
 	@echo "  spice-corpus  download TI's SPICE models (plus data/spice-corpus/manual/) and load-check each in ngspice"
+	@echo "  replay     re-check a recorded run's answer with the current checker, no model call: make replay run=<id>"
 	@echo "  issues     list open GitHub issues"
 	@echo "  fix-issue  hand an issue to an AI agent: make fix-issue n=123 [agent=devin]"
 	@echo "  clean      remove dev artifacts (logs, caches, build output)"
@@ -115,6 +116,13 @@ eval-app:
 spice-corpus:
 	docker compose exec --user $(shell id -u):$(shell id -g) -e LOG_FILE= \
 		backend .venv/bin/python /app/scripts/spice_corpus.py
+
+# A recorded run (data/runs/<id>.jsonl) re-checked with today's evidence
+# checker (backend/scripts/replay.py); no model call, no Redis.
+replay:
+	@test -n "$(run)" || { echo "usage: make replay run=<id> (ls data/runs/)"; exit 2; }
+	docker compose exec --user $(shell id -u):$(shell id -g) -e LOG_FILE= \
+		backend .venv/bin/python /app/scripts/replay.py --run $(run)
 
 # `compose run` (not exec): exec can't publish a port. ENVIRONMENT= skips the
 # entrypoint's dev dep sync. The run container starts from the image (no dev

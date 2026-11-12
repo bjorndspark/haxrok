@@ -55,7 +55,6 @@ from app.features.debug.design import (
     parse_labels,
     parse_netlist,
 )
-from app.features.debug.evidence import check
 from app.features.debug.facts import DatasheetReading, FactReader
 from app.features.debug.kicad import KicadRunner
 from app.features.debug.project import load_project
@@ -524,11 +523,7 @@ async def _review(
         time.monotonic() - start,
     )
     yield _progress("checking", "Checking every citation against your schematic.")
-    checked = check(analysis, ctx.evidence)
-    miswired = diagram.miswired_pins(ctx.table.findings, ctx.calculations)
-    checked.diagrams = {
-        h.id: d for h in checked.hypotheses if (d := diagram.build(h, prepared.design, miswired))
-    }
+    checked = diagram.checked(analysis, ctx.evidence, ctx.table.findings, ctx.calculations)
     yield _event("result", checked.model_dump_json())
 
 
@@ -584,13 +579,27 @@ async def rerun(req: RerunRequest, runner: spice.SpiceRunner) -> Simulation:
     return new
 
 
-async def ask_result(req: ResultAskRequest, answer: Answerer) -> str:
+async def ask_result(
+    req: ResultAskRequest, answer: Answerer, recorder: record.Recorder | None = None
+) -> str:
     """The model's answer to a follow-up question about a finished run,
-    from the design summary and checked result the browser sent back."""
+    from the design summary and checked result the browser sent back. The
+    question and answer go to the run's record as an ``ask`` line."""
     start = time.monotonic()
-    text = await answer(
-        prompt.in_language(prompt.ASK_RESULT, req.language),
-        prompt.build_result_ask_message(req.summary, req.result, req.history, req.question),
+    text = (
+        await answer(
+            prompt.in_language(prompt.ASK_RESULT, req.language),
+            prompt.build_result_ask_message(req.summary, req.result, req.history, req.question),
+        )
+    ).strip()
+    (recorder or record.NoRecorder()).append(
+        "ask",
+        {
+            "question": req.question,
+            "language": req.language,
+            "answer": text,
+            "seconds": round(time.monotonic() - start, 1),
+        },
     )
     logger.info(
         "ask about %s (%s run, %d findings) in %.1fs: %r",
@@ -600,7 +609,7 @@ async def ask_result(req: ResultAskRequest, answer: Answerer) -> str:
         time.monotonic() - start,
         req.question,
     )
-    return text.strip()
+    return text
 
 
 def _progress(stage: str, message: str) -> SseEvent:

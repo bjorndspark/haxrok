@@ -959,14 +959,21 @@ class RerunRequest(BaseModel):
 
 class ResultAskRequest(BaseModel):
     """A follow-up question about a finished run: the design summary and the
-    checked result it produced. Nothing is stored, so both and the
-    conversation so far come with every question, as with ``AskRequest``."""
+    checked result it produced. Both and the conversation so far come with
+    every question, as with ``AskRequest``; ``run_id`` only names the record
+    the turn is appended to, so a deleted record never fails a follow-up."""
 
     summary: DesignSummary
     result: CheckedAnalysis
     question: str = Field(min_length=1, max_length=1000)
     history: list[AskTurn] = Field(default_factory=list, max_length=10)
     language: Language = "en"
+    run_id: str = Field(
+        default="",
+        max_length=40,
+        description="The run's id from its summary: the question and answer are appended "
+        "to its record. Empty, unknown or deleted: nothing is recorded.",
+    )
 
 
 class AskAnswer(BaseModel):

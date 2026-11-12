@@ -11,7 +11,9 @@ roughly in the order a run writes them:
   check and the diagrams read (``context_data``), so a recorded answer can
   be checked again without a model call;
 - ``model``: one per model call: its name, which prompt, the answer, seconds;
-- ``event``: each SSE event as sent, the result included.
+- ``event``: each SSE event as sent, the result included;
+- ``ask``: each follow-up question about the result and its answer
+  (``/debug/ask-result`` with the run's id), after the run.
 
 Events are written as the stream sends them; ``context`` and ``model`` lines
 are written as the review makes them, which can be ahead of the events it
@@ -20,23 +22,28 @@ has queued. Each line's ``at`` is from ``get_clock()``.
 Writing fails open, like the answer cache: an error is logged once and the
 run goes on unrecorded. A line is a small blocking append, not worth a
 thread. Records are kept until deleted by hand (see ``DECISIONS.md``,
-"Runs are recorded as files").
+"Runs are recorded as files"). ``load`` and ``evidence_context`` read one
+back, for ``replay``.
 """
 
 import dataclasses
 import hashlib
 import json
+import re
 import secrets
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
 from app.core.clock import get_clock
 from app.core.logging import get_logger
 from app.features.debug.context import ReviewContext
-from app.features.debug.design import Design
+from app.features.debug.design import Design, Node, Part
+from app.features.debug.evidence import EvidenceContext
+from app.features.debug.schemas import Calculation, ErcEntry, WiringFinding
 
 logger = get_logger(__name__)
 
@@ -99,6 +106,26 @@ class FileRecorder:
             self._failed = True
 
 
+# What ``new_run_id`` makes. A run id from the browser is checked against
+# it before it names a file, so it can't point outside the runs folder.
+RUN_ID = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")
+
+
+def existing(folder: Path, run_id: str) -> Recorder:
+    """A recorder that appends to the run's record if it is there, else one
+    that records nothing: an empty or malformed id, or a record deleted by
+    hand. A follow-up never starts a record of its own."""
+    if RUN_ID.fullmatch(run_id) and (folder / f"{run_id}.jsonl").is_file():
+        return FileRecorder(folder, run_id)
+    return NoRecorder()
+
+
+def load(path: Path) -> list[dict[str, Any]]:
+    """A record's lines, in order: ``{"at", "kind", "data"}`` each."""
+    with path.open(encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
 def new_run_id() -> str:
     """A run id that sorts by start time and is safe as a file name:
     ``20261112-153012-a1b2c3`` (UTC)."""
@@ -141,6 +168,42 @@ def context_data(ctx: ReviewContext) -> dict[str, object]:
         "wiring": ctx.table.findings,
         "calculations": ctx.calculations,
     }
+
+
+def design_from(data: Mapping[str, Any]) -> Design:
+    """The design ``design_data`` wrote."""
+    return Design(
+        {ref: Part(**p) for ref, p in data["parts"].items()},
+        {name: [Node(**n) for n in nodes] for name, nodes in data["nets"].items()},
+    )
+
+
+@dataclass(frozen=True)
+class Recorded:
+    """What a ``context`` line gives back: the evidence check's input, and
+    the wiring findings and calculations the diagrams read."""
+
+    evidence: EvidenceContext
+    findings: list[WiringFinding]
+    calculations: list[Calculation]
+
+
+def evidence_context(data: Mapping[str, Any]) -> Recorded:
+    """The ``context`` line read back (``context_data`` wrote it)."""
+    erc = [ErcEntry.model_validate(e) for e in data["erc"]]
+    return Recorded(
+        evidence=EvidenceContext(
+            design=design_from(data["design"]),
+            erc={e.id: e for e in erc},
+            pin_data=frozenset(data["pin_data"]),
+            symptom_ids=frozenset(data["symptom_ids"]),
+            measurement_ids=frozenset(data["measurement_ids"]),
+            reference_ids=frozenset(data["reference_ids"]),
+            datasheet_ids=frozenset(data["datasheet_ids"]),
+        ),
+        findings=[WiringFinding.model_validate(w) for w in data["wiring"]],
+        calculations=[Calculation.model_validate(c) for c in data["calculations"]],
+    )
 
 
 def _encode(value: object) -> object:

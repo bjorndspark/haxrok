@@ -649,7 +649,10 @@ orbit board), but an eval doesn't fail when it doesn't.
 `data/runs/<run id>.jsonl` (`DEBUG_RUN_DIR`, `features/debug/record.py`):
 the input (the files as SHA-256 digests, not the files), the context the
 model read and its answer is checked against, each model answer and every
-SSE event as sent. The run id reaches the browser in the design summary.
+SSE event as sent, then each follow-up question and its answer (the
+browser sends the run id it got in the design summary). `make replay
+run=<id>` checks the recorded answer again with the current evidence
+check, with no model call.
 Records are kept until deleted by hand, like `data/datasheets/`.
 
 **Why:** before this a run's state was spread over the SSE stream, the

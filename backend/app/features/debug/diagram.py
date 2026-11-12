@@ -13,10 +13,13 @@ names.
 from collections import Counter
 
 from app.features.debug.design import Design, is_ic, is_inductor, normalize_pin
-from app.features.debug.evidence import mentioned_pins
+from app.features.debug.evidence import EvidenceContext, check, mentioned_pins
 from app.features.debug.schemas import (
+    Analysis,
     Calculation,
+    CheckedAnalysis,
     CheckedClaim,
+    Claim,
     Diagram,
     DiagramMember,
     DiagramNet,
@@ -34,6 +37,23 @@ MAX_MEMBERS = 4
 # (TX on TX, EN on its own output; the UI's "miswired" badge), or onto a
 # rail above their absolute maximum (pin_voltage).
 _MISWIRED_KINDS = {"uart", "enable_pin", "pin_voltage", "mcu_pin"}
+
+
+def checked(
+    analysis: Analysis[Claim],
+    evidence: EvidenceContext,
+    findings: list[WiringFinding],
+    calculations: list[Calculation],
+) -> CheckedAnalysis:
+    """The model's answer as the user gets it: every reference checked
+    (``evidence.check``), then a diagram per hypothesis. A live review and a
+    replay of a recorded one (``replay``) both end here."""
+    result = check(analysis, evidence)
+    miswired = miswired_pins(findings, calculations)
+    result.diagrams = {
+        h.id: d for h in result.hypotheses if (d := build(h, evidence.design, miswired))
+    }
+    return result
 
 
 def miswired_pins(findings: list[WiringFinding], calculations: list[Calculation]) -> set[str]:

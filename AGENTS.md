@@ -111,6 +111,9 @@ frontend/src/
 - `make spice-corpus` — download TI's SPICE models through the app's finder
   (plus any put in `data/spice-corpus/manual/`) and load-check each in
   ngspice (`backend/scripts/spice_corpus.py`); not committed, not in CI
+- `make replay run=<id>` — re-check a recorded run (`data/runs/<id>.jsonl`)
+  with the current evidence check and diagrams, no model call; prints the
+  claims, problems and diagrams that changed (`backend/scripts/replay.py`)
 - `make docs` — regenerate `docs/architecture/api/routes.md` from the route
   table; run after changing routes
 - CI runs the same checks on GitHub Actions (`.github/workflows/`) on pushes
@@ -170,4 +173,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `007-one-review-path-recorded.md`
+None.

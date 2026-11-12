@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-12 | 2026-11-12 | in progress (steps 1–2 done) | — | `DECISIONS.md` ("No database", "Evidence labels are checked references", "Debug analysis is two model calls"), `evals/app_prompts.py` |
+| 2026-11-12 | 2026-11-12 | done | — | `DECISIONS.md` ("No database", "Evidence labels are checked references", "Debug analysis is two model calls"), `evals/app_prompts.py` |
 
 A review of the debug pipeline against the usual advice for apps built
 around a model ("keep the core small, keep one append-only log as the
@@ -171,7 +171,7 @@ under the dev server, and the live run's log lines (its `run <id>` line
 included) are in neither the log nor its archive; the tests share the
 server's log file.
 
-## 3. Replay and follow-ups from the record
+## 3. Replay and follow-ups from the record: done
 
 - `make replay run=<id>`: reads a record, rebuilds the `EvidenceContext`
   from its `context` line, parses the `debug_analysis` answer as
@@ -193,3 +193,37 @@ Big: touches the backend and the frontend.
 reports no change; with a changed checker it reports the change), one
 live run with a follow-up, then `make replay` on it.
 Effort: 4–8 h.
+
+Decided (2026-11-12), default taken in loop: the design is rebuilt from
+the JSON step 2 records (`record.design_from`), not by parsing the
+compact netlist back; `record.evidence_context` rebuilds the
+`EvidenceContext`, wiring findings and calculations from the `context`
+line.
+Decided (2026-11-12), default taken in loop: `diagram.checked` (check,
+then draw with the miswired pins) is the one function `_review` and the
+replay both call, so the replay can't drift from the app the way the
+evals did.
+Decided (2026-11-12), default taken in loop: `make replay` exits 0
+whether or not something changed and 2 when the record can't be replayed
+(bad id, no file, or no context, structured answer or result line). It
+reports problems added or gone and diagrams changed, besides claims.
+Decided (2026-11-12), default taken in loop: a follow-up's `run_id` is
+checked against the run id pattern and appended to only when the record
+exists (`record.existing`); an empty, unknown or malformed id records
+nothing and the answer is still returned. A follow-up never creates a
+record. The `ask` line holds the question, language, answer and seconds.
+
+**Checks:** `make lint` passes (ESLint warnings in frontend code this
+step doesn't touch). `make test`: 419 backend tests and 52 frontend tests
+pass, including the replay of a faked run's record (no change), the same
+record with a checker that fails `pin_function` cites (claim `h1 claim 2`
+goes from `datasheet` to downgraded), a record cut off before its result
+(can't be replayed), a follow-up appended to an existing record only, and
+the route test with a real and an unknown run id. The frontend sends the
+summary's `run_id`; there's no hook test setup, so that line is checked
+only by `tsc` and the live run. One live run of `rust-board-fb-swapped`
+(both answers from the cache, 3 s) wrote `20261112-023001-f5874a`; a
+follow-up with its id (20 s) appended one `ask` line; `make replay` on
+it and on step 2's record printed "no change", and a bad id exits 2.
+`make docs`: the routes doc doesn't change.
+Bugs found: none beyond an import order `ruff` caught.

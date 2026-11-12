@@ -16,7 +16,7 @@ import pytest
 from app.core.clock import FakeClock, SystemClock, set_clock
 from app.core.config import settings
 from app.core.errors import BadRequestError, UpstreamError
-from app.features.debug import diagram, pins, prompt, record, router, service
+from app.features.debug import diagram, evidence, pins, prompt, record, replay, router, service
 from app.features.debug.calc import lookup as calc_lookup
 from app.features.debug.design import Design, Label, Node, Part, parse_labels, parse_netlist
 from app.features.debug.evidence import EvidenceContext
@@ -1331,6 +1331,84 @@ async def test_an_unrecorded_run_has_no_run_id():
     assert events[0][1]["run_id"] == ""
 
 
+async def _recorded_run(folder: pathlib.Path) -> pathlib.Path:
+    """A faked run recorded to ``folder``; the record's path."""
+    recorder = record.FileRecorder(folder, record.new_run_id())
+    prepared = await service.prepare(
+        _files(), "Dead board", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
+    async for _ in service.stream(
+        prepared, service.Model(_diagnose, _structure), recorder=recorder
+    ):
+        pass
+    return recorder.path
+
+
+async def test_a_replayed_record_matches_its_result(tmp_path):
+    lines = record.load(await _recorded_run(tmp_path))
+    r = replay.replay(lines)
+    assert r.unchanged
+    sent = next(line["data"]["data"] for line in lines if line["data"].get("event") == "result")
+    assert r.result.model_dump(mode="json") == sent
+    # The fixture's result has a diagram and a downgraded claim (m2 was never
+    # measured), so both made the round trip.
+    assert r.result.diagrams and r.result.hypotheses[0].claims[2].downgraded
+
+
+async def test_a_replay_names_the_claims_a_changed_checker_labels_differently(
+    tmp_path, monkeypatch
+):
+    lines = record.load(await _recorded_run(tmp_path))
+    # A stricter checker: no pin function resolves any more.
+    real = evidence._cite_failure
+    monkeypatch.setattr(
+        evidence,
+        "_cite_failure",
+        lambda cite, ctx: (
+            "pin functions are off" if cite.kind == "pin_function" else real(cite, ctx)
+        ),
+    )
+    r = replay.replay(lines)
+    assert [(c.where, c.before) for c in r.claims] == [("h1 claim 2", "datasheet")]
+    assert r.claims[0].after == "none (downgraded from datasheet: pin functions are off)"
+    assert not r.problems_added and not r.problems_removed
+
+
+async def test_a_run_cut_off_before_its_result_cant_be_replayed(tmp_path):
+    lines = [line for line in record.load(await _recorded_run(tmp_path)) if line["kind"] != "event"]
+    with pytest.raises(ValueError, match="no event line"):
+        replay.replay(lines)
+
+
+def test_a_follow_up_appends_only_to_a_record_that_exists(tmp_path):
+    (tmp_path / "20261112-063000-a1b2c3.jsonl").write_text("")
+    assert isinstance(record.existing(tmp_path, "20261112-063000-a1b2c3"), record.FileRecorder)
+    for run_id in ("", "20261112-063000-ffffff", "../20261112-063000-a1b2c3", "x"):
+        assert isinstance(record.existing(tmp_path, run_id), record.NoRecorder)
+
+
+async def test_ask_result_appends_the_turn_to_the_record(tmp_path):
+    from app.features.debug.schemas import ResultAskRequest
+
+    summary, result = await _finished_run()
+    recorder = record.FileRecorder(tmp_path, "20261112-063000-a1b2c3")
+
+    async def answer(system: str, user: str) -> str:
+        return " Rewire U2.9.\n"
+
+    req = ResultAskRequest.model_validate(
+        {"summary": summary, "result": result, "question": "Fix?", "language": "ja"}
+    )
+    await service.ask_result(req, answer, recorder)
+    [line] = record.load(recorder.path)
+    assert line["kind"] == "ask"
+    assert {k: line["data"][k] for k in ("question", "language", "answer")} == {
+        "question": "Fix?",
+        "language": "ja",
+        "answer": "Rewire U2.9.",
+    }
+
+
 async def test_simulations_stream_alongside_the_model_and_the_result_comes_last():
     import asyncio
 
@@ -1869,6 +1947,30 @@ async def test_ask_result_answers_in_the_envelope(client, monkeypatch):
     del summary["datasheets"]
     res = await client.post("/api/v1/debug/ask-result", json=body)
     assert res.status_code == 200
+
+
+async def test_ask_result_with_a_run_id_records_the_turn(client, monkeypatch, fake_backends):
+    async def answer(system: str, user: str) -> str:
+        return "Rewire U2.9."
+
+    monkeypatch.setattr(router, "_answer", answer)
+    files = [("files", (name, data)) for name, data in _files()]
+    res = await client.post("/api/v1/debug/analyze", files=files, data={"symptoms": "Dead"})
+    summary = json.loads(
+        res.text.split("event: design_summary")[1].split("data: ")[1].split("\r\n")[0]
+    )
+    result = json.loads(res.text.split("event: result")[1].split("data: ")[1].split("\r\n")[0])
+    body = {"summary": summary, "result": result, "question": "Fix?", "run_id": summary["run_id"]}
+    res = await client.post("/api/v1/debug/ask-result", json=body)
+    assert res.status_code == 200
+    path = pathlib.Path(settings.DEBUG_RUN_DIR) / f"{summary['run_id']}.jsonl"
+    assert record.load(path)[-1]["kind"] == "ask"
+
+    # An id that names no record answers all the same and writes nothing.
+    body["run_id"] = "20261112-063000-ffffff"
+    res = await client.post("/api/v1/debug/ask-result", json=body)
+    assert res.status_code == 200
+    assert sorted(p.name for p in path.parent.iterdir()) == [path.name]
 
 
 # --- reference designs ------------------------------------------------------------------------

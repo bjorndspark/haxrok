@@ -283,11 +283,20 @@ export function useSimulationChat(runNumber: number, sim: Simulation): Chat {
 }
 
 /** Follow-up questions about a finished run: its summary and checked
- *  result go back with every question. */
+ *  result go back with every question, and its run id, so the server
+ *  appends each turn to the run's record. */
 export function useResultChat(run: Run, summary: DesignSummary, result: CheckedAnalysis): Chat {
   return useChat(
     run.resultChat,
-    (question, history, language) => askResult({ summary, result, question, history, language }),
+    (question, history, language) =>
+      askResult({
+        summary,
+        result,
+        question,
+        history,
+        language,
+        run_id: summary.run_id ?? "",
+      }),
     (turn) => {
       useDebugStore.getState().addResultTurn(run.number, turn)
     },

@@ -506,6 +506,9 @@ export interface DesignSummary {
   datasheet_failures?: DatasheetReadFailure[]
   /** Absent in runs recorded before it existed. */
   power?: PowerTree | null
+  /** The run's record on the server (data/runs/<run_id>.jsonl); empty when
+   *  it isn't recorded, absent in runs from before records. */
+  run_id?: string
 }
 
 export type ProgressStage = "pin_lookup" | "reasoning" | "structuring" | "checking"
@@ -576,6 +579,8 @@ export interface ResultAskRequest {
   question: string
   history: AskTurn[]
   language: Language
+  /** Appends the turn to the run's record; "" records nothing. */
+  run_id: string
 }
 
 export interface AskAnswer {
