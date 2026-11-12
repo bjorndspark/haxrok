@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-11 | 2026-11-12 | done | — | `004-datasheets-and-simulation.md`, `005-whole-board-static-review.md`, `DECISIONS.md` ("SPICE models are untrusted text") |
+| 2026-11-11 | 2026-11-13 | done | — | `004-datasheets-and-simulation.md`, `005-whole-board-static-review.md`, `DECISIONS.md` ("SPICE models are untrusted text") |
 
 Plan 005 made the private board's fault (the TPS63070's L2 pin wired to
 its own output, +3V3) a verified static finding. The simulation still
@@ -339,7 +339,7 @@ frontend.
 board at 4.8 V and 6 V; a repeat run served from the cache.
 Effort: 4–6 h.
 
-## 5. The model plans simulations itself through tool calls: later
+## 5. The model plans simulations itself through tool calls: dropped
 
 - Only if the gateway allows tool calls and steps 1–4 leave faults in the
   eval cases uncaught.
@@ -358,8 +358,21 @@ answered. It accepts tool calls: through `app.core.ai`'s client and
 with `{"a":17,"b":25}` (3.9 s), and the `tool` reply was answered "42"
 (2.7 s). Not checked: streaming, parallel calls, or a long loop under
 the ~90 s calls and 503s.
+Decided (2026-11-13): dropped (user's answer). No case gives a tool
+loop anything to fix. `make eval-app sim=startup` on all nine cases:
+every planted fault #1, `furby-boot-cap` #1, `rp-micro-no-fault` claims
+no schematic fault (one run each; six answers from cache). A probe aimed
+at the gap (orbit's C13, the TPS63802's 22 µF output capacitor, made
+220 nF; symptoms brown-out resets on LED switching and 350 mV ripple at
+the MCU's VDD, no simulation run) was still found: #2, from the
+datasheet's 7 µF effective minimum against the 5.32 µF the netlist sums
+to, behind the source board's own L1 mismatch (value 0.47 µH, part
+number `DFE201612E-2R2M`, 2.2 µH) at #1. A wrong part value is caught
+by the datasheet comparison, so a fault that only a model-chosen
+simulation finds would need parts each in spec that fail together.
+Reopen with such a case.
 
-Alternative to weigh then (not decided): expose the checks (pin table,
+Alternative kept on file (not decided): expose the checks (pin table,
 datasheet, reference calculations, SPICE runs) as an MCP server instead of
 building a tool loop in the app. An outside agent's own model does the
 round trips, so the gateway's ~90 s calls and 503s don't bound it, and the
@@ -368,5 +381,5 @@ MCP client (Claude Desktop, Cursor), so the web app's users don't get it,
 and its runs take a different path each time, so `make eval-app` can't
 measure them.
 
-**Check:** decided when the step is.
-Effort: 8–12 h.
+**Check:** none; nothing built.
+Effort: 8–12 h, not spent.
