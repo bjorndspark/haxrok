@@ -612,3 +612,28 @@ both edited together).
 **Consequence:** CORS only matters when `VITE_API_URL` is set. HMR follows
 the page's host instead of a fixed `localhost`. The production image
 (nginx) still needs `VITE_API_URL` or its own `/api` proxy.
+
+## Wiring faults are judged by the wiring check, not a simulation's waveform
+
+**Decision:** a wiring fault a vendor-model run might show (a pin shorted
+to a rail, a swapped divider) counts as caught when the wiring check
+finds it from pin data. A simulation's waveform is evidence beside that
+finding, never the test of it: no eval case or plan acceptance requires a
+transient detail (a current burst, a ringing edge) to appear.
+
+**Why:** the same deck gives different transients on different ngspice
+builds. The TPS63070 L2-to-VOUT study's bursts of more than 10 A into
+U5.9 appear in macOS libngspice 45.2 (as KiCad 10 ships it) and in none
+of Linux ngspice 43 or 44.2, the builds the container can run. A verdict
+on that detail depends on the engine, not the board. The wiring check
+depends only on the netlist and the datasheet, and it finds the fault on
+both the private board (U5.9, plan 005) and `orbit-l2-shorted` (U15.7).
+
+**Alternatives rejected:** pinning the container to ngspice 45.2 (built
+from source, a heavier image, and the next release can move the result
+again). Accepting a run only when several engines agree (several
+toolchains for one check).
+
+**Consequence:** plan 006 closed on the wiring check (2026-11-12). A
+simulation can still flag a fault (the start-up's min corner flags the
+orbit board), but an eval doesn't fail when it doesn't.
