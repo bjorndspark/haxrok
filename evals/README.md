@@ -24,6 +24,7 @@ cases/<name>/
 | `rp-micro-ldo-en` | RT9013 LDO enable tied to its own output, so it never starts | Planted (siderakb/rp-micro) |
 | `rp-micro-cc-shared` | USB-C CC1 and CC2 tied together on one 5.1 kΩ pull-down, so e-marked USB-C cables get no VBUS | Planted (siderakb/rp-micro) |
 | `rp-micro-no-fault` | None; the cause is a charge-only USB cable. Pass = no schematic fault claimed at any rank | Unmodified board (siderakb/rp-micro) |
+| `furby-boot-cap` | ESP32-S3 GPIO0 has 100 nF to GND and only the internal pull-up, so it's still low when sampled and every cold boot enters download mode | Real bug (maintainer's board, built) |
 
 Planted cases take a real open-source board and make one minimal edit that
 KiCad's ERC doesn't flag (ERC checked before and after). Each `expected.md`
@@ -216,6 +217,21 @@ on/off switch). Run through the Bifrost gateway; the time wasn't recorded.
 | Case | Mode | Rank of real cause | Total time | Notes |
 |---|---|---|---|---|
 | `orbit-boot0-high` | review | #1 (won't work) | — | The PWR1 false alarm is gone: the diagnosis infers pin 3 as the common from PWR1's own wiring and calls it an ordinary on/off switch. #2 (may fail) is real: L1's value says 0.47 µH but its part number `DFE201612E-2R2M` is 2.2 µH, labelled unverified |
+
+### A real bug: `furby-boot-cap`, 2026-11-12
+
+The first case from a built board rather than a planted edit: the app's
+review flagged it (run `20261112-045722-2defa1`, #1, will fail) before the
+board was found to boot into download mode. Run through the gateway.
+
+| Case | Mode | Rank of real cause | Total time | Notes |
+|---|---|---|---|---|
+| `furby-boot-cap` | review | MISS | 250 s | The gateway refused 3 of 4 datasheet reads (503, PII detector down), so the review had no ESP32-S3 facts and called "GPIO0 via C5 to GND, internal pull-up" looks right |
+| `furby-boot-cap` | review | #2 (may fail) | 291 s | All four datasheets read. Quotes the 45 kΩ pull-up, 3 ms hold time and VIH: τ = 4.5 ms, ~0.49 × VDD at 3 ms, reads low. #1 is "microphone not wired" (from the dangling-label ERC entries) |
+
+The catch depends on the datasheet facts: without the pull-up and the hold
+time the same netlist reads as correct. `mcu.py`'s strapping check ignores
+capacitors, so nothing deterministic flags it yet.
 
 ## Reading the result
 

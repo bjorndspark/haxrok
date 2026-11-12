@@ -1,0 +1,5 @@
+# The schematic Datasheet fields the compact netlist drops: REF URL
+U1 https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf
+U2 https://www.st.com/resource/en/datasheet/usblc6-2.pdf
+U4 http://www.ti.com/lit/ds/sbvs193d/sbvs193d.pdf
+U7 http://www.ti.com/lit/ds/symlink/drv8837.pdf

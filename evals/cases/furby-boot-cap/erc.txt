@@ -1,0 +1,108 @@
+erc-1 [label_dangling] (error, sheet /): Label not connected to anything
+    Label 'J_MIC_LR'
+erc-2 [label_dangling] (error, sheet /): Label not connected to anything
+    Label 'J_MIC_WS'
+erc-3 [label_dangling] (error, sheet /): Label not connected to anything
+    Label 'J_MIC_SCK'
+erc-4 [label_dangling] (error, sheet /): Label not connected to anything
+    Label 'J_MIC_LR'
+erc-5 [label_dangling] (error, sheet /): Label not connected to anything
+    Label 'J_MIC_SCK'
+erc-6 [label_dangling] (error, sheet /): Label not connected to anything
+    Label 'J_MIC_WS'
+erc-7 [unconnected_wire_endpoint] (warning, sheet /): Unconnected wire endpoint
+    Horizontal Wire, length 0.5461 mm
+erc-8 [unconnected_wire_endpoint] (warning, sheet /): Unconnected wire endpoint
+    Horizontal Wire, length 0.1651 mm
+erc-9 [power_pin_not_driven] (error, sheet /MCU/): Input Power pin not driven by any Output Power pins
+    Symbol #PWR5 Pin 1 [Power input, Line]
+erc-10 [multiple_net_names] (warning, sheet /Power MUX/): Both VBUS and U_PMUX_IN1 are attached to the same items; VBUS will be used in the netlist
+    Symbol #PWR13 Pin 1 [Power input, Line]
+    Label 'U_PMUX_IN1'
+erc-11 [multiple_net_names] (warning, sheet /Power MUX/): Both VBAT and U_PMUX_IN2 are attached to the same items; VBAT will be used in the netlist
+    Symbol #PWR14 Pin 1 [Power input, Line]
+    Label 'U_PMUX_IN2'
+erc-12 [pin_to_pin] (error, sheet /Power MUX/): Pins of type Output and Output are connected
+    Symbol U3 Pin 9 [ST, Output, Line]
+    Symbol U5 Pin 6 [FB2, Output, Line]
+erc-13 [power_pin_not_driven] (error, sheet /Power MUX/): Input Power pin not driven by any Output Power pins
+    Symbol #PWR21 Pin 1 [Power input, Line]
+erc-14 [multiple_net_names] (warning, sheet /Power Management/): Both VDD and U_VR_VIN are attached to the same items; VDD will be used in the netlist
+    Symbol #PWR22 Pin 1 [Power input, Line]
+    Label 'U_VR_VIN'
+erc-15 [multiple_net_names] (warning, sheet /Power Management/): Both +3V3 and U_VR_VOUT are attached to the same items; +3V3 will be used in the netlist
+    Symbol #PWR35 Pin 1 [Power input, Line]
+    Label 'U_VR_VOUT'
+erc-16 [pin_to_pin] (error, sheet /Power Management/): Pins of type Output and Power output are connected
+    Symbol U5 Pin 6 [FB2, Output, Line]
+    Symbol #FLG2 Pin 1 [Power output, Line]
+erc-17 [multiple_net_names] (warning, sheet /Speaker/): Both U_SPKR_BCLK and SPKR_BCLK are attached to the same items; U_SPKR_BCLK will be used in the netlist
+    Label 'U_SPKR_BCLK'
+    Hierarchical Label 'SPKR_BCLK'
+erc-18 [multiple_net_names] (warning, sheet /Speaker/): Both U_SPKR_DIN and SPKR_DIN are attached to the same items; U_SPKR_DIN will be used in the netlist
+    Label 'U_SPKR_DIN'
+    Hierarchical Label 'SPKR_DIN'
+erc-19 [multiple_net_names] (warning, sheet /Speaker/): Both U_SPKR_LRCLK and SPKR_LRCLK are attached to the same items; U_SPKR_LRCLK will be used in the netlist
+    Label 'U_SPKR_LRCLK'
+    Hierarchical Label 'SPKR_LRCLK'
+erc-20 [multiple_net_names] (warning, sheet /Speaker/): Both GND and J_SPKR_GAIN_12DB are attached to the same items; GND will be used in the netlist
+    Symbol #PWR38 Pin 1 [Power input, Line]
+    Label 'J_SPKR_GAIN_12DB'
+erc-21 [multiple_net_names] (warning, sheet /Speaker/): Both J_SPKR_OUT_N and U_SPKR_OUT_N are attached to the same items; J_SPKR_OUT_N will be used in the netlist
+    Label 'J_SPKR_OUT_N'
+    Label 'U_SPKR_OUT_N'
+erc-22 [multiple_net_names] (warning, sheet /Speaker/): Both J_SPKR_OUT_P and U_SPKR_OUT_P are attached to the same items; J_SPKR_OUT_P will be used in the netlist
+    Label 'J_SPKR_OUT_P'
+    Label 'U_SPKR_OUT_P'
+erc-23 [multiple_net_names] (warning, sheet /Speaker/): Both J_BELLY_BTN_P and BELLY_BTN_SW are attached to the same items; J_BELLY_BTN_P will be used in the netlist
+    Label 'J_BELLY_BTN_P'
+    Hierarchical Label 'BELLY_BTN_SW'
+erc-24 [pin_not_driven] (error, sheet /Microphone/): Input pin not driven by any Output pins
+    Symbol MK1 Pin 4 [L/R, Input, Line]
+erc-25 [power_pin_not_driven] (error, sheet /Microphone/): Input Power pin not driven by any Output Power pins
+    Symbol MK1 Pin 7 [VDD, Power input, Line]
+erc-26 [pin_not_driven] (error, sheet /Microphone/): Input pin not driven by any Output pins
+    Symbol MK1 Pin 1 [SCK, Input, Clock]
+erc-27 [pin_not_driven] (error, sheet /Microphone/): Input pin not driven by any Output pins
+    Symbol MK1 Pin 3 [WS, Input, Line]
+erc-28 [power_pin_not_driven] (error, sheet /Microphone/): Input Power pin not driven by any Output Power pins
+    Symbol MK1 Pin 5_1 [GND, Power input, Line]
+erc-29 [multiple_net_names] (warning, sheet /Motor/): Both U_MOTOR_EN and MOTOR_EN are attached to the same items; U_MOTOR_EN will be used in the netlist
+    Label 'U_MOTOR_EN'
+    Hierarchical Label 'MOTOR_EN'
+erc-30 [multiple_net_names] (warning, sheet /Motor/): Both U_MOTOR_IN1 and MOTOR_IN1 are attached to the same items; U_MOTOR_IN1 will be used in the netlist
+    Label 'U_MOTOR_IN1'
+    Hierarchical Label 'MOTOR_IN1'
+erc-31 [multiple_net_names] (warning, sheet /Motor/): Both U_MOTOR_IN2 and MOTOR_IN2 are attached to the same items; U_MOTOR_IN2 will be used in the netlist
+    Label 'U_MOTOR_IN2'
+    Hierarchical Label 'MOTOR_IN2'
+erc-32 [multiple_net_names] (warning, sheet /Motor/): Both J_MOTOR_OUT_P and U_MOTOR_OUT1 are attached to the same items; J_MOTOR_OUT_P will be used in the netlist
+    Label 'J_MOTOR_OUT_P'
+    Label 'U_MOTOR_OUT1'
+erc-33 [multiple_net_names] (warning, sheet /Motor/): Both J_MOTOR_OUT_N and U_MOTOR_OUT2 are attached to the same items; J_MOTOR_OUT_N will be used in the netlist
+    Label 'J_MOTOR_OUT_N'
+    Label 'U_MOTOR_OUT2'
+erc-34 [multiple_net_names] (warning, sheet /Sensor/): Both +3V3 and J_IR_RECV_VDD are attached to the same items; +3V3 will be used in the netlist
+    Symbol #PWR56 Pin 1 [Power input, Line]
+    Label 'J_IR_RECV_VDD'
+erc-35 [multiple_net_names] (warning, sheet /Sensor/): Both J_IR_RECV_DRAIN and HEAD_IR_RECV_OUT are attached to the same items; J_IR_RECV_DRAIN will be used in the netlist
+    Label 'J_IR_RECV_DRAIN'
+    Hierarchical Label 'HEAD_IR_RECV_OUT'
+erc-36 [multiple_net_names] (warning, sheet /Sensor/): Both J_LDR_DRAIN and HEAD_LDR_OUT are attached to the same items; J_LDR_DRAIN will be used in the netlist
+    Label 'J_LDR_DRAIN'
+    Hierarchical Label 'HEAD_LDR_OUT'
+erc-37 [multiple_net_names] (warning, sheet /IMU/): Both MT_ICM_SCL and IMU_SCL are attached to the same items; MT_ICM_SCL will be used in the netlist
+    Label 'MT_ICM_SCL'
+    Hierarchical Label 'IMU_SCL'
+erc-38 [multiple_net_names] (warning, sheet /IMU/): Both MT_ICM_SDA and IMU_SDA are attached to the same items; MT_ICM_SDA will be used in the netlist
+    Label 'MT_ICM_SDA'
+    Hierarchical Label 'IMU_SDA'
+erc-39 [multiple_net_names] (warning, sheet /IMU/): Both +3V3 and MT_ICM_VDD are attached to the same items; +3V3 will be used in the netlist
+    Symbol #PWR62 Pin 1 [Power input, Line]
+    Label 'MT_ICM_VDD'
+erc-40 [multiple_net_names] (warning, sheet /IMU/): Both MT_ICM_INT1 and IMU_INT1 are attached to the same items; MT_ICM_INT1 will be used in the netlist
+    Label 'MT_ICM_INT1'
+    Hierarchical Label 'IMU_INT1'
+erc-41 [multiple_net_names] (warning, sheet /IMU/): Both MT_ICM_INT2 and IMU_INT2 are attached to the same items; MT_ICM_INT2 will be used in the netlist
+    Label 'MT_ICM_INT2'
+    Hierarchical Label 'IMU_INT2'

@@ -1,0 +1,201 @@
+# Components
+H1  MountingHole  (Mechanical:MountingHole)  [MechanicalHole:MechanicalHole_2.7mm_M2.5]
+H2  MountingHole  (Mechanical:MountingHole)  [MechanicalHole:MechanicalHole_2.7mm_M2.5]
+H3  MountingHole  (Mechanical:MountingHole)  [MechanicalHole:MechanicalHole_2.7mm_M2.5]
+H4  MountingHole  (Mechanical:MountingHole)  [MechanicalHole:MechanicalHole_10.0mm_M10]
+C1  10u  (Device:C)  [Capacitor_SMD:C_0603_1608Metric]
+C2  100n  (Device:C)  [Capacitor_SMD:C_0603_1608Metric]
+C3  22u  (Device:C)  [Capacitor_SMD:C_0805_2012Metric]
+C4  100n  (Device:C)  [Capacitor_SMD:C_0603_1608Metric]
+C5  100n  (Device:C)  [Capacitor_SMD:C_0603_1608Metric]
+R1  10K  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+SW1  SW_Push  (Switch:SW_Push)  [TS-1088-AR02016:SW_TS-1088-AR02016]
+SW2  SW_Push  (Switch:SW_Push)  [TS-1088-AR02016:SW_TS-1088-AR02016]
+U1  ESP32-S3-WROOM-1  (PCM_Espressif:ESP32-S3-WROOM-1)  [PCM_Espressif:ESP32-S3-WROOM-1]
+J1  USB_C_Receptacle_USB2.0_16P  (Connector:USB_C_Receptacle_USB2.0_16P)  [TYPE-C_16PIN_2MD_073:SHOUHAN_TYPE-C_16PIN_2MD__073_]
+J2  Conn_01x02  (Connector_Generic:Conn_01x02)  [Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical]
+R2  5k1  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R3  5k1  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+TP3  TP_VBAT  (Connector:TestPoint)  [Adhoc:Adhoc_TestPoint_THTPad_D1.0mm_Drill0.5mm]
+TP4  TP_GND  (Connector:TestPoint)  [Adhoc:Adhoc_TestPoint_THTPad_D1.0mm_Drill0.5mm]
+TP5  TP_VBUS  (Connector:TestPoint)  [Adhoc:Adhoc_TestPoint_THTPad_D1.0mm_Drill0.5mm]
+U2  USBLC6-2SC6  (Power_Protection:USBLC6-2SC6)  [Package_TO_SOT_SMD:SOT-23-6]
+C6  10u  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C7  10u  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C8  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C9  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C10  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+R4  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R5  5k1  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R6  24k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R7  5k1  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R8  30k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R9  5k1  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R10  47k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+TP6  TP_VDD  (Connector:TestPoint)  [Adhoc:Adhoc_TestPoint_THTPad_D1.0mm_Drill0.5mm]
+U3  TPS2121RUXR  (TPS2121RUXR:TPS2121RUXR)  [TPS2121RUXR:IC_TPS2121RUXR]
+C11  10u  (Device:C_Small)  [Capacitor_SMD:C_0805_2012Metric]
+C12  10u  (Device:C_Small)  [Capacitor_SMD:C_0805_2012Metric]
+C13  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C14  10u  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C15  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C16  10u  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C17  22u  (Device:C_Small)  [Capacitor_SMD:C_0805_2012Metric]
+C18  22u  (Device:C_Small)  [Capacitor_SMD:C_0805_2012Metric]
+C19  22u  (Device:C_Small)  [Capacitor_SMD:C_0805_2012Metric]
+C20  100u  (Device:C_Small)  [Capacitor_SMD:C_1206_3216Metric]
+C21  100u  (Device:C_Small)  [Capacitor_SMD:C_1206_3216Metric]
+J3  Conn_01x03  (Connector_Generic:Conn_01x03)  [Connector_PinHeader_1.27mm:PinHeader_1x03_P1.27mm_Vertical]
+JP1  Jumper_Cap  (Adhoc:Jumper_Cap)  [Adhoc:Adhoc_Placeholder]
+L1  1u5  (Device:L_Small)  [XFL4020-152MEC:IND_XFL4020-152MEC]
+R11  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R12  470k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R13  150k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R14  100k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+TP8  TP_LI  (Connector:TestPoint)
+TP9  TP_LO  (Connector:TestPoint)
+TP10  TP_PWR_PG  (Connector:TestPoint)  [Adhoc:Adhoc_TestPoint_Pad_D1.0mm]
+TP11  TP_3V3  (Connector:TestPoint)  [Adhoc:Adhoc_TestPoint_THTPad_D1.0mm_Drill0.5mm]
+U4  TPS3839G33DBZR  (Power_Supervisor:TPS3839DBZ)  [Package_TO_SOT_SMD:SOT-23]
+U5  TPS63070RNMR  (TPS63070RNMR:TPS63070RNMR)  [TPS63070RNMR:VREG_TPS63070RNMR]
+Q1  AO3400A  (Transistor_FET:AO3400A)  [Package_TO_SOT_SMD:SOT-23]
+R15  220R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R16  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+C22  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C23  10u  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+J4  Conn_01x03  (Connector_Generic:Conn_01x03)  [Connector_PinHeader_1.27mm:PinHeader_1x03_P1.27mm_Vertical]
+J5  Conn_01x04  (Connector_Generic:Conn_01x04)  [Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical]
+JP2  Jumper_Cap  (Adhoc:Jumper_Cap)  [Adhoc:Adhoc_Placeholder]
+R17  100k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R18  1M  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+U6  MAX98357AETE_T  (MAX98357AETE_T:MAX98357AETE_T)  [MAX98357AETE_T:QFN50P300X300X80-17N]
+J6  Conn_01x01  (Connector_Generic:Conn_01x01)  [Adhoc:Adhoc_SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm]
+J7  Conn_01x01  (Connector_Generic:Conn_01x01)  [Adhoc:Adhoc_SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm]
+J8  Conn_01x01  (Connector_Generic:Conn_01x01)  [Adhoc:Adhoc_SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm]
+J9  Conn_01x01  (Connector_Generic:Conn_01x01)  [Adhoc:Adhoc_SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm]
+J10  Conn_01x01  (Connector_Generic:Conn_01x01)  [Adhoc:Adhoc_SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm]
+J11  Conn_01x01  (Connector_Generic:Conn_01x01)  [Adhoc:Adhoc_SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm]
+C25  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C26  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C27  10u  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+J12  Conn_01x02  (Connector_Generic:Conn_01x02)  [MOLEX_22272021:MOLEX_22272021]
+U7  DRV8837  (Driver_Motor:DRV8837)  [Package_SON:WSON-8-1EP_2x2mm_P0.5mm_EP0.9x1.6mm]
+D1  IR333C-A  (Device:LED)  [LED_THT:LED_D5.0mm_Clear]
+J13  Conn_01x02  (Connector_Generic:Conn_01x02)  [MOLEX_22272021:MOLEX_22272021]
+J14  Conn_01x02  (Connector_Generic:Conn_01x02)  [Connector_JST:JST_XH_S2B-XH-A_1x02_P2.50mm_Horizontal]
+J15  Conn_01x04  (Connector_Generic:Conn_01x04)  [Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical]
+Q2  AO3400A  (Transistor_FET:AO3400A)  [Package_TO_SOT_SMD:SOT-23]
+R20  220R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R21  100R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R22  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R23  680R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+SP1  LED_Spacer  (Adhoc:LED_Spacer_4x6)  [Adhoc:Adhoc_Placeholder]
+SW7  SW_Push  (Switch:SW_Push)  [Adhoc:Adhoc_SolderWire-0.1sqmm_1x02_P3.6mm_D0.4mm_OD1mm]
+J16  Conn_01x06  (Connector_Generic:Conn_01x06)  [Connector_JST:JST_XH_B6B-XH-A_1x06_P2.50mm_Vertical]
+Q4  AO3400A  (Transistor_FET:AO3400A)  [Package_TO_SOT_SMD:SOT-23]
+R24  220R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R25  100R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R26  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R27  680R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R28  47k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+C28  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C29  10u  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+C30  100n  (Device:C_Small)  [Capacitor_SMD:C_0603_1608Metric]
+MT1  ICM-42670-P  (ICM-42670-P:ICM-42670-P)  [ICM-42670-P:XDCR_ICM-42670-P]
+R30  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R31  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R32  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R33  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R34  10k  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+D3  GREEN_LED  (Device:LED)  [LED_SMD:LED_0603_1608Metric]
+D4  ORANGE_LED  (Device:LED)  [LED_SMD:LED_0603_1608Metric]
+D5  BLUE_LED  (Device:LED)  [LED_SMD:LED_0603_1608Metric]
+R35  220R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R36  220R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+R37  100R  (Device:R_Small)  [Resistor_SMD:R_0603_1608Metric]
+
+# Nets
++3V3: C13.1 C16.1 C17.1 C18.1 C19.1 C20.1 C21.1 C22.1 C23.1 C25.1 C26.1 C27.1 C28.1 C29.1 C3.1 C30.1 C4.1 J15.4(Pin_4) J16.1(Pin_1) J16.6(Pin_6) MT1.5(VDDIO) MT1.8(VDD) R12.2 R14.2 R21.1 R25.1 R30.1 R31.1 R32.1 TP11.1(1) U1.2(3V3) U4.3(VDD) U5.7(VOUT) U5.8(VOUT) U6.7(VDD) U6.8(VDD) U7.1(VM) U7.8(VCC)
+/IMU/MT_ICM_CS: MT1.12(AP_CS) R32.2
+/IMU/MT_ICM_FSYNC: MT1.7(FSYNC) R33.1
+/IMU/MT_ICM_SDO: MT1.1(AP_SDO/AP_AD0) R34.1
+/IO1_RESET_BTN_P: SW7.1(1) U1.39(GPIO1/TOUCH1/ADC1_CH0)
+/IO2_PWR_LED: R35.1 U1.38(GPIO2/TOUCH2/ADC1_CH1)
+/IO3_BOTY_IR_RECV_OUT: J15.3(Pin_3) R23.1 U1.15(GPIO3/TOUCH3/ADC1_CH2)
+/IO4_BACK_BTN_P: J14.1(Pin_1) U1.4(GPIO4/TOUCH4/ADC1_CH3)
+/IO5_CPS_BTN_P: J13.1(Pin_1) U1.5(GPIO5/TOUCH5/ADC1_CH4)
+/IO6_MIC_SCK: J8.1(Pin_1) U1.6(GPIO6/TOUCH6/ADC1_CH5)
+/IO7_MIC_WS: J7.1(Pin_1) U1.7(GPIO7/TOUCH7/ADC1_CH6)
+/IO8_TONGUE_BTN_P: J15.2(Pin_2) U1.12(GPIO8/TOUCH8/ADC1_CH7/SUBSPICS1)
+/IO9_BODY_IR_SND_GATE: R20.1 U1.17(GPIO9/TOUCH9/ADC1_CH8/FSPIHD/SUBSPIHD)
+/IO10_PWR_CTRL_GATE: J10.1(Pin_1) R15.1 R18.1 U1.18(GPIO10/TOUCH10/ADC1_CH9/FSPICS0/FSPIIO4/SUBSPICS0) U7.7(~{SLEEP})
+/IO11_MOTOR_IN1: U1.19(GPIO11/TOUCH11/ADC2_CH0/FSPID/FSPIIO5/SUBSPID) U7.6(IN1)
+/IO12_MOTOR_IN2: U1.20(GPIO12/TOUCH12/ADC2_CH1/FSPICLK/FSPIIO6/SUBSPICLK) U7.5(IN2)
+/IO13_BELLY_BTN_P: J5.4(Pin_4) U1.21(GPIO13/TOUCH13/ADC2_CH2/FSPIQ/FSPIIO7/SUBSPIQ)
+/IO14_SPKR_DIN: U1.22(GPIO14/TOUCH14/ADC2_CH3/FSPIWP/FSPIDQS/SUBSPIWP) U6.1(DIN)
+/IO15_MIC_SD: J11.1(Pin_1) U1.8(GPIO15/U0RTS/ADC2_CH4/XTAL_32K_P)
+/IO16_HEAD_LDR_OUT: J16.5(Pin_5) R28.1 U1.9(GPIO16/U0CTS/ADC2_CH5/XTAL_32K_N)
+/IO17_HEAD_IR_SND_GATE: R24.1 U1.10(GPIO17/U1TXD/ADC2_CH6)
+/IO18_HEAD_IR_RECV_OUT: J16.2(Pin_2) R27.1 U1.11(GPIO18/U1RXD/ADC2_CH7/CLK_OUT3)
+/IO19_20_USB_D+: U1.14(GPIO20/U1CTS/ADC2_CH9/CLK_OUT1/USB_D+) U2.4(I/O2)
+/IO19_20_USB_D-: U1.13(GPIO19/U1RTS/ADC2_CH8/CLK_OUT2/USB_D-) U2.6(I/O1)
+/IO21_SPKR_BCLK: U1.23(GPIO21) U6.16(BCLK)
+/IO38_IMU_INT2: MT1.9(INT2) U1.31(GPIO38/FSPIWP/SUBSPIWP)
+/IO39_IMU_SCL: MT1.13(AP_SCL/AP_SCLK) R31.2 U1.32(MTCK/GPIO39/CLK_OUT3/SUBSPICS1)
+/IO40_IMU_SDA: MT1.14(AP_SDA/AP_SDIO/AP_SDI) R30.2 U1.33(MTDO/GPIO40/CLK_OUT2)
+/IO41_IMU_INT1: MT1.4(INT1/INT) U1.34(MTDI/GPIO41/CLK_OUT1)
+/IO42_NETWORK_LED: R36.1 U1.35(MTMS/GPIO42)
+/IO47_SPKR_LRCK: U1.24(GPIO47/SPICLK_P/SUBSPICLK_P_DIFF) U6.14(LRCLK)
+/IO48_DEBUG_LED: R37.1 U1.25(GPIO48/SPICLK_N/SUBSPICLK_N_DIFF)
+/LED Indicator/D_B_LED_A: D5.2(A) R37.2
+/LED Indicator/D_G_LED_A: D3.2(A) R35.2
+/LED Indicator/D_O_LED_A: D4.2(A) R36.2
+/MCU/GPIO35: U1.28(SPIIO6/GPIO35/FSPID/SUBSPID)
+/MCU/GPIO36: U1.29(SPIIO7/GPIO36/FSPICLK/SUBSPICLK)
+/MCU/GPIO37: U1.30(SPIDQS/GPIO37/FSPIQ/SUBSPIQ)
+/MCU/U0RXD{slash}GPIO44: U1.36(U0RXD/GPIO44/CLK_OUT2)
+/MCU/U0TXD{slash}GPIO43: U1.37(U0TXD/GPIO43/CLK_OUT1)
+/MCU/U_MCU_BOOT: C5.1 SW2.2(2) U1.27(GPIO0/BOOT)
+/MCU/U_MCU_EN: C1.1 C2.2 R1.2 SW1.2(2) U1.3(EN)
+/MCU_EN: R1.1 U4.2(~{RESET})
+/Machinery/D_BODY_IR_A: D1.2(A) R21.2
+/Machinery/D_BODY_IR_K: D1.1(K) Q2.3(D)
+/Machinery/Q_BODY_IR_SND_GATE: Q2.1(G) R20.2 R22.1
+/Motor/J_MOTOR_OUT_N: J12.2(Pin_2) U7.3(OUT2)
+/Motor/J_MOTOR_OUT_P: J12.1(Pin_1) U7.2(OUT1)
+/PWR_CTRL_DRAIN: Q1.3(D) R23.2 R27.2 R28.2
+/Power Control/Q_PWR_CTRL_GATE: Q1.1(G) R15.2 R16.1
+/Power MUX/U_PMUX_LIM: R10.1 U3.10(ILIM)
+/Power MUX/U_PMUX_OV1: R6.2 R7.2 U3.5(OV1)
+/Power MUX/U_PMUX_OV2: R8.2 R9.2 U3.4(OV2)
+/Power MUX/U_PMUX_PR1: R4.2 R5.2 U3.6(PR1)
+/Power MUX/U_PMUX_SS: C10.1 U3.11(SS)
+/Power Management/U_VR_EN: J3.1(Pin_1) R11.1 U5.14(EN)
+/Power Management/U_VR_FB: R12.1 R13.2 U5.5(FB)
+/Power Management/U_VR_L1: L1.1 TP8.1(1) U5.11(L1)
+/Power Management/U_VR_L2: L1.2 TP9.1(1) U5.9(L2)
+/Power Management/U_VR_PG: R14.1 TP10.1(1) U5.2(PG)
+/Power Management/U_VR_PS: J3.2(Pin_2) U5.1(PS/SYNC)
+/Power Management/U_VR_VAUX: C15.1 U5.3(VAUX)
+/Power Source/J_USB_CC1: J1.A5(CC1) R3.1
+/Power Source/J_USB_CC2: J1.B5(CC2) R2.1
+/Power Source/J_USB_D+: J1.A6(D+) J1.B6(D+) U2.3(I/O2)
+/Power Source/J_USB_D-: J1.A7(D-) J1.B7(D-) U2.1(I/O1)
+/Sensor/J_IR_SND_DRAIN: J16.3(Pin_3) Q4.3(D)
+/Sensor/J_IR_SND_VDD: J16.4(Pin_4) R25.2
+/Sensor/Q_IR_SND_GATE: Q4.1(G) R24.2 R26.1
+/Speaker/J_SPKR_GAIN_15DB: J4.3(Pin_3) R17.1
+/Speaker/J_SPKR_OUT_N: J5.2(Pin_2) U6.10(OUTN)
+/Speaker/J_SPKR_OUT_P: J5.1(Pin_1) U6.9(OUTP)
+/Speaker/U_SPKR_GAIN: J4.2(Pin_2) U6.2(GAIN_SLOT)
+/Speaker/U_SPKR_SD: R18.2 U6.4(SD_MODE)
+GND: C1.2 C10.2 C11.2 C12.2 C13.2 C14.2 C15.2 C16.2 C17.2 C18.2 C19.2 C2.1 C20.2 C21.2 C22.2 C23.2 C25.2 C26.2 C27.2 C28.2 C29.2 C3.2 C30.2 C4.2 C5.2 C6.2 C7.2 C8.2 C9.2 D3.1(K) D4.1(K) D5.1(K) J1.A1(GND) J1.A12(GND) J1.B1(GND) J1.B12(GND) J1.S1(SHIELD) J13.2(Pin_2) J14.2(Pin_2) J15.1(Pin_1) J2.2(Pin_2) J3.3(Pin_3) J4.1(Pin_1) J5.3(Pin_3) J6.1(Pin_1) J9.1(Pin_1) MT1.6(GND) Q1.2(S) Q2.2(S) Q4.2(S) R10.2 R13.1 R16.2 R17.2 R2.2 R22.2 R26.2 R3.2 R33.2 R34.2 R5.1 R7.1 R9.1 SW1.1(1) SW2.1(1) SW7.2(2) TP4.1(1) U1.1(GND) U1.40(GND) U1.41(GND) U2.2(GND) U3.12(GND) U3.3(CP2) U3.9(ST) U4.1(GND) U5.10(PGND) U5.15(VSEL) U5.4(GND) U5.6(FB2) U6.11(GND) U6.15(GND) U6.17(EP) U6.3(GND) U7.4(GND) U7.9(GND)
+VBAT: C7.1 C9.1 J2.1(Pin_1) R8.1 TP3.1(1) U3.2(IN2)
+VBUS: C6.1 C8.1 J1.A4(VBUS) J1.A9(VBUS) J1.B4(VBUS) J1.B9(VBUS) R4.1 R6.1 TP5.1(1) U2.5(VBUS) U3.7(IN1)
+VDD: C11.1 C12.1 C14.1 R11.2 TP6.1(1) U3.1(OUT) U3.8(OUT) U5.12(VIN) U5.13(VIN)
+unconnected-(J1-SBU1-PadA8): J1.A8(SBU1)
+unconnected-(J1-SBU2-PadB8): J1.B8(SBU2)
+unconnected-(MT1-RESV-Pad10): MT1.10(RESV) MT1.11(RESV) MT1.2(RESV) MT1.3(RESV)
+unconnected-(U1-GPIO45-Pad26): U1.26(GPIO45)
+unconnected-(U1-GPIO46-Pad16): U1.16(GPIO46)
+unconnected-(U6-RESV-Pad12): U6.12(RESV) U6.13(RESV) U6.5(RESV) U6.6(RESV)
