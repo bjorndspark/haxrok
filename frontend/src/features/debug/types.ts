@@ -195,6 +195,9 @@ export interface SimLevel {
   label: string
   /** A limit the waveform shouldn't cross. */
   danger: boolean
+  /** Which edge of a regulation band this line is, if one; absent on
+   *  runs recorded before it was added. */
+  band?: "high" | "low" | null
 }
 
 /** What a vendor-model simulation checks. */

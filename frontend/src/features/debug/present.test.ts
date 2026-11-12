@@ -22,6 +22,7 @@ import {
   powerRows,
   stateRows,
   simulationLayout,
+  spreadLabels,
   splitGlossary,
   toMarkdown,
   whatIfLabels,
@@ -345,6 +346,37 @@ describe("simulationLayout", () => {
     expect(fast.unit).toBe("ns")
     expect(fast.points[4].x).toBe(fast.plot.x1)
     expect(simulationLayout(sim).whatIf).toBeNull()
+  })
+
+  it("keeps a narrow band's labels apart, centred on their lines", () => {
+    const band = {
+      ...sim,
+      levels: [
+        { v: 3.267, label: "band low (±1 %)", danger: false },
+        { v: 3.333, label: "band high (±1 %)", danger: false },
+      ],
+    }
+    const [low, high] = simulationLayout(band).levels
+    expect(low.labelY - high.labelY).toBeGreaterThanOrEqual(13)
+    expect((low.labelY + high.labelY) / 2).toBeCloseTo((low.y + high.y) / 2)
+    // Far-apart lines keep their labels on the line.
+    for (const l of simulationLayout(sim).levels) expect(l.labelY).toBe(l.y)
+  })
+})
+
+describe("spreadLabels", () => {
+  it("leaves spaced labels alone and spreads a crowded run", () => {
+    expect(spreadLabels([10, 50], 13)).toEqual([10, 50])
+    expect(spreadLabels([52, 50], 13)).toEqual([57.5, 44.5])
+    // Three close lines: one group, evenly spaced around their mean.
+    expect(spreadLabels([100, 101, 102], 13)).toEqual([88, 101, 114])
+  })
+
+  it("merges a group into a neighbour it grows into", () => {
+    // 40/42 spread to 34.5..47.5, which then reaches the line at 55.
+    const out = spreadLabels([40, 42, 55], 13)
+    expect(out[1] - out[0]).toBeCloseTo(13)
+    expect(out[2] - out[1]).toBeCloseTo(13)
   })
 })
 

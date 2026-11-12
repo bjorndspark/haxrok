@@ -630,8 +630,15 @@ export interface SimulationLayout {
   points: Point[]
   /** The what-if re-run, drawn dashed over the original. */
   whatIf: { path: string; points: Point[] } | null
-  /** Horizontal reference lines, labelled at the right edge. */
-  levels: { y: number; label: string; danger: boolean }[]
+  /** Horizontal reference lines, labelled at the right edge; `labelY` is
+   *  the label's baseline line, nudged off its neighbours' when close. */
+  levels: {
+    y: number
+    labelY: number
+    label: string
+    danger: boolean
+    band: "high" | "low" | null
+  }[]
   xTicks: { x: number; label: string }[]
   yTicks: { y: number; label: string }[]
 }
@@ -651,6 +658,38 @@ function unitScale(unit: Simulation["t_unit"]): number {
  *  backend picks a simulation's own unit. */
 function timeUnit(seconds: number): [Simulation["t_unit"], number] {
   return TIME_UNITS.find(([, scale]) => seconds * scale <= 10_000) ?? ["ms", 1e3]
+}
+
+/** A level label's minimum vertical spacing, in plot units: one text-xs line. */
+const LABEL_GAP = 13
+
+/** Label positions for lines at `ys`, each kept at least `gap` from the
+ *  next. Labels that would collide are grouped and the group is centred on
+ *  its lines' mean, so a narrow band's high and low labels split evenly
+ *  above and below rather than one sliding off. Returned in input order. */
+export function spreadLabels(ys: number[], gap: number): number[] {
+  const order = ys.map((y, i) => ({ y, i })).sort((a, b) => a.y - b.y)
+  // Each cluster: its members (in y order) and the y of its first label.
+  const clusters: { members: { y: number; i: number }[]; top: number }[] = []
+  for (const item of order) {
+    clusters.push({ members: [item], top: item.y })
+    // Merge back while the newest cluster overlaps the one above it.
+    while (clusters.length > 1) {
+      const last = clusters[clusters.length - 1]
+      const prev = clusters[clusters.length - 2]
+      if (prev.top + prev.members.length * gap <= last.top) break
+      const members = [...prev.members, ...last.members]
+      const mean = members.reduce((sum, m) => sum + m.y, 0) / members.length
+      clusters.splice(-2, 2, { members, top: mean - ((members.length - 1) * gap) / 2 })
+    }
+  }
+  const out: number[] = new Array<number>(ys.length).fill(0)
+  for (const c of clusters) {
+    c.members.forEach((m, k) => {
+      out[m.i] = c.top + k * gap
+    })
+  }
+  return out
 }
 
 /** Where a simulated waveform goes: volts up, time across, with its
@@ -682,7 +721,15 @@ export function simulationLayout(sim: Simulation, whatIf?: Simulation | null): S
     return { path, points }
   }
   const { path, points } = trace(sim, seconds[0] ?? [])
-  const levels = sim.levels.map((l) => ({ y: y(l.v), label: l.label, danger: l.danger }))
+  const lineYs = sim.levels.map((l) => y(l.v))
+  const labelYs = spreadLabels(lineYs, LABEL_GAP)
+  const levels = sim.levels.map((l, i) => ({
+    y: lineYs[i] ?? 0,
+    labelY: labelYs[i] ?? 0,
+    label: l.label,
+    danger: l.danger,
+    band: l.band ?? null,
+  }))
   const step = niceStep(tMax / 4)
   const xTicks = []
   for (let t = 0; t <= tMax + 1e-9; t += step) {

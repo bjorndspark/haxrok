@@ -1631,8 +1631,10 @@ def _envelope(rows: Rows, points: int = _POINTS) -> Rows:
 
 def _levels(analysis: SimAnalysis, lim: Limits) -> list[SimLevel]:
     levels = [
-        SimLevel(v=round(lim.lo, 4), label=f"band low ({lim.accuracy})", danger=False),
-        SimLevel(v=round(lim.hi, 4), label=f"band high ({lim.accuracy})", danger=False),
+        SimLevel(v=round(lim.lo, 4), label=f"band low ({lim.accuracy})", danger=False, band="low"),
+        SimLevel(
+            v=round(lim.hi, 4), label=f"band high ({lim.accuracy})", danger=False, band="high"
+        ),
     ]
     if analysis == "startup":
         levels.append(SimLevel(v=round(lim.over, 4), label=lim.over_label, danger=True))

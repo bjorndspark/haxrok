@@ -689,6 +689,7 @@ def test_result_says_passed_timed_out_or_failed():
         "band high (±1 %)",
         "U16 supply max",
     ]
+    assert [lv.band for lv in sim.levels] == ["low", "high", None]
 
     sim = sc.result("vm1", job, Run(None, None, "partial"))
     assert sim.verdict == "timed_out" and sim.text.startswith("ngspice was stopped after ")

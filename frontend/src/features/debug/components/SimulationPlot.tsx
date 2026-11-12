@@ -1,8 +1,18 @@
 import { useState } from "react"
 
 import { useMessages } from "../messages"
-import { hoverReadout, simulationLayout } from "../present"
+import { hoverReadout, simulationLayout, type SimulationLayout } from "../present"
 import type { Simulation } from "../types"
+
+/** A reference line's colours: red for a limit; a regulation band's edges
+ *  in one hue, the high edge full and the low edge faded, so the pair reads
+ *  as one band yet stays told apart; any other line muted, label in value. */
+function levelTone(l: SimulationLayout["levels"][number]): { stroke: string; fill: string } {
+  if (l.danger) return { stroke: "stroke-bad", fill: "fill-bad" }
+  if (l.band === "high") return { stroke: "stroke-value", fill: "fill-value" }
+  if (l.band === "low") return { stroke: "stroke-value/50", fill: "fill-value/60" }
+  return { stroke: "stroke-muted-foreground", fill: "fill-value" }
+}
 
 /** ngspice's waveform for an RC node: a flagged I²C line rising past the
  *  IC's supply + 0.3 V, or an enable pin rising through its RC delay.
@@ -70,9 +80,9 @@ export function SimulationPlot({
               y1={l.y}
               y2={l.y}
               strokeDasharray="4 3"
-              className={l.danger ? "stroke-bad" : "stroke-muted-foreground"}
+              className={levelTone(l).stroke}
             />
-            <text x={plot.x1 + 4} y={l.y + 4} className={l.danger ? "fill-bad" : "fill-value"}>
+            <text x={plot.x1 + 4} y={l.labelY + 4} className={levelTone(l).fill}>
               {l.label}
             </text>
           </g>

@@ -547,6 +547,9 @@ class SimLevel(BaseModel):
     v: float
     label: str
     danger: bool = Field(description="A limit the waveform shouldn't cross.")
+    band: Literal["high", "low"] | None = Field(
+        default=None, description="Which edge of a regulation band this line is, if one."
+    )
 
 
 class SimPeak(BaseModel):
