@@ -233,8 +233,15 @@ sends a case through `prompt.DIAGNOSE` and then `prompt.STRUCTURE`
 analysis is two model calls"), with the netlist and ERC as above. Since
 2026-11-03 it also reads the compact netlist back into the app's `Design`
 and adds the pin table and verified wiring findings the app would send
-(`pins.lookup`); no committed case has ICs in the pin table, so none
-gets findings. The results table below predates that. It runs in the backend container, so it uses the app's
+(`pins.lookup`). Since 2026-11-12 it builds the input as the app's review
+does once the datasheets are read: each IC's datasheet is found (from its
+value and `parts.txt`, below) and read through the gateway, its pins,
+roles and typical application replace the hand-written pin table and
+recheck the wiring, and the datasheet facts, deviations, limit checks and
+budgeted power tree go in too. No committed case has an IC in the
+hand-written pin table, so emptying it changes no case's input; what
+findings there are (`orbit-l2-shorted`'s U15.7) come from the datasheet.
+The results table below predates both. It runs in the backend container, so it uses the app's
 gateway settings:
 
 ```sh
@@ -243,10 +250,12 @@ make eval-app case=rust-board-fb-swapped   # one case; run at most ~3 at once
 
 `sim=startup` (or a comma list of `startup,load_step,dropout`) also runs
 the vendor-model simulations alongside the prompts, as the app streams
-them: each IC's datasheet and SPICE model looked up by its value, then
-`spice_circuits.simulate`. A compact netlist drops the schematic's
+them: each IC's SPICE model looked up from the same parts and datasheets,
+then `spice_circuits.simulate`. A compact netlist drops the schematic's
 Datasheet field, so a case gives the URLs the finders start from in
-`parts.txt` (`U15 https://…` per line); without one, no part is found. It writes `app-simulations.json` and prints
+`parts.txt` (`U15 https://…` per line); without one, a part is found only
+when the datasheet store (`DATASHEET_DIR`) already holds its part number,
+as the orbit cases' U15 does once `orbit-l2-shorted` has run. It writes `app-simulations.json` and prints
 each verdict. Switching models take minutes per run. Start-up runs at
 the source's nominal, from a current-limited bench supply, and at its min
 and max. Finished runs are cached in Redis (`SPICE_CACHE_TTL_S`), so a
