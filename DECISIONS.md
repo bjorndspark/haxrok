@@ -40,13 +40,16 @@ obvious home for it. Until then a deployed instance is open to anyone who
 finds the URL; AI spend is capped at the gateway (see above), and the
 unauthenticated log ingest and debug upload endpoints are bounded only by
 their request-size limits (`DEBUG_MAX_FILES`, `DEBUG_MAX_UPLOAD_BYTES`).
+Every analysis run is recorded on disk (see "Runs are recorded as
+files"), so a public instance keeps everyone's symptoms and netlists
+until someone deletes them.
 
 Auth belongs in derivative projects, not the template — many don't need
 it, and the first real one defines the requirements. The intended shape:
 an `auth` feature delegating identity to a hosted OIDC provider (free
 tier; self-hosted Zitadel/Authentik as the swap-in), opt-in via config the
-way `AI_BASE_URL` is, with debug runs gaining an owner once they are
-stored (today nothing is).
+way `AI_BASE_URL` is, with each recorded run (`data/runs/`) gaining an
+owner.
 
 ## Conventions over enforcement
 
@@ -64,8 +67,10 @@ when the structure is clean.
 
 ## No database; Redis is shared infra
 
-**Decision:** the app stores nothing between requests. A debug run takes
-an upload and streams back its result, so there is no database: no
+**Decision:** the app keeps no database. A debug run takes an upload and
+streams back its result; what outlives the request is files (datasheets,
+models, each run's record, see "Runs are recorded as files"), so there is
+no database: no
 Postgres, no SQLAlchemy, no migrations. The only stateful service is Redis,
 which caches gateway answers. It lives in `docker-compose.infra.yml`
 (`name: infra`, one stack per machine whichever copy starts it); the
@@ -637,3 +642,28 @@ toolchains for one check).
 **Consequence:** plan 006 closed on the wiring check (2026-11-12). A
 simulation can still flag a fault (the start-up's min corner flags the
 orbit board), but an eval doesn't fail when it doesn't.
+
+## Runs are recorded as files
+
+**Decision:** every analysis run appends what it did to
+`data/runs/<run id>.jsonl` (`DEBUG_RUN_DIR`, `features/debug/record.py`):
+the input (the files as SHA-256 digests, not the files), the context the
+model read and its answer is checked against, each model answer and every
+SSE event as sent. The run id reaches the browser in the design summary.
+Records are kept until deleted by hand, like `data/datasheets/`.
+
+**Why:** before this a run's state was spread over the SSE stream, the
+rotating app log, the answer cache and the browser. Nothing could
+re-check a past answer after a change to the evidence check, and a
+result that looked wrong had its input rebuilt by hand (plan 007).
+
+**Alternatives rejected:** a database (one append-only file per run is
+all a replay needs, and it reads with `jq`); keeping the uploaded files
+(the record keeps the input built from them, which is what a replay
+reads); pruning by age (a record is a few hundred kB; easy to add when
+the folder grows).
+
+**Consequence:** state outlives a request, as files (see "No database").
+Writing fails open, like the answer cache: a run whose record can't be
+written goes on unrecorded, with one warning in the log. With no auth, a
+public deploy keeps every visitor's input on disk (see "No auth").

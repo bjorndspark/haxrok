@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-12 | 2026-11-12 | in progress (step 1 done) | — | `DECISIONS.md` ("No database", "Evidence labels are checked references", "Debug analysis is two model calls"), `evals/app_prompts.py` |
+| 2026-11-12 | 2026-11-12 | in progress (steps 1–2 done) | — | `DECISIONS.md` ("No database", "Evidence labels are checked references", "Debug analysis is two model calls"), `evals/app_prompts.py` |
 
 A review of the debug pipeline against the usual advice for apps built
 around a model ("keep the core small, keep one append-only log as the
@@ -112,7 +112,7 @@ read and review mode. `make eval-app` served both calls from cache for
 `make test` ran target by target, since make 3.81 lacks
 `--output-sync`.)
 
-## 2. Every run appends to its own record
+## 2. Every run appends to its own record: done
 
 - `features/debug/record.py`: a `Recorder` protocol with
   `append(kind, data)`, a file recorder that writes one JSON line per
@@ -138,6 +138,38 @@ lines in order; a failing recorder doesn't fail the run), then one live
 run, reading its record. `make docs` if the summary's schema shows in
 the routes doc.
 Effort: 4–6 h.
+
+Decided (2026-11-12), default taken in loop: the `context` line holds
+the design whole as JSON (`record.design_data`: each part and each net's
+nodes, which `Design(parts, nets)` rebuilds), the ERC entries, pin data,
+the evidence ids, the wiring findings and the calculations. That leaves
+step 3's choice open: the compact netlist is in the user message, the
+JSON beside it.
+Decided (2026-11-12), default taken in loop: the run id is
+`<UTC yyyymmdd-hhmmss>-<6 hex>`, so records sort by start time; a run
+recorded with the no-op recorder has an empty `run_id` in its summary.
+Decided (2026-11-12), default taken in loop: `context` and `model` lines
+are written when the review makes them, so they can come before events
+the review has queued but the stream hasn't sent yet; the test checks
+order within each kind, not across kinds.
+
+**Checks:** `make lint` passes (ESLint warnings in frontend code this
+step doesn't touch). `make test`: 413 backend tests and 52 frontend tests
+pass, including a faked run whose record has the input (file digests),
+context (a `Design` rebuilt from it), both model lines and every event in
+order, a recorder that can't write (a file where its folder should be)
+that logs one warning while the run still ends in a result, and the
+route test reading the record its SSE names. One live run of
+`rust-board-fb-swapped` (7.5 min, nothing cached) wrote a 140 kB record:
+input, context (55 parts, 90 datasheet ids, 17 references), the
+diagnosis (131 s) and analysis (173 s) model lines, and every event
+through `result`. `make docs`: the routes doc doesn't change.
+Bugs found: the route tests wrote real records into `data/runs/` until
+`fake_backends` pointed `DEBUG_RUN_DIR` at a temp folder. Not fixed
+here: a `make test` run during the live run rotated `logs/backend/app.log`
+under the dev server, and the live run's log lines (its `run <id>` line
+included) are in neither the log nor its archive; the tests share the
+server's log file.
 
 ## 3. Replay and follow-ups from the record
 

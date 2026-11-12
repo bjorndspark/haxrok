@@ -853,6 +853,10 @@ class DesignSummary(BaseModel):
     # the browser merges it into the summary, so /ask-result gets it back.
     datasheet_facts: list[DatasheetLine] = Field(default_factory=list)
     deviations: list[DatasheetLine] = Field(default_factory=list)
+    run_id: str = Field(
+        default="",
+        description="The run's record (data/runs/<run_id>.jsonl); empty when it isn't recorded.",
+    )
     datasheet_failures: list[DatasheetReadFailure] = Field(default_factory=list)
     # Built from the netlist; rebuilt with the datasheet facts and sent in
     # the datasheet_facts event. None in runs from before it existed.

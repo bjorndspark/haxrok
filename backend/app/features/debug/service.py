@@ -19,13 +19,16 @@ The model is called twice (see ``prompt``): a free-text diagnosis, then a
 conversion of it into the structured answer. ``ask`` answers a question
 about one simulation afterwards, ``ask_result`` a follow-up about the run;
 ``rerun`` re-runs an RC simulation with the user's R and C (a what-if).
-The kicad and ngspice runners, the datasheet finder and reader, and the
-model calls are passed in, so tests fake them.
+The kicad and ngspice runners, the datasheet finder and reader, the
+model calls and the run's recorder (``record``) are passed in, so tests
+fake them.
 """
 
 import asyncio
+import json
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Sequence
+from contextlib import aclosing
 from dataclasses import dataclass, field
 
 from app.core.errors import AppError, BadRequestError
@@ -38,6 +41,7 @@ from app.features.debug import (
     pins,
     power,
     prompt,
+    record,
     reference,
     spice,
     spice_circuits,
@@ -215,7 +219,44 @@ async def stream(
     ngspice: spice.SpiceRunner | None = None,
     facts: FactReader | None = None,
     models: spice.ModelRunner | None = None,
+    recorder: record.Recorder | None = None,
 ) -> AsyncIterator[SseEvent]:
+    """``_stream``'s events, each recorded with ``recorder`` as it is sent,
+    after the run's input; the design summary carries the recorder's run id."""
+    rec = recorder or record.NoRecorder()
+    rec.append("input", _input(prepared))
+    if rec.run_id:
+        logger.info("run %s: %s, %s mode", rec.run_id, prepared.summary.project, prepared.mode)
+    # aclosing: when the client goes away, _stream's own cleanup (cancelling
+    # the reading and the vendor-model runs) runs now, not when collected.
+    async with aclosing(_stream(prepared, model, ngspice, facts, models, rec)) as events:
+        async for ev in events:
+            rec.append("event", {"event": ev["event"], "data": json.loads(ev["data"])})
+            yield ev
+
+
+def _input(prepared: Prepared) -> dict[str, object]:
+    """The record's ``input`` line: what the user sent, the files as digests."""
+    return {
+        "project": prepared.summary.project,
+        "mode": prepared.mode,
+        "language": prepared.language,
+        "symptoms": prepared.symptoms,
+        "measurements": prepared.measurements,
+        "analyses": list(prepared.analyses),
+        "battery": list(prepared.battery) if prepared.battery else None,
+        "files": record.file_digests(prepared.upload),
+    }
+
+
+async def _stream(
+    prepared: Prepared,
+    model: Model,
+    ngspice: spice.SpiceRunner | None,
+    facts: FactReader | None,
+    models: spice.ModelRunner | None,
+    rec: record.Recorder,
+) -> AsyncGenerator[SseEvent]:
     """The SSE body for one analysis run: the review (with ``facts``, after
     reading the found datasheets), and with ``ngspice`` the simulations
     ``spice.plan`` picks, run alongside it (an enable/reset RC fed by a
@@ -225,7 +266,8 @@ async def stream(
     (``spice_circuits``) start once the datasheets are read; they take
     minutes, so they come after the terminal event, each as it finishes.
     Closing the stream cancels whatever still runs."""
-    yield _event("design_summary", prepared.summary.model_dump_json())
+    summary = prepared.summary.model_copy(update={"run_id": rec.run_id})
+    yield _event("design_summary", summary.model_dump_json())
     reading = asyncio.create_task(_read(prepared, facts))
     vendor: asyncio.Queue[SseEvent] = asyncio.Queue()
     later = (
@@ -234,7 +276,7 @@ async def stream(
         else None
     )
     try:
-        sources = [_review(prepared, model, facts, reading)]
+        sources = [_review(prepared, model, facts, reading, rec)]
         if ngspice is not None:
             now, fed = _by_rail(spice.plan(prepared.calculations, prepared.design), prepared)
             if now:
@@ -387,10 +429,12 @@ async def _review(
     model: Model,
     facts: FactReader | None,
     reading_task: Awaitable[DatasheetReading],
+    rec: record.Recorder,
 ) -> AsyncIterator[SseEvent]:
     """The model's part of the stream: progress, the datasheet facts (when a
     datasheet was found), then result or error. ``reading_task`` is
-    ``_read``'s, shared with the vendor-model runs."""
+    ``_read``'s, shared with the vendor-model runs. The context and each
+    model answer go to ``rec``."""
     found_sheets = sum(1 for s in prepared.datasheets if s.status == "found")
     if facts is not None and found_sheets:
         yield _progress(
@@ -411,6 +455,7 @@ async def _review(
         labels=prepared.labels,
         battery=prepared.battery,
     )
+    rec.append("context", record.context_data(ctx))
     if facts is not None and found_sheets:
         yield _event("datasheet_facts", context.facts_event(ctx).model_dump_json())
     yield _progress("pin_lookup", context.progress_note(ctx))
@@ -425,6 +470,15 @@ async def _review(
     try:
         diagnosis = await model.diagnose(
             prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE, ctx.user
+        )
+        rec.append(
+            "model",
+            {
+                "name": "debug_diagnosis",
+                "prompt": "REVIEW_DIAGNOSE" if review else "DIAGNOSE",
+                "answer": diagnosis,
+                "seconds": round(time.monotonic() - start, 1),
+            },
         )
         # Logged whole: it's the reasoning the structured answer must follow,
         # and the first thing to read when a result looks wrong.
@@ -443,11 +497,22 @@ async def _review(
         )
         # Only the write-up switches language: the diagnosis is reasoning the
         # user never sees, and the prompts that find bugs were tuned in English.
+        structuring = time.monotonic()
         analysis = await model.structure(
             prompt.in_language(
                 prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE, prepared.language
             ),
             prompt.build_structure_message(diagnosis=diagnosis, user=ctx.user),
+        )
+        rec.append(
+            "model",
+            {
+                "name": "debug_analysis",
+                "prompt": "REVIEW_STRUCTURE" if review else "STRUCTURE",
+                "language": prepared.language,
+                "answer": analysis,
+                "seconds": round(time.monotonic() - structuring, 1),
+            },
         )
     except AppError as e:
         yield _event("error", ErrorEvent(message=e.detail).model_dump_json())

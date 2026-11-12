@@ -16,7 +16,7 @@ from app.core.ai.structured import complete_structured
 from app.core.config import settings
 from app.core.errors import BadRequestError
 from app.core.responses import SuccessResponse, ok
-from app.features.debug import power, service
+from app.features.debug import power, record, service
 from app.features.debug.datasheet import Datasheets, DatasheetStore, HttpFetcher
 from app.features.debug.facts import FactReader, RedisFactsCache
 from app.features.debug.kicad import KicadCli
@@ -122,7 +122,8 @@ async def analyze(
     review it for design mistakes before the board is ordered.
 
     Upload errors, missing sub-sheets and kicad-cli failures return the
-    error envelope. Otherwise the response is an SSE stream:
+    error envelope. Otherwise the run is recorded (``record``, its id in
+    the design summary) and the response is an SSE stream:
     ``design_summary``, ``progress`` and ``simulation`` (Simulation, as each
     ngspice run finishes)…, then ``result`` (CheckedAnalysis) or ``error``,
     then a ``simulation`` for each vendor-model run in ``analyses`` (minutes
@@ -178,6 +179,7 @@ async def analyze(
             ngspice,
             FactReader(_extract, RedisFactsCache()),
             CachedRunner(Ngspice(timeout_s=settings.NGSPICE_MODEL_TIMEOUT_S)),
+            record.FileRecorder(Path(settings.DEBUG_RUN_DIR), record.new_run_id()),
         )
     )
 

@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     # Each IC's SPICE model files, kept by the same key as its datasheet.
     # Lookups share the datasheet's timeout and size cap.
     SPICE_MODEL_DIR: str = "data/models"
+    # Each analysis run's record, one JSONL file per run (features/debug/
+    # record.py), kept until deleted by hand.
+    DEBUG_RUN_DIR: str = "data/runs"
     DEBUG_MAX_FILES: int = 200
     DEBUG_MAX_UPLOAD_BYTES: int = 20 * 1024 * 1024
 

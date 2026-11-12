@@ -5,14 +5,18 @@ kicad-cli and the model are faked.
 """
 
 import dataclasses
+import hashlib
 import json
 import pathlib
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 import pytest
 
+from app.core.clock import FakeClock, SystemClock, set_clock
+from app.core.config import settings
 from app.core.errors import BadRequestError, UpstreamError
-from app.features.debug import diagram, pins, prompt, router, service
+from app.features.debug import diagram, pins, prompt, record, router, service
 from app.features.debug.calc import lookup as calc_lookup
 from app.features.debug.design import Design, Label, Node, Part, parse_labels, parse_netlist
 from app.features.debug.evidence import EvidenceContext
@@ -1231,6 +1235,102 @@ async def test_model_failure_ends_the_stream_with_an_error_event():
     )
 
 
+def _record(path: pathlib.Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+async def test_a_run_records_its_input_context_model_answers_and_events(tmp_path):
+    set_clock(FakeClock(datetime(2026, 11, 12, 6, 30, tzinfo=UTC)))
+    try:
+        run_id = record.new_run_id()
+        recorder = record.FileRecorder(tmp_path / "runs", run_id)
+        prepared = await service.prepare(
+            _files(),
+            "Fails on battery",
+            [MeasurementInput(step_id="h1-c1", context="Ohms L2 to VOUT", value="0.2 ohm")],
+            FakeKicad(),
+            FakeDatasheets(),
+            FakeSpiceModels(),
+        )
+        model = service.Model(_diagnose, _structure)
+        sent = [
+            (e["event"], json.loads(e["data"]))
+            async for e in service.stream(prepared, model, recorder=recorder)
+        ]
+    finally:
+        set_clock(SystemClock())
+    assert run_id.startswith("20261112-063000-")
+    assert sent[0][1]["run_id"] == run_id
+
+    lines = _record(tmp_path / "runs" / f"{run_id}.jsonl")
+    kinds = [line["kind"] for line in lines]
+    assert lines[0]["at"] == "2026-11-12T06:30:00+00:00"
+    # The input first; the events exactly as sent; the context before the
+    # two model calls, diagnosis first; the result last.
+    assert kinds[0] == "input"
+    assert [(e["data"]["event"], e["data"]["data"]) for e in lines if e["kind"] == "event"] == sent
+    assert [k for k in kinds if k in ("context", "model")] == ["context", "model", "model"]
+    assert kinds[-1] == "event" and lines[-1]["data"]["event"] == "result"
+
+    given = lines[0]["data"]
+    assert (given["mode"], given["language"], given["analyses"]) == ("debug", "en", ["startup"])
+    assert given["symptoms"] == [{"id": "s1", "text": "Fails on battery"}]
+    assert given["measurements"][0]["id"] == "m1"
+    assert [f["name"] for f in given["files"]] == [
+        "board.kicad_pro",
+        "board.kicad_sch",
+        "power.kicad_sch",
+    ]
+    assert given["files"][1]["sha256"] == hashlib.sha256(ROOT_SCH).hexdigest()
+
+    ctx = next(line["data"] for line in lines if line["kind"] == "context")
+    model_lines = [line["data"] for line in lines if line["kind"] == "model"]
+    assert "+3V3: L1.2 U2.7(VOUT) U2.9(L2)" in ctx["user"]
+    assert ctx["symptom_ids"] == ["s1"] and ctx["measurement_ids"] == ["m1"]
+    assert "U2.9" in ctx["pin_data"]
+    assert ctx["erc"][0]["id"] == "erc-1"
+    assert [w["pin"] for w in ctx["wiring"]] == ["U2.9"]
+    # The design comes back whole from its record.
+    rebuilt = Design(
+        {ref: Part(**p) for ref, p in ctx["design"]["parts"].items()},
+        {name: [Node(**n) for n in nodes] for name, nodes in ctx["design"]["nets"].items()},
+    )
+    assert rebuilt.parts == prepared.design.parts and rebuilt.nets == prepared.design.nets
+
+    assert [(m["name"], m["prompt"]) for m in model_lines] == [
+        ("debug_diagnosis", "DIAGNOSE"),
+        ("debug_analysis", "STRUCTURE"),
+    ]
+    assert model_lines[0]["answer"] == "1. L2 tied to VOUT."
+    assert Analysis[Claim].model_validate(model_lines[1]["answer"]) == _analysis()
+
+
+async def test_a_failing_recorder_doesnt_fail_the_run(tmp_path, caplog):
+    blocked = tmp_path / "not-a-folder"
+    blocked.write_text("a file where the runs folder should be")
+    recorder = record.FileRecorder(blocked, "r1")
+    prepared = await service.prepare(
+        _files(), "Dead board", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
+    names = [
+        e["event"]
+        async for e in service.stream(
+            prepared, service.Model(_diagnose, _structure), recorder=recorder
+        )
+    ]
+    assert names[-1] == "result"
+    warnings = [r for r in caplog.records if "couldn't record run r1" in r.getMessage()]
+    assert len(warnings) == 1
+
+
+async def test_an_unrecorded_run_has_no_run_id():
+    prepared = await service.prepare(
+        _files(), "Dead board", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
+    )
+    events = await _collect(prepared, service.Model(_diagnose, _structure))
+    assert events[0][1]["run_id"] == ""
+
+
 async def test_simulations_stream_alongside_the_model_and_the_result_comes_last():
     import asyncio
 
@@ -1681,7 +1781,8 @@ async def test_japanese_changes_only_the_write_up_and_ask_prompts():
 
 
 @pytest.fixture
-def fake_backends(monkeypatch):
+def fake_backends(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "DEBUG_RUN_DIR", str(tmp_path / "runs"))
     monkeypatch.setattr(router, "KicadCli", FakeKicad)
     monkeypatch.setattr(router, "Datasheets", FakeDatasheets)
     monkeypatch.setattr(router, "SpiceModels", FakeSpiceModels)
@@ -1698,6 +1799,12 @@ async def test_analyze_streams_sse(client, fake_backends):
     assert res.headers["content-type"].startswith("text/event-stream")
     assert "event: design_summary" in res.text
     assert "event: result" in res.text
+    # The route records the run under the summary's run id.
+    summary = json.loads(
+        res.text.split("event: design_summary")[1].split("data: ")[1].split("\r\n")[0]
+    )
+    lines = _record(pathlib.Path(settings.DEBUG_RUN_DIR) / f"{summary['run_id']}.jsonl")
+    assert lines[0]["kind"] == "input" and lines[-1]["data"]["event"] == "result"
 
 
 async def test_analyze_bad_upload_returns_the_envelope(client, fake_backends):
