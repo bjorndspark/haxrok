@@ -189,11 +189,27 @@ def test_rules_come_from_the_pin_table_unless_the_datasheet_gave_some():
     [found] = mcu.check(design, PowerTree(rails=[], parts=[]), table)
     assert found.flagged and found.pins == ["U1.27"]
 
-    read = PinRuleFact(
-        kind="input_only", pins=["5"], boot_level="either", condition="", text="In.", page=12
-    )
+    read = _fact("input_only", ["5"], "either", page=12)
     [only] = mcu.rules(design, {"U1": [read]})["U1"]
     assert (only.kind, only.source) == ("input_only", "datasheet p.12")
+
+
+def _fact(
+    kind: PinRuleKind, pins: list[str], level: BootLevel, page: int, **timing: object
+) -> PinRuleFact:
+    """A datasheet's pin rule; ``timing`` sets its RC numbers (default null)."""
+    fields: dict[str, object] = {
+        "internal_pull": None,
+        "pull_kohms": None,
+        "threshold": None,
+        "hold_ms": None,
+    }
+    return PinRuleFact.model_validate(
+        {"kind": kind, "pins": pins, "boot_level": level, "condition": "", "text": "Hi."}
+        | fields
+        | timing
+        | {"page": page}
+    )
 
 
 # --- strapping pins: the RC against the hold time ------------------------------------
@@ -270,9 +286,7 @@ def test_the_pin_tables_timing_reaches_a_datasheets_strapping_rule():
     [io0] = [r for r in mcu.rules(design)["U1"] if r.pins == ("27",)]
     assert io0.timing == TIMING
 
-    read = PinRuleFact(
-        kind="strapping", pins=["27"], boot_level="high", condition="", text="Hi.", page=14
-    )
+    read = _fact("strapping", ["27"], "high", page=14)
     [rule] = mcu.rules(design, {"U1": [read]})["U1"]
     assert rule.timing == TIMING and rule.source == "datasheet p.14"
     [found] = mcu.check(design, PowerTree(rails=[], parts=[]), {"U1": [rule]})
@@ -280,3 +294,57 @@ def test_the_pin_tables_timing_reaches_a_datasheets_strapping_rule():
 
     other_way = read.model_copy(update={"boot_level": "low"})
     assert mcu.rules(design, {"U1": [other_way]})["U1"][0].timing is None
+
+
+def test_a_datasheets_own_numbers_set_the_rc_check():
+    """Another MCU, no pin table entry: a 50 kΩ pull-up, VIH 0.7, tH 1 ms."""
+    other = Part("U1", "OTHERMCU", "", "QFN-48")
+    design = Design({"U1": other, "C5": CAP, "SW2": _part("SW2")}, _boot())
+    read = _fact(
+        "strapping",
+        ["27"],
+        "high",
+        page=7,
+        internal_pull="high",
+        pull_kohms=50,
+        threshold=0.7,
+        hold_ms=1,
+    )
+    [rule] = mcu.rules(design, {"U1": [read]})["U1"]
+    assert rule.timing == StrapTiming(pull="high", pull_ohms=50e3, threshold=0.7, hold_s=1e-3)
+    [found] = mcu.check(design, PowerTree(rails=[], parts=[]), {"U1": [rule]})
+    assert found.flagged and found.value == 6.02  # 5 ms × ln(1/0.3)
+
+
+def test_a_datasheets_complete_numbers_win_over_the_pin_tables():
+    read = _fact(
+        "strapping",
+        ["27"],
+        "high",
+        page=14,
+        internal_pull="high",
+        pull_kohms=10,
+        threshold=0.75,
+        hold_ms=3,
+    )
+    [rule] = mcu.rules(_design(_boot(), CAP), {"U1": [read]})["U1"]
+    assert rule.timing == StrapTiming(pull="high", pull_ohms=10e3, threshold=0.75, hold_s=3e-3)
+
+
+def test_partial_or_opposite_datasheet_numbers_fall_back_to_the_table_whole():
+    design = _design(_boot(), CAP)
+    partial = _fact("strapping", ["27"], "high", page=14, internal_pull="high", pull_kohms=10)
+    [rule] = mcu.rules(design, {"U1": [partial]})["U1"]
+    assert rule.timing == TIMING
+    opposite = _fact(
+        "strapping",
+        ["27"],
+        "high",
+        page=14,
+        internal_pull="low",
+        pull_kohms=10,
+        threshold=0.75,
+        hold_ms=3,
+    )
+    [rule] = mcu.rules(design, {"U1": [opposite]})["U1"]
+    assert rule.timing == TIMING

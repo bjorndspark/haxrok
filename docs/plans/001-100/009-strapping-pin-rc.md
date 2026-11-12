@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-12 | 2026-11-12 | in progress | — | `005-whole-board-static-review.md` (step 7: MCU pin rules), `evals/cases/furby-boot-cap/` |
+| 2026-11-12 | 2026-11-12 | done | — | `005-whole-board-static-review.md` (step 7: MCU pin rules), `evals/cases/furby-boot-cap/` |
 
 Plan 005 step 7 reads a strapping pin's level at reset from the netlist
 with capacitors ignored (`mcu._level`). That misses the bug in
@@ -40,7 +40,7 @@ Effort: about 4–8 h.
 | Step | What | |
 |---|---|---|
 | 1 | The RC check, with the pin table's numbers | done |
-| 2 | The same numbers from the datasheet | proposed |
+| 2 | The same numbers from the datasheet | done |
 
 ## 1. The RC check, with the pin table's numbers: done
 
@@ -102,14 +102,45 @@ gateway's answer cache, from an earlier run on the same new input).
 Bugs found: hand arithmetic in the first test had the added pull-up at
 41.6 kΩ; it is 1/(1/21.64k − 1/45k) = 41.7 kΩ, the code was right.
 
-## 2. The same numbers from the datasheet: proposed
+## 2. The same numbers from the datasheet: done
 
 - `PinRuleFact` gains the internal pull's ohms, the hold time and the
   threshold, read by the datasheet extraction, so other MCUs get the
   check and a datasheet's rules don't drop it for the ESP32-S3.
 - Big: it changes the model's output schema.
 
+Decided (2026-11-12): a strapping rule's check uses the datasheet's
+numbers when it gave all three (pull, threshold, hold time) with its pull
+toward the boot level; otherwise the pin table's whole set, as step 1;
+otherwise none. One source per check, never mixed field by field.
+Decided (2026-11-12): the threshold is read only when printed as a
+fraction of VDD (VIH = 0.75 × VDD); printed only in volts it is null and
+that MCU gets no RC check. The model does no arithmetic on it.
+Decided (2026-11-12, default): the fields are `internal_pull`
+(high/low, null for none or not printed, so the pin table's own rules,
+whose numbers stay in `strap_timing`, say nothing false), `pull_kohms` (typical; null when only a range is
+printed), `threshold` and `hold_ms`, all required (strict output), null
+when not printed.
+
 **Check:** `test_debug_facts.py` for the new fields; `make lint`,
 `make test`.
+
+**Checks:** three new tests in `test_debug_mcu.py` (another MCU's own
+numbers, 50 kΩ / 0.7 / 1 ms, flag its cap at 6.02 ms; complete datasheet
+numbers win over the table's; partial numbers, or a pull the other way,
+fall back to the table's whole set) and two in `test_debug_facts.py`
+(`facts.check` nulls a non-positive pull or hold time and a threshold
+outside (0, 1); the fact line gives "internal pull-up 45 kΩ, threshold
+0.75 × VDD, hold time 3 ms"). They failed before the change (9 failures,
+the schema forbade the fields). Backend 448 passed, ruff/format/mypy
+clean; frontend 55 passed, eslint/tsc/prettier clean.
+`make eval-app case=furby-boot-cap` with a fresh datasheet read (the
+schema is in the facts cache key): the model read IO0 as pull-up 45 kΩ,
+0.75, 3 ms and IO45 as pull-down 45 kΩ, 0.25, 3 ms (p.14–15), the same
+numbers as the pin table, so cf8 now runs on the datasheet's own; debug
+#1 (284 s, "GPIO0 held low through strapping window by C5 plus weak
+pull-up", citing cf8 FLAGGED, τ 4.5 ms, 6.24 ms), review #1 (240 s,
+will_fail "ESP32-S3 fails to strap for SPI boot - C5 on GPIO0", cf8).
+Bugs found: none; the own diff review found nothing to fix.
 
 ## Log

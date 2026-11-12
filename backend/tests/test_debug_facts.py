@@ -368,9 +368,20 @@ def _pin_rule(
     kind: PinRuleKind = "strapping",
     level: BootLevel = "high",
     condition: str = "",
+    **timing: object,
 ) -> PinRuleFact:
-    return PinRuleFact(
-        kind=kind, pins=pins, boot_level=level, condition=condition, text="Boot mode.", page=page
+    """A pin rule; ``timing`` sets its RC numbers (default null)."""
+    fields: dict[str, object] = {
+        "internal_pull": None,
+        "pull_kohms": None,
+        "threshold": None,
+        "hold_ms": None,
+    }
+    return PinRuleFact.model_validate(
+        {"kind": kind, "pins": pins, "boot_level": level, "condition": condition}
+        | {"text": "Boot mode.", "page": page}
+        | fields
+        | timing
     )
 
 
@@ -383,6 +394,35 @@ def test_check_keeps_pin_rules_on_sent_pages_and_board_pins_only():
     read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
     [kept] = facts.check(read, {33}, {"44"}).pin_rules
     assert kept.pins == ["44"] and kept.page == 33
+
+
+def test_check_drops_rc_numbers_no_datasheet_prints():
+    rules = [
+        _pin_rule(["44"], 33, internal_pull="high", pull_kohms=45, threshold=0.75, hold_ms=3),
+        _pin_rule(["44"], 33, internal_pull="high", pull_kohms=0, threshold=2.0, hold_ms=-1),
+    ]
+    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
+    sane, insane = facts.check(read, {33}, {"44"}).pin_rules
+    assert (sane.pull_kohms, sane.threshold, sane.hold_ms) == (45, 0.75, 3)
+    assert (insane.internal_pull, insane.pull_kohms, insane.threshold, insane.hold_ms) == (
+        "high",
+        None,
+        None,
+        None,
+    )
+
+
+def test_fact_line_gives_a_strapping_pins_rc_numbers():
+    rules = [
+        _pin_rule(["27"], 9, internal_pull="high", pull_kohms=45, threshold=0.75, hold_ms=3),
+        _pin_rule(["26"], 9, level="low", internal_pull="low"),
+    ]
+    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
+    assert [line for _, line in facts._fact_lines(read)] == [
+        "pin rule: strapping, pins 27, normal boot needs it high, internal pull-up 45 kΩ, "
+        "threshold 0.75 × VDD, hold time 3 ms: Boot mode.",
+        "pin rule: strapping, pins 26, normal boot needs it low, internal pull-down: Boot mode.",
+    ]
 
 
 def test_fact_line_names_a_pin_rule_with_its_boot_level_and_condition():

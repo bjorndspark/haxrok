@@ -237,7 +237,7 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
         if lim.page in pages
     ]
     rules = [
-        rule.model_copy(update={"pins": on})
+        _sane_timing(rule.model_copy(update={"pins": on}))
         for rule in facts.pin_rules
         if rule.page in pages and (on := [pin for pin in rule.pins if pin in board_pins])
     ]
@@ -262,6 +262,19 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
     if dropped:
         logger.info("datasheet facts: dropped %d not backed by a sent page or board pin", dropped)
     return DatasheetFacts(pins=kept, limits=limits, application=application, pin_rules=rules)
+
+
+def _sane_timing(rule: PinRuleFact) -> PinRuleFact:
+    """A pin rule with RC numbers no datasheet prints set to null: a pull or
+    hold time that isn't positive, a threshold outside (0, 1) of VDD."""
+    update: dict[str, None] = {}
+    if rule.pull_kohms is not None and rule.pull_kohms <= 0:
+        update["pull_kohms"] = None
+    if rule.hold_ms is not None and rule.hold_ms <= 0:
+        update["hold_ms"] = None
+    if rule.threshold is not None and not 0 < rule.threshold < 1:
+        update["threshold"] = None
+    return rule.model_copy(update=update) if update else rule
 
 
 # A range printed on a page the model wasn't sent isn't one it read.
@@ -300,11 +313,25 @@ def _fact_lines(facts: DatasheetFacts) -> list[tuple[int, str]]:
         lines.append(
             (
                 rule.page,
-                f"pin rule: {_RULE_NAME[rule.kind]}, pins {', '.join(rule.pins)}{level}{cond}: "
-                f"{rule.text}",
+                f"pin rule: {_RULE_NAME[rule.kind]}, pins {', '.join(rule.pins)}{level}"
+                f"{_timing_text(rule)}{cond}: {rule.text}",
             )
         )
     return lines
+
+
+def _timing_text(rule: PinRuleFact) -> str:
+    """A strapping rule's RC numbers, those it gave, as ", internal pull-up
+    45 kΩ, threshold 0.75 × VDD, hold time 3 ms"; "" when none."""
+    parts = []
+    if rule.internal_pull is not None:
+        ohms = f" {_num(rule.pull_kohms)} kΩ" if rule.pull_kohms is not None else ""
+        parts.append(f"internal pull-{'up' if rule.internal_pull == 'high' else 'down'}{ohms}")
+    if rule.threshold is not None:
+        parts.append(f"threshold {_num(rule.threshold)} × VDD")
+    if rule.hold_ms is not None:
+        parts.append(f"hold time {_num(rule.hold_ms)} ms")
+    return "".join(f", {p}" for p in parts)
 
 
 _RULE_NAME = {

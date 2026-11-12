@@ -18,7 +18,7 @@ to when no datasheet says otherwise, and its ``rules`` are the
 microcontroller pin rules ``mcu.check`` holds the board to when no
 datasheet gave any. Its ``strap_timing`` gives a strapping pin's internal
 pull, input threshold and hold time, for ``mcu.check``'s RC check, to the
-table's rules and to a datasheet's alike.
+table's rules and to a datasheet's that didn't print all three itself.
 """
 
 import re
@@ -260,7 +260,16 @@ def _rule(
     kind: PinRuleKind, pins: list[str], level: BootLevel, text: str, condition: str = ""
 ) -> PinRuleFact:
     return PinRuleFact(
-        kind=kind, pins=pins, boot_level=level, condition=condition, text=text, page=0
+        kind=kind,
+        pins=pins,
+        boot_level=level,
+        internal_pull=None,  # the numbers are in ``strap_timing``
+        pull_kohms=None,
+        threshold=None,
+        hold_ms=None,
+        condition=condition,
+        text=text,
+        page=0,
     )
 
 

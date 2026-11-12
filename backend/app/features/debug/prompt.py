@@ -652,7 +652,13 @@ each needs at reset for the normal boot from flash, and the built-in \
 USB's D+ and D-. Read the variant from the part's value (flash and PSRAM \
 size and voltage); a rule that depends on a variant or setting the value \
 doesn't settle keeps that in condition. A strapping pin the normal boot \
-doesn't depend on is either.
+doesn't depend on is either. For a strapping pin, also what sets how fast \
+it reaches its level after reset, each only as printed (null otherwise, \
+and for every other kind): internal_pull, the way the chip's own pull \
+holds it, with pull_kohms its typical resistance; threshold, the input \
+threshold for boot_level as a fraction of VDD (VIH for high, VIL for low; \
+null when printed only in volts); hold_ms, how long after reset the chip \
+latches the strapping pins.
 - page: the N of the '=== Page N ===' header the fact is under."""
 
 

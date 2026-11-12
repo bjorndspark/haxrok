@@ -309,6 +309,24 @@ class PinRuleFact(_Strict):
         "boot from flash with this part's settings (high, low), or either when that boot "
         "doesn't depend on it. either for every other kind."
     )
+    internal_pull: Literal["high", "low"] | None = Field(
+        description="strapping only: the way the chip's own pull holds the pin at reset "
+        "(high for a pull-up, low for a pull-down); null when it has none, it isn't "
+        "printed, or for every other kind."
+    )
+    pull_kohms: float | None = Field(
+        description="strapping only: that internal pull's typical resistance in kΩ as "
+        "printed; null when only a min-max range or no value is printed."
+    )
+    threshold: float | None = Field(
+        description="strapping only: the input threshold the pin must pass to read as "
+        "boot_level, as a fraction of VDD exactly as printed (VIH for high, VIL for low; "
+        '0.75 for "0.75 × VDD"); null when printed only in volts, or not at all.'
+    )
+    hold_ms: float | None = Field(
+        description="strapping only: how long after reset (EN or nRST rising) the chip "
+        "latches the strapping pins (the hold time), in ms; null if not printed."
+    )
     condition: str = Field(
         description="When the rule depends on a variant or setting the part's value doesn't "
         'settle, that condition as printed (e.g. "on modules with octal PSRAM"); "" when '

@@ -18,8 +18,9 @@ gave any. Each is checked on the netlist alone:
   fail". A pin the normal boot doesn't depend on (``either``) isn't
   checked.
 - strapping, RC: a pin left at its boot level (by external pulls toward
-  it, or by its internal pull alone) whose rule carries the pin table's
-  timing (``pins.StrapTiming``): the internal pull and the pulls toward
+  it, or by its internal pull alone) whose rule carries timing
+  (``pins.StrapTiming``: the datasheet's own numbers when it printed all
+  three, else the pin table's): the internal pull and the pulls toward
   the boot level in parallel, against the capacitors straight from its net
   to the other level, τ = R × C, and the time t = τ·ln(1/(1 − f)) to cover
   the fraction f of VDD up to the input threshold. Past the hold time is
@@ -108,9 +109,32 @@ def _rule(fact: PinRuleFact, source: str, entry: PartPins | None) -> Rule:
 
 
 def _timing(fact: PinRuleFact, entry: PartPins | None) -> StrapTiming | None:
-    """The pin table's timing for a strapping rule, when every pin it names
-    has the same entry there and its pull is toward the rule's boot level."""
-    if fact.kind != "strapping" or entry is None or not fact.pins:
+    """A strapping rule's numbers for the RC check: its own when it gave all
+    three, else the pin table's whole set. One source, never mixed."""
+    if fact.kind != "strapping" or not fact.pins:
+        return None
+    return _own_timing(fact) or _table_timing(fact, entry)
+
+
+def _own_timing(fact: PinRuleFact) -> StrapTiming | None:
+    """The datasheet's numbers, when it printed the pull, the threshold and
+    the hold time, and its pull is toward the boot level."""
+    if fact.pull_kohms is None or fact.threshold is None or fact.hold_ms is None:
+        return None
+    if fact.internal_pull is None or fact.internal_pull != fact.boot_level:
+        return None
+    return StrapTiming(
+        pull=fact.internal_pull,
+        pull_ohms=fact.pull_kohms * 1e3,
+        threshold=fact.threshold,
+        hold_s=fact.hold_ms * 1e-3,
+    )
+
+
+def _table_timing(fact: PinRuleFact, entry: PartPins | None) -> StrapTiming | None:
+    """The pin table's timing, when every pin the rule names has the same
+    entry there and its pull is toward the rule's boot level."""
+    if entry is None:
         return None
     found = {entry.strap_timing.get(p) for p in fact.pins}
     timing = found.pop() if len(found) == 1 else None
