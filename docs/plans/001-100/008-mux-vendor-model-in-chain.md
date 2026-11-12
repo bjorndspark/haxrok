@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-12 | 2026-11-12 | open | — | `006-power-chain-simulated.md` (step 2: a mux is an ideal switch), `DECISIONS.md` ("SPICE models are untrusted text") |
+| 2026-11-12 | 2026-11-12 | in progress | — | `006-power-chain-simulated.md` (step 2: a mux is an ideal switch), `DECISIONS.md` ("SPICE models are untrusted text") |
 
 Plan 006 step 2 cuts the chain from its source and turns a mux or load
 switch on it into a zero-volt source, "as an ideal switch"
@@ -63,7 +63,7 @@ Acceptance:
 
 Effort: about 14–22 h.
 
-## 1. The mux's model in the cut, its input current conserved: open
+## 1. The mux's model in the cut, its input current conserved: done
 
 - In `_cut`, a mux or load switch with a runnable model is instantiated
   with its board pins (`_model_pin`), like the regulator.
@@ -85,10 +85,36 @@ ideal-switch fallback. Not "always wrap": a model that conserves current
 would then draw it twice from the source.
 Decided (2026-11-12, default): the wrapper and its probe are a trade-off
 worth a `DECISIONS.md` entry, written in this step's commit.
+Decided (2026-11-12): TI's TPS2121 model never turns on from a ramped
+input (1 µs–500 µs ramps, runs to 10 ms, output under 4 mV), only from
+a step. A mux model whose output stays down in the ramped probe is
+probed again with its input stepped on at 0 s; if it comes up there, the
+chain's source steps on at 0 s too, and the setup text says so (user's
+answer at the loop's blocker).
+Decided (2026-11-12, default taken in loop): behind the bench corner's
+current limit such a step-only model stays an ideal switch, labelled
+"its model starts only from a stepped input, and the supply's limit
+ramps it" — the limit ramps the caps again, and holding the model's
+input at 4.8 V with `.ic` didn't start it either (599 s, output dead).
+Decided (2026-11-12, default taken in loop): the wrapper's F-source
+draws from the mux's chain node (the input the cut follows), not from
+an input picked by re-implementing the model's PR1 priority logic.
+Step 3 (switchover) must account for a step-only model: a VBUS plug-in
+ramps that input, which such a model may not follow.
 
-**Check:** unit tests for the cut with a mux model and with the
-fallback; the private board's 0.5 ms chain, shorted and fixed, against
-the table above, with `Vam_in` ≈ load current.
+**Check:** `make lint` clean (the one old eslint warning in
+`button.tsx`); `make test` 432 backend + 52 frontend passed. The private
+board through the app (VBAT 4.8 V, 0.49 ms window): the probe takes 3 s
+and finds U3 step-only and wrapped (input current 0.14 % of output).
+Nominal, fixed: 207 s, in-peak 2.77 A at 50.5 µs, `Vam_in` average
+0.305 A over 0.4–0.5 ms (the ideal switch on the same deck: 0.308 A),
+L1/L2 1.85 A at 208 µs, +3V3 at 1.36 V at the window's end. Nominal,
+shorted: 219 s, `Vam_in` 0.313 A, L1 1.79 A at 375 µs, no L2 burst
+inside 490 µs (the study's −13.98 A came at 494 µs). Bench, fixed: U3
+as the ideal switch with the reason above, 58 s, input at its 1.0 A
+limit from 157 µs, `Vam_in` 0.284 A. All within the budget; U5 not
+reaching regulation in 490 µs happens with the ideal switch as well —
+the window, step 2's subject.
 Effort: 8–12 h.
 
 ## 2. Fit the budget and the window: open

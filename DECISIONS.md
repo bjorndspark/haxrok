@@ -670,3 +670,53 @@ the folder grows).
 Writing fails open, like the answer cache: a run whose record can't be
 written goes on unrecorded, with one warning in the log. With no auth, a
 public deploy keeps every visitor's input on disk (see "No auth").
+
+## A mux's model is probed before it goes on the chain
+
+**Decision:** before the chain's decks are planned, each mux or load
+switch on a chain with a model that loads gets one short probe run
+(`spice_circuits.probe_muxes`): its best-ranked input at its rail's
+voltage, a fixed 0.1 A load, 1 ms. The probe's input and output
+currents decide how it goes in. Below 10 % of the output current at the
+input, its output goes through a zero-volt sense source and an F-source
+draws that current from the chain's node above it. Otherwise the model
+goes in as it is. A probe that times out, fails or doesn't bring its
+output up leaves the mux an ideal switch, as before, with the reason in
+the run's setup. The probe runs through the same cache as the decks, so
+a model is probed once per input and voltage. A model whose output
+doesn't come up from the probe's 50 µs ramp is probed again with its
+input stepped on at 0 s; if it comes up then, every run on its chain
+steps the chain's source on at 0 s instead of ramping it, and says so in
+the setup. Behind the bench corner's current-limited supply its input
+can't step (the limit charges the input's caps as a ramp), so there such
+a mux stays an ideal switch, saying why.
+
+**Why:** TI's TPS2121 model makes its pass FET's drain a voltage source
+to ground copying its input, so the source above it supplies a fraction
+of a milliamp while the load draws hundreds (plan 008). An input ammeter
+on that chain reads nothing, and the bench supply's current limit is
+never reached. A model that does draw its load would draw it twice
+under a blanket wrapper. The same model never turns on from an input
+ramped up from 0 V (1 µs to 500 µs ramps, runs up to 10 ms: its output
+stays under 4 mV), but does from a step; the app ramps every source, so
+without the stepped retry the model could never go on a chain.
+
+**Alternatives rejected:** always wrapping (doubles the input current of
+a model that conserves it); a list of models known to need it (the next
+vendor model isn't on it, and the probe costs one short run); deciding
+from the netlist text (a model's current path isn't readable from a
+behavioural source's expression in general). For the ramp: finding and
+forcing the model's power-on latch inside its netlist (one model's
+internals, and the vendor's text is untrusted input we don't edit), or
+keeping the ideal switch for it (that model is the plan's point).
+
+**Consequence:** the probe's run time counts against `SPICE_BUDGET_S`.
+With a wrapped mux the input ammeter reads the load through the F-source
+plus whatever the model draws from its input itself. The wrapper
+draws from the input node the chain came through, not the one the
+model's priority logic picked, which is the same input whenever the
+chain's source is the only one powered, as in every run today. On a
+stepped chain the inrush the source sees is the step's, through the
+mux's own soft start, not a 50 µs ramp's. The bench corner doesn't run
+such a model: on the private board, TI's TPS2121 behind a 1 A limit
+stayed off even with its input held at 4.8 V by an initial condition.

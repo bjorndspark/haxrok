@@ -8,8 +8,12 @@ whose both ends are on them or on ground. The chain follows the power
 tree upstream through muxes, load switches and pass parts to one source:
 the battery when one feeds it, else USB, else an input, else an upstream
 regulator's rail, each an ideal source at the middle of its range. A mux
-or load switch on it becomes an ideal switch, a fuse or ferrite a wire,
-both labelled. The source ramps up at power-on, the ICs on the output are
+or load switch on it goes in as its vendor model when that loads and a
+short probe run with a fixed load comes up (plan 008 step 1); a model whose
+input doesn't draw its load current (TI's TPS2121) gets a sense source
+and an F-source that draw it from the input. Without one, or when the
+probe fails, it's an ideal switch with the reason; a fuse or ferrite is a
+wire. All labelled. The source ramps up at power-on, the ICs on the output are
 replaced by a resistor drawing the rail's budget (plan 005 step 5; the
 datasheet's rated output current without one), and a reset RC on the
 output to another IC's pin is kept and probed. Each analysis the user
@@ -61,7 +65,7 @@ import math
 import re
 import time
 from collections import Counter
-from collections.abc import AsyncIterator, Callable, Iterable, Sequence
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 
 from app.core.config import settings
@@ -116,6 +120,16 @@ _SWITCHING_OPTIONS = ".options method=gear reltol=0.01 abstol=1e-9 vntol=1e-5 it
 _LINEAR_OPTIONS = ".options klu reltol=0.003"
 _UNCITED_SWITCH = 2.0  # without a switch current limit: this many times the rated current
 _LOAD_HYSTERESIS = 0.02  # the start-up load's switch, as a share of the output voltage
+# A mux's model probe (plan 008 step 1): a fixed load for a short run; its
+# model is wrapped when the input draws under ``_WRAP_BELOW`` of the output
+# current, averaged over the run's end.
+_PROBE_LOAD = 0.1  # A
+_PROBE_STOP = 1e-3
+_PROBE_AVERAGE = 0.2e-3
+_PROBE_UP = 0.5  # the output came up: it draws at least this share of the load
+_WRAP_BELOW = 0.1
+# ``meas tran iin AVG …`` prints "iin = 1.000e-01 from= … to= …".
+_PROBE_MEAS = re.compile(r"^(iin|iout)\s*=\s*(\S+)", re.MULTILINE | re.IGNORECASE)
 # The chain's source, best first (plan 006 step 2); an upstream regulator's
 # rail comes after these.
 _SOURCE_RANK = {"battery": 0, "usb": 1, "input": 2}
@@ -268,6 +282,26 @@ class _Cut:
     setup: str = ""  # the source, the chain's parts and the load, said
     source_net: str | None = None  # the chain's top net, for the title
     span: tuple[float, float] | None = None  # the source's range, when it has two ends
+    # A mux's model on the chain (plan 008 step 1): its files, merged into
+    # the regulator's, and the file each one's deck line includes.
+    files: dict[str, bytes] = field(default_factory=dict, repr=False)
+    includes: tuple[str, ...] = ()
+    stepped: bool = False  # a mux's model on it needs its source stepped on
+
+
+@dataclass(frozen=True)
+class Mux:
+    """A mux or load switch on a chain that goes in as its vendor model
+    (plan 008 step 1). ``wrap`` when its probe run showed the model doesn't
+    draw its load current from its input (TI's TPS2121): a sense source on
+    its output and an F-source drawing the same current from the input.
+    ``stepped`` when the model only came up from an input stepped on at
+    0 s (TI's TPS2121 stays off from a ramp): the chain's source steps."""
+
+    m: ModelFiles
+    wrap: bool
+    share: float  # the probe's input current over its output current
+    stepped: bool = False
 
 
 @dataclass(frozen=True)
@@ -462,12 +496,16 @@ def _value(letter: str, value: str) -> float | None:
 def _model_pin(board: dict[str, str], pin: str) -> str:
     """A model pin's normalized name as the board names it: vendor models
     number a function's repeated pins ("VIN_0", "VIN_1") where the symbol
-    repeats "VIN"."""
+    repeats "VIN", and may put a V before a supply pin the symbol calls
+    "OUT" ("VOUT_0" on TI's TPS2121)."""
     name = _norm(pin)
-    if name not in board and (m := re.fullmatch(r"(.+?)_\d+", pin)):
-        base = _norm(m.group(1))
-        if base in board:
-            return base
+    if name in board:
+        return name
+    m = re.fullmatch(r"(.+?)_\d+", pin)
+    base = _norm(m.group(1)) if m else name
+    for alias in (base, base[1:] if base in ("VIN", "VOUT") else ""):
+        if alias in board:
+            return alias
     return name
 
 
@@ -570,6 +608,259 @@ def _source_said(tree: PowerTree, c: Chain, vin: float, corner: Corner = NOMINAL
     return f"{what} {net} at {_v(vin)}{how}, as {_supply(corner)}"
 
 
+def _new_node(nodes: dict[str, str]) -> str:
+    """The next free ``n<k>`` deck node."""
+    return f"n{sum(1 for v in nodes.values() if v.startswith('n')) + 1}"
+
+
+def _safe(ref: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_]", "_", ref)
+
+
+def _mux_pins(
+    design: Design, ref: str, m: ModelFiles, nodes: dict[str, str]
+) -> tuple[list[str], dict[str, str]] | str:
+    """A mux model's pins as deck nodes, in the model's order, with
+    ``nodes`` plus the mux's other nets; or why a pin can't be wired: a
+    model pin the board doesn't have, or an enable another IC drives."""
+    board: dict[str, str] = {}
+    for pin, on in _pins_of(design, ref):
+        board.setdefault(_norm(design.pin_name(f"{ref}.{pin}")), on)
+    added = dict(nodes)
+    used: list[str] = []
+    for p in (_model_pin(board, raw) for raw in m.pins):
+        net = board.get(p)
+        if net is None:
+            if _GROUND_PIN.fullmatch(p):
+                used.append("0")
+                continue
+            return f"its model's pin {p} has no pin of that name on {ref}"
+        if is_ground(net):
+            added[net] = "0"
+        if net not in added:
+            others = sorted({n.ref for n in design.nets[net] if n.ref != ref and _is_ic(n.ref)})
+            if _ENABLE_PIN.fullmatch(p) and others:
+                return f"its {p} is driven by {', '.join(others)}"
+            added[net] = _new_node(added)
+        used.append(added[net])
+    return used, added
+
+
+def _mux_lines(
+    design: Design, ref: str, mux: Mux, a: str, b: str, nodes: dict[str, str], m: ModelFiles
+) -> list[str] | str:
+    """The chain's mux ``ref`` as its model from node ``a`` to ``b``, its
+    other nets added to ``nodes``; with ``mux.wrap``, its output through
+    ``Vsense_<ref>`` and an F-source drawing that current from ``a``. Or
+    why it stays an ideal switch: its files clash with the regulator's
+    model ``m``, or it can't be wired from ``a`` to ``b``."""
+    # One deck runs in one dialect: a .spiceinit on either side only must
+    # match the other's (none is ngspice's own).
+    if mux.m.files.get(".spiceinit") != m.files.get(".spiceinit"):
+        return "its model's dialect differs from the regulator's"
+    for name, data in mux.m.files.items():
+        if name in m.files and m.files[name] != data:
+            return f"its model's file {name} differs from the regulator's of that name"
+    if mux.m.subckt.lower() == m.subckt.lower():
+        return "its model is the regulator's"
+    got = _mux_pins(design, ref, mux.m, nodes)
+    if isinstance(got, str):
+        return got
+    pins, added = got
+    if a not in pins or b not in pins:
+        return "its model's pins don't reach both ends of the chain through it"
+    nodes.update(added)
+    name = _safe(ref)
+    if not mux.wrap:
+        return [f"X{name} {' '.join(pins)} {mux.m.subckt}"]
+    # The model doesn't draw its output current from its input: its output
+    # goes through a sense source, and an F-source draws that current from
+    # the chain's input node, so the source above sees the load.
+    mx = f"mx_{name.lower()}"
+    return [
+        f"X{name} {' '.join(mx if p == b else p for p in pins)} {mux.m.subckt}",
+        f"Vsense_{name} {mx} {b} 0",
+        f"F{name} {a} 0 Vsense_{name} 1",
+    ]
+
+
+def _passives(design: Design, nodes: dict[str, str], skip: set[str], derate: float) -> list[str]:
+    """The R, C, L and D (not in ``skip``) with both ends on ``nodes``, as
+    deck lines; a ceramic C or an L at ``derate`` of its value."""
+    lines: list[str] = []
+    for part in design.parts.values():
+        letter = _head(part.ref)
+        if letter not in ("R", "C", "L", "D") or part.ref in skip:
+            continue
+        ends = _pins_of(design, part.ref)
+        if len(ends) != 2 or not all(net in nodes for _, net in ends):
+            continue
+        a, b = (nodes[net] for _, net in ends)
+        if a == b:
+            continue
+        name = _element(letter, part.ref)
+        if letter == "D":
+            k, an = _diode_ends(design, part.ref, ends, nodes)
+            lines.append(f"{name} {an} {k} hx_d")
+            continue
+        value = _value(letter, part.value)
+        if value is None:
+            logger.info(
+                "spice circuits: %s's value %r doesn't parse; left out", part.ref, part.value
+            )
+            continue
+        if letter == "L" or (letter == "C" and _is_ceramic(design, part.ref)):
+            value *= derate
+        lines.append(f"{name} {a} {b} {value:g}")
+    if any(ln.startswith("D") for ln in lines):
+        lines.append(".model hx_d D")
+    return lines
+
+
+def _probe_deck(
+    design: Design, tree: PowerTree, part: PowerPart, m: ModelFiles, stepped: bool = False
+) -> str:
+    """The probe deck for mux ``part``'s model (plan 008 step 1): the mux
+    alone with its passives, its best-ranked input with a voltage ramped
+    to that voltage (``stepped``: held at it from 0 s), and
+    ``_PROBE_LOAD`` on its output through ``Vam_out``. It measures the
+    input's and output's mean current over the run's last
+    ``_PROBE_AVERAGE`` (``iin``, ``iout`` in the log). Raises ValueError
+    with why it can't be built."""
+    rails = {r.net: r for r in tree.rails}
+
+    def voltage(net: str) -> float | None:
+        r = rails.get(net)
+        if r is not None and r.min is not None and r.max is not None:
+            return (r.min + r.max) / 2
+        return named_voltage(net)
+
+    def rank(net: str) -> int:
+        source = rails[net].source if net in rails else None
+        return _SOURCE_RANK.get(source or "", len(_SOURCE_RANK))
+
+    powered = [(n, v) for n in sorted(part.inputs, key=rank) if (v := voltage(n))]
+    if not powered:
+        raise ValueError("none of its inputs has a voltage to probe it from")
+    net_in, vin = powered[0]
+    nodes = {net_in: "vin", part.output: "out"}
+    got = _mux_pins(design, part.ref, m, nodes)
+    if isinstance(got, str):
+        raise ValueError(got)
+    pins, nodes = got
+    for net in design.nets:
+        if is_ground(net):
+            nodes[net] = "0"
+    leaks = sorted({n for n in nodes.values() if n not in ("0", "vin")})
+    t0 = _PROBE_STOP - _PROBE_AVERAGE
+    return "\n".join(
+        [
+            one_line(
+                f"{part.ref}'s model probe from {net_in} at {_v(vin)}"
+                + (" stepped" if stepped else "")
+                + f", {_PROBE_LOAD:g} A"
+            ),
+            f'.include "{m.name}"',
+            _SWITCHING_OPTIONS,
+            f"Vsrc src 0 PWL(0 {vin if stepped else 0:g} {_RAMP:g} {vin:g})",
+            "Vam_in src vin 0",
+            f"X{_safe(part.ref)} {' '.join(pins)} {m.subckt}",
+            "Vam_out out lo 0",
+            f"Rprobe lo 0 {vin / _PROBE_LOAD:g}",
+            *_passives(design, nodes, {part.ref}, 1.0),
+            *(f"Rleak_{n} {n} 0 1G" for n in leaks),
+            ".control",
+            "save v(out) i(vam_in) i(vam_out)",
+            f"tran {_STEP:g} {_PROBE_STOP:g} uic",
+            f"meas tran iin AVG i(vam_in) from={t0:g} to={_PROBE_STOP:g}",
+            f"meas tran iout AVG i(vam_out) from={t0:g} to={_PROBE_STOP:g}",
+            "linearize",
+            "wrdata out.txt v(out)",
+            "quit",
+            ".endc",
+            ".end",
+            "",
+        ]
+    )
+
+
+def _down(run: Run | None) -> bool:
+    """Whether a probe run finished but its output didn't come up: the
+    one failure a stepped probe may get past."""
+    got = {k.lower(): v for k, v in _PROBE_MEAS.findall(run.log)} if run else {}
+    try:
+        return (
+            run is not None
+            and run.code is not None
+            and not (float(got["iout"]) >= _PROBE_UP * _PROBE_LOAD)
+        )
+    except (KeyError, ValueError):
+        return False
+
+
+def probed(m: ModelFiles, run: Run | None, stepped: bool = False) -> Mux | str:
+    """The mux model as its probe run found it: wrapped when its input
+    draws under ``_WRAP_BELOW`` of its output current, ``stepped`` as the
+    run's input was; or why it stays an ideal switch (the run failed, or
+    its output didn't come up)."""
+    if run is None:
+        return "ngspice isn't installed to probe its model"
+    if run.code is None:
+        return "its model's probe run timed out"
+    got = {k.lower(): v for k, v in _PROBE_MEAS.findall(run.log)}
+    try:
+        iin, iout = float(got["iin"]), float(got["iout"])
+    except (KeyError, ValueError):
+        error = ngspice_error(run.log) or f"ngspice exited with {run.code}"
+        return f"its model's probe run failed: {error}"
+    if not iout >= _PROBE_UP * _PROBE_LOAD:
+        return (
+            f"its model's output didn't come up in its probe run "
+            f"({iout * 1e3:.0f} mA of {_PROBE_LOAD * 1e3:g} mA)"
+        )
+    share = iin / iout
+    return Mux(m, share < _WRAP_BELOW, share, stepped)
+
+
+async def probe_muxes(
+    statuses: Sequence[SpiceModelStatus],
+    upload: dict[str, bytes],
+    design: Design,
+    tree: PowerTree,
+    runner: ModelRunner,
+) -> dict[str, Mux | str]:
+    """Each mux or load switch in ``tree`` with a loading model, probed
+    once (``_probe_deck``; the runner's cache keeps the run), and again
+    from a stepped input when its output didn't come up from the ramp:
+    its ``Mux``, or why it stays an ideal switch on the chains through it."""
+    found = {s.ref: s for s in _runnable(statuses)}
+    out: dict[str, Mux | str] = {}
+    for part in tree.parts:
+        s = found.get(part.ref)
+        if part.kind != "switch" or s is None or part.ref in out:
+            continue
+        m = await asyncio.to_thread(model_files, s, upload)
+        if not isinstance(m, ModelFiles):
+            out[part.ref] = f"its model isn't ready: {m[1]}"
+            continue
+        try:
+            deck = _probe_deck(design, tree, part, m)
+        except ValueError as e:
+            out[part.ref] = str(e)
+            continue
+        run = await runner.transient(deck, m.files)
+        out[part.ref] = probed(m, run)
+        if _down(run):
+            # Some models (TI's TPS2121) latch off from a ramped input and
+            # start only from a step: the chain's source then steps too.
+            deck = _probe_deck(design, tree, part, m, stepped=True)
+            got = probed(m, await runner.transient(deck, m.files), stepped=True)
+            if isinstance(got, Mux):
+                out[part.ref] = got
+        logger.info("spice circuits: mux %s probed: %s", part.ref, out[part.ref])
+    return out
+
+
 def _cut(
     design: Design,
     ref: str,
@@ -578,11 +869,14 @@ def _cut(
     rate: Ratings,
     tree: PowerTree | None = None,
     corner: Corner = NOMINAL,
+    muxes: Mapping[str, Mux | str] | None = None,
 ) -> _Cut | str | None:
     """The regulator's circuit, or why it can't be simulated; None when the
     model isn't a single-rail regulator's: no input and output pin, or input
     or output pins on more than one net (a driver's IN1/IN2, OUT1/OUT2).
-    ``corner`` sets the source's voltage and the C and L derating."""
+    ``corner`` sets the source's voltage and the C and L derating. A mux on
+    the chain goes in as its model when ``muxes`` has its ``Mux``, else as
+    an ideal switch, with the reason ``muxes`` or the wiring gives."""
     board: dict[str, str] = {}
     number: dict[str, str] = {}  # normalized pin name -> the board's pin number
     for pin, on in _pins_of(design, ref):
@@ -638,19 +932,48 @@ def _cut(
     chain_lines: list[str] = []
     via: list[str] = []
     handled: set[str] = set()
+    mux_files: dict[str, bytes] = {}
+    includes: list[str] = []
+    stepped = False
     if up is not None:
         for i, link in enumerate(up.nets[:-1]):
             nodes.setdefault(link, f"c{i}")
         for i, step in enumerate(up.parts):
             a, b = nodes[up.nets[i]], nodes[up.nets[i + 1]]
             said = f"{step.ref} ({step.value})" if step.value else step.ref
+            why = (muxes or {}).get(step.ref) if step.kind == "switch" else None
+            if isinstance(why, Mux) and why.stepped and corner.limit is not None:
+                # Behind a current limit its input charges the caps as a ramp
+                # again, and such a model stays off (plan 008 step 1).
+                why = "its model starts only from a stepped input, and the supply's limit ramps it"
+            if isinstance(why, Mux):
+                got = _mux_lines(design, step.ref, why, a, b, nodes, m)
+                if isinstance(got, list):
+                    chain_lines += got
+                    mux_files.update(why.m.files)
+                    if why.m.name not in includes and why.m.name != m.name:
+                        includes.append(why.m.name)
+                    said += f" as its vendor model {why.m.subckt}"
+                    if why.wrap:
+                        said += (
+                            ", its load current drawn from its input (the model draws "
+                            f"{why.share * 100:.2g} % of it there)"
+                        )
+                    if why.stepped:
+                        stepped = True
+                        said += (
+                            ", the source stepped on at 0 s (the model doesn't start from a ramp)"
+                        )
+                    via.append(said)
+                    continue
+                why = got
             if step.kind == "switch" or (step.kind == "pass" and _is_wire(design, step)):
                 # Zero volts: the mux's or fuse's own drop isn't modelled,
                 # and i(v_sw_<ref>) is the current through it.
                 chain_lines.append(f"{_element('V', 'sw_' + step.ref)} {a} {b} 0")
                 handled.add(step.ref)
                 kind = "switch" if step.kind == "switch" else "wire"
-                said += f" as an ideal {kind}"
+                said += f" as an ideal {kind}" + (f" ({why})" if why else "")
             via.append(said)
     if up is not None and tree is not None:
         source_said = _source_said(tree, up, vin, corner)
@@ -680,7 +1003,7 @@ def _cut(
         if is_ground(net):
             nodes[net] = "0"
         if net not in nodes:
-            nodes[net] = f"n{sum(1 for v in nodes.values() if v.startswith('n')) + 1}"
+            nodes[net] = _new_node(nodes)
         on_chain = up is not None and net in up.nets
         if _ENABLE_PIN.fullmatch(p) and nodes[net] not in ("vin", "out", "0") and not on_chain:
             others = sorted({n.ref for n in design.nets[net] if n.ref != ref and _is_ic(n.ref)})
@@ -703,41 +1026,16 @@ def _cut(
         if is_ground(net):
             nodes[net] = "0"
     lines = [
-        f"X{re.sub(r'[^A-Za-z0-9_]', '_', ref)} {' '.join(pins_used)} {m.subckt}",
+        f"X{_safe(ref)} {' '.join(pins_used)} {m.subckt}",
         *ammeters,
         *chain_lines,
+        *_passives(design, nodes, {ref, *handled}, corner.derate),
     ]
     reset = None
-    for part in design.parts.values():
-        letter = _head(part.ref)
-        if letter not in ("R", "C", "L", "D") or part.ref == ref or part.ref in handled:
-            continue
-        ends = _pins_of(design, part.ref)
-        if len(ends) != 2 or not all(net in nodes for _, net in ends):
-            continue
-        a, b = (nodes[net] for _, net in ends)
-        if a == b:
-            continue
-        name = _element(letter, part.ref)
-        if letter == "D":
-            k, an = _diode_ends(design, part.ref, ends, nodes)
-            lines.append(f"{name} {an} {k} hx_d")
-            continue
-        value = _value(letter, part.value)
-        if value is None:
-            logger.info(
-                "spice circuits: %s's value %r doesn't parse; left out", part.ref, part.value
-            )
-            continue
-        if letter == "L" or (letter == "C" and _is_ceramic(design, part.ref)):
-            value *= corner.derate
-        lines.append(f"{name} {a} {b} {value:g}")
     rc = _reset_rc(design, ref, net_out, nodes, corner.derate)
     if rc is not None:
         reset, extra = rc
         lines += extra
-    if any(ln.split()[0].upper().startswith("D") for ln in lines[1:]):
-        lines.append(".model hx_d D")
     return _Cut(
         vin,
         vout,
@@ -751,6 +1049,9 @@ def _cut(
         setup=setup,
         source_net=up.nets[0] if up is not None else None,
         span=span,
+        files=mux_files,
+        includes=tuple(includes),
+        stepped=stepped,
     )
 
 
@@ -853,12 +1154,14 @@ def _deck(
         )
     ]
     ammeters = ["in", *(s.name for s in cut.switches)]
-    switching = bool(cut.switches)
+    # A mux's model on the chain takes the switching settings too: the
+    # hand-built chain runs (plan 008) needed gear and ``uic`` to start.
+    switching = bool(cut.switches) or bool(cut.files)
     return "\n".join(
         [
             one_line(title),
             *comments,
-            f'.include "{name}"',
+            *(f'.include "{n}"' for n in (name, *cut.includes)),
             _SWITCHING_OPTIONS if switching else _LINEAR_OPTIONS,
             *sources,
             *cut.lines,
@@ -886,16 +1189,18 @@ def plan(
     reading: DatasheetReading,
     analyses: Sequence[SimAnalysis],
     tree: PowerTree | None = None,
+    muxes: Mapping[str, Mux | str] | None = None,
 ) -> list[Job] | Skip | None:
     """The decks for one regulator, or why it's skipped; None when the
     model isn't a regulator's. ``tree`` (budgeted, ``budget.apply``) gives
     the chain from the source and the load; without it, the regulator
     alone from its input. Every analysis runs at the source's nominal;
     start-up also runs from the bench supply and at the source's min and
-    max (``Corner``), in that order. Pure; nothing runs yet."""
+    max (``Corner``), in that order. ``muxes`` (``probe_muxes``) puts a
+    mux on the chain in as its model. Pure; nothing runs yet."""
     ref = status.ref
     rate = ratings(reading.limits.get(ref, []))
-    cut = _cut(design, ref, m, status, rate, tree)
+    cut = _cut(design, ref, m, status, rate, tree, NOMINAL, muxes)
     title = f"{ref} ({status.value[:60]})"
     if cut is None:
         return None
@@ -911,7 +1216,7 @@ def plan(
             Corner("max", cut.span[1], _DERATE),
         ]
     for corner in corners:
-        at = _cut(design, ref, m, status, rate, tree, corner)
+        at = _cut(design, ref, m, status, rate, tree, corner, muxes)
         if not isinstance(at, _Cut):
             logger.info("spice circuits: %s at %s isn't planned: %s", ref, corner.name, at)
             continue
@@ -968,12 +1273,15 @@ def _jobs(
         setup=cut.setup,
     )
     src = cut.src
+    # The source's rise: a ramp from 0 V, or held at ``vin`` from 0 s when
+    # a mux's model on the chain only starts from a step.
+    rise = f"0 {vin if cut.stepped else 0:g} {_RAMP:g} {vin:g}"
     jobs: list[Job] = []
     for analysis in analyses:
         if analysis == "startup":
             limits = base
             sources = [
-                *_source(f"0 0 {_RAMP:g} {vin:g}", src, corner.limit),
+                *_source(rise, src, corner.limit),
                 *_switched_load(vout / current, droop, vout),
             ]
             what = "start-up"
@@ -981,7 +1289,7 @@ def _jobs(
             t1 = window
             limits = replace(base, t_event=t1, stop=t1 + _LOAD_STEP_AFTER)
             sources = [
-                *_source(f"0 0 {_RAMP:g} {vin:g}", src),
+                *_source(rise, src),
                 f"Rload out 0 {vout / (_LIGHT * current):g}",
                 f"Istep out 0 PWL(0 0 {t1:g} 0 {t1 + 1e-6:g} {(1 - _LIGHT) * current:g})",
             ]
@@ -993,7 +1301,7 @@ def _jobs(
             vend = vout * (1 - rate.accuracy) * 0.9
             limits = replace(base, t_event=t1, stop=t1 + _SWEEP, vin_end=vend)
             sources = [
-                *_source(f"0 0 {_RAMP:g} {vin:g} {t1:g} {vin:g} {t1 + _SWEEP:g} {vend:g}", src),
+                *_source(f"{rise} {t1:g} {vin:g} {t1 + _SWEEP:g} {vend:g}", src),
                 f"Rload out 0 {vout / current:g}",
             ]
             what = "dropout"
@@ -1007,7 +1315,7 @@ def _jobs(
                 full,
                 deck,
                 limits,
-                m.files,
+                {**m.files, **cut.files},
                 frozenset(cut.nodes),
                 corner=corner.name,
             )
@@ -1443,9 +1751,12 @@ async def simulate(
     with (plan 006 step 3), at the same corner. Runs are queued by corner
     (nominal, bench, min, max), each as built before its fix; one still
     queued after ``budget_s`` (default ``SPICE_BUDGET_S``) of ``clock`` is
-    skipped. Closing the iterator early cancels the runs still going."""
+    skipped. Each mux on a chain is probed first (``probe_muxes``), inside
+    the budget. Closing the iterator early cancels the runs still going."""
     if not analyses:
         return
+    start = clock()
+    muxes = await probe_muxes(statuses, upload, design, tree, runner) if tree is not None else {}
     jobs: list[tuple[str, Job]] = []
     n = 0
     for s in _runnable(statuses):
@@ -1453,7 +1764,7 @@ async def simulate(
         if not isinstance(m, ModelFiles):
             logger.info("spice circuits: %s's model isn't ready: %s", s.ref, m[1])
             continue
-        got = plan(design, s, m, reading, analyses, tree)
+        got = plan(design, s, m, reading, analyses, tree, muxes)
         if got is None:
             continue
         if isinstance(got, Skip):
@@ -1471,7 +1782,7 @@ async def simulate(
             if not touched:
                 continue
             again = plan(
-                f.design, s, m, reading, list(dict.fromkeys(a for a, _ in touched)), f.tree
+                f.design, s, m, reading, list(dict.fromkeys(a for a, _ in touched)), f.tree, muxes
             )
             if not isinstance(again, list):
                 logger.info(
@@ -1486,7 +1797,6 @@ async def simulate(
                 jobs.append((f"vm{n}", replace(job, title=title, fix_of=of, finding=f.finding)))
     jobs = _queued(jobs)
     budget = settings.SPICE_BUDGET_S if budget_s is None else budget_s
-    start = clock()
     gate = asyncio.Semaphore(_PARALLEL)
 
     async def one(sim_id: str, job: Job) -> Simulation | None:

@@ -4,6 +4,7 @@ running them (plan 004 step 6)."""
 
 import dataclasses
 import itertools
+import re
 import shutil
 
 import pytest
@@ -1018,3 +1019,292 @@ async def test_a_toy_regulator_starts_up_in_real_ngspice():
     # No switch-node pin: the linear solver settings, the operating point solved.
     assert sc._LINEAR_OPTIONS in sim.deck and " uic" not in sim.deck
     assert "meas tran pk_in MAX i(vam_in)" in sim.deck
+
+
+# --- a mux's model on the chain (plan 008 step 1) ----------------------------
+
+MUX_LIB = b".SUBCKT TPS2121_TRANS IN1 IN2 VOUT_0 VOUT_1 GND\nR1 IN1 VOUT_0 1\n.ENDS\n"
+MUX_PINS = ["IN1", "IN2", "VOUT_0", "VOUT_1", "GND"]
+
+
+def _mux_files(pins: list[str] = MUX_PINS, spiceinit: bytes | None = None) -> ModelFiles:
+    files = {"tps2121.lib": MUX_LIB}
+    if spiceinit is not None:
+        files[".spiceinit"] = spiceinit
+    return ModelFiles("tps2121.lib", "TPS2121_TRANS", pins, {}, files)
+
+
+def _muxed_job(mux: sc.Mux | str) -> sc.Job:
+    got = sc.plan(
+        _muxed(), _status(), _files(), _reading(), ["startup"], _muxed_tree(), {"U3": mux}
+    )
+    assert isinstance(got, list), got
+    return next(j for j in got if j.corner == "nominal")
+
+
+def test_a_mux_whose_model_draws_nothing_goes_in_wrapped():
+    job = _muxed_job(sc.Mux(_mux_files(), wrap=True, share=0.02))
+    lines = job.deck.splitlines()
+    # VOUT_0/VOUT_1 land on the board's OUT; the other input (VBUS) is its own node.
+    assert "XU3 n1 c1 mx_u3 mx_u3 0 TPS2121_TRANS" in lines
+    # The output through a sense source, the same current drawn from the input.
+    assert "Vsense_U3 mx_u3 vin 0" in lines and "FU3 c1 0 Vsense_U3 1" in lines
+    assert "Rleak_n1 n1 0 1G" in lines  # VBUS unpowered
+    assert not any(ln.startswith("V_sw_U3") for ln in lines)
+    assert '.include "tps63802.lib"' in lines and '.include "tps2121.lib"' in lines
+    assert job.files["tps2121.lib"] == MUX_LIB and job.files["tps63802.lib"] == TPS_LIB
+    assert sc._SWITCHING_OPTIONS in lines
+    assert job.limits.setup.startswith(
+        "From the battery VBAT at 3.600 V (the middle of 3.000 V–4.200 V), as an ideal "
+        "source through F1 (1A) as an ideal wire, U3 (TPS2121) as its vendor model "
+        "TPS2121_TRANS, its load current drawn from its input (the model draws 2 % of it "
+        "there); load"
+    )
+
+
+def test_a_mux_whose_model_draws_its_load_goes_in_as_it_is():
+    job = _muxed_job(sc.Mux(_mux_files(), wrap=False, share=0.98))
+    lines = job.deck.splitlines()
+    assert "XU3 n1 c1 vin vin 0 TPS2121_TRANS" in lines
+    assert not any(ln.startswith(("Vsense_", "FU3")) for ln in lines)
+    assert "U3 (TPS2121) as its vendor model TPS2121_TRANS; load" in job.limits.setup
+
+
+def test_a_mux_that_starts_only_from_a_step_steps_the_chains_source():
+    got = sc.plan(
+        _muxed(),
+        _status(),
+        _files(),
+        _reading(),
+        ["startup"],
+        _muxed_tree(),
+        {"U3": sc.Mux(_mux_files(), wrap=True, share=0.02, stepped=True)},
+    )
+    assert isinstance(got, list) and {j.corner for j in got} == {"nominal", "bench", "min", "max"}
+    for job in (j for j in got if j.corner != "bench"):
+        # Held at the corner's voltage from 0 s.
+        vsrc = next(ln for ln in job.deck.splitlines() if ln.startswith("Vsrc"))
+        assert re.fullmatch(r"Vsrc src 0 PWL\(0 (\S+) 5e-05 \1\)", vsrc), vsrc
+        assert (
+            "TPS2121_TRANS, its load current drawn from its input (the model draws 2 % of it "
+            "there), the source stepped on at 0 s (the model doesn't start from a ramp); load"
+        ) in job.limits.setup
+    nominal = next(j for j in got if j.corner == "nominal")
+    assert "Vsrc src 0 PWL(0 3.6 5e-05 3.6)" in nominal.deck.splitlines()
+    # Behind the bench supply's limit: ramped, and the mux an ideal switch.
+    bench = next(j for j in got if j.corner == "bench")
+    assert "Vsrc sup 0 PWL(0 0 5e-05 3.6)" in bench.deck.splitlines()
+    assert "V_sw_U3 c1 vin 0" in bench.deck.splitlines()
+    assert (
+        "U3 (TPS2121) as an ideal switch (its model starts only from a stepped input, and "
+        "the supply's limit ramps it)"
+    ) in bench.limits.setup
+
+
+@pytest.mark.parametrize(
+    ("mux", "reason"),
+    [
+        ("its model's probe run failed: boom", "its model's probe run failed: boom"),
+        (
+            sc.Mux(_mux_files([*MUX_PINS, "ILIM"]), wrap=True, share=0.0),
+            "its model's pin ILIM has no pin of that name on U3",
+        ),
+        (
+            sc.Mux(_mux_files(spiceinit=b"set ngbehavior=lt\n"), wrap=True, share=0.0),
+            "its model's dialect differs from the regulator's",
+        ),
+    ],
+)
+def test_a_mux_falls_back_to_an_ideal_switch_saying_why(mux, reason):
+    job = _muxed_job(mux)
+    lines = job.deck.splitlines()
+    assert "V_sw_U3 c1 vin 0" in lines and not any(ln.startswith("XU3") for ln in lines)
+    assert "tps2121.lib" not in job.files
+    assert f"U3 (TPS2121) as an ideal switch ({reason});" in job.limits.setup
+
+
+def _probe_log(iin: float, iout: float) -> str:
+    return (
+        f"iin                 =  {iin:e} from=  8.000000e-04 to=  1.000000e-03\n"
+        f"iout                =  {iout:e} from=  8.000000e-04 to=  1.000000e-03\n"
+    )
+
+
+def test_the_probe_wraps_a_model_whose_input_draws_too_little():
+    m = _mux_files()
+    assert sc.probed(m, Run(0, "", _probe_log(2e-3, 0.1))) == sc.Mux(m, True, 0.02)
+    assert sc.probed(m, Run(0, "", _probe_log(0.1, 0.1))) == sc.Mux(m, False, 1.0)
+    assert sc.probed(m, Run(0, "", _probe_log(0.0, 0.01))) == (
+        "its model's output didn't come up in its probe run (10 mA of 100 mA)"
+    )
+    assert sc.probed(m, Run(None, None, "")) == "its model's probe run timed out"
+    assert sc.probed(m, Run(1, None, "Error: unknown subckt: x")).startswith(
+        "its model's probe run failed: "
+    )
+
+
+class ProbeRunner(FakeRunner):
+    """Answers a mux's probe with an input drawing 1 % of the output."""
+
+    async def transient(self, netlist: str, files: dict[str, bytes]) -> Run | None:
+        if "model probe" in netlist.splitlines()[0]:
+            self.decks.append(netlist)
+            return Run(0, "", _probe_log(1e-3, 0.1))
+        return await super().transient(netlist, files)
+
+
+class StepOnlyRunner(FakeRunner):
+    """Answers a mux's probe as TI's TPS2121 model runs: its output stays
+    off from a ramped input and comes up from a stepped one (``stepped``
+    False: from neither)."""
+
+    def __init__(self, stepped: bool = True) -> None:
+        super().__init__()
+        self.stepped = stepped
+
+    async def transient(self, netlist: str, files: dict[str, bytes]) -> Run | None:
+        title = netlist.splitlines()[0]
+        if "model probe" in title:
+            self.decks.append(netlist)
+            up = self.stepped and " stepped," in title
+            return Run(0, "", _probe_log(1e-4, 0.1 if up else 5e-5))
+        return await super().transient(netlist, files)
+
+
+def _mux_status() -> SpiceModelStatus:
+    return _status("U3", "TPS2121_TRANS", value="TPS2121", file="tps2121.lib")
+
+
+async def test_each_mux_is_probed_once_from_its_best_input():
+    runner = ProbeRunner()
+    upload = {"tps2121.lib": MUX_LIB}
+    got = await sc.probe_muxes([_mux_status(), _status()], upload, _muxed(), _muxed_tree(), runner)
+    assert set(got) == {"U3"} and isinstance(got["U3"], sc.Mux)
+    assert got["U3"].wrap and got["U3"].share == pytest.approx(0.01)
+    (deck,) = runner.decks
+    lines = deck.splitlines()
+    # USB ranks above the fused battery's /IN2, which has no source of its own.
+    assert lines[0] == "U3's model probe from VBUS at 5.000 V, 0.1 A"
+    assert "Vsrc src 0 PWL(0 0 5e-05 5)" in lines and "Rprobe lo 0 50" in lines
+    assert "XU3 vin n1 out out 0 TPS2121_TRANS" in lines
+    assert "C7 0 n1 1e-05" in lines and "Rleak_n1 n1 0 1G" in lines
+    assert "meas tran iout AVG i(vam_out) from=0.0008 to=0.001" in lines
+
+
+async def test_simulate_puts_the_probed_mux_in_the_chain():
+    runner = ProbeRunner()
+    sims = [
+        s
+        async for s in sc.simulate(
+            [_mux_status(), _status()],
+            {"tps2121.lib": MUX_LIB, "tps63802.lib": TPS_LIB},
+            _muxed(),
+            _reading(),
+            ["startup"],
+            runner,
+            _muxed_tree(),
+        )
+    ]
+    assert sims and all(s.ref == "U15" for s in sims)
+    chain = [d for d in runner.decks if "model probe" not in d.splitlines()[0]]
+    assert chain and all("FU3 c1 0 Vsense_U3 1" in d for d in chain)
+
+
+@needs_ngspice
+async def test_a_toy_mux_that_draws_nothing_is_wrapped_and_the_source_sees_the_load():
+    design = _design(
+        {"U1": "TOYREG", "U2": "TOYMUX", "C1": "10u", "C2": "1u"},
+        {
+            "VBUS": ["U2.1(IN1)"],
+            "/IN2": ["U2.2(IN2)"],
+            "+SYS": ["U2.3(OUT)", "U1.1(VIN)", "U1.3(EN)", "C2.1"],
+            "+3V3": ["U1.4(VOUT)", "C1.1"],
+            "GND": ["U1.2(GND)", "U2.4(GND)", "C1.2", "C2.2"],
+        },
+    )
+    upload = {
+        # A linear regulator: its load current drawn from VIN.
+        "toy.lib": b".SUBCKT TOYREG VIN GND EN VOUT\n"
+        b"B1 INT GND V=min(V(VIN,GND), 3.3)\n"
+        b"VS INT X 0\n"
+        b"RS X VOUT 0.01\n"
+        b"F1 VIN GND VS 1\n"
+        b".ENDS\n",
+        # The output follows the higher input without drawing from it.
+        "mux.lib": b".SUBCKT TOYMUX IN1 IN2 OUT GND\n"
+        b"B1 INT GND V=max(V(IN1,GND), V(IN2,GND))\n"
+        b"RS INT OUT 0.01\n"
+        b".ENDS\n",
+    }
+    tree = PowerTree(
+        rails=[
+            _rail("VBUS", 5.0, 5.0, source="usb"),
+            _rail("+SYS", 5.0, 5.0, fed_by=["U2"]),
+            _rail("+3V3", 3.3, 3.3, fed_by=["U1"]),
+        ],
+        parts=[
+            PowerPart(
+                ref="U2", value="TOYMUX", kind="switch", inputs=["VBUS", "/IN2"], output="+SYS"
+            ),
+            PowerPart(ref="U1", value="TOYREG", kind="regulator", inputs=["+SYS"], output="+3V3"),
+        ],
+    )
+    reading = DatasheetReading(
+        limits={
+            "U1": [
+                _fact("Output current", None, None, 0.5, "A"),
+                _fact("Start-up time", None, 100, None, "µs"),
+            ]
+        }
+    )
+    reg = _status("U1", "TOYREG", value="TOYREG", status="ngspice", file="toy.lib")
+    mux = _status("U2", "TOYMUX", value="TOYMUX", status="ngspice", file="mux.lib")
+    ngspice = Ngspice(timeout_s=60)
+    probed = await sc.probe_muxes([mux, reg], upload, design, tree, ngspice)
+    assert isinstance(probed["U2"], sc.Mux) and probed["U2"].wrap, probed
+    assert abs(probed["U2"].share) < 0.01
+    sims = [
+        s
+        async for s in sc.simulate([mux, reg], upload, design, reading, ["startup"], ngspice, tree)
+    ]
+    sim = next(s for s in sims if s.id == "vm1")
+    assert sim.verdict == "passed", sim.text
+    assert "FU2 c0 0 Vsense_U2 1" in sim.deck.splitlines()
+    # Through the F-source the source sees C1 charging (1e5 V/s on 10 µF),
+    # the 0.5 A load and C2: about 1.6 A. Without it, only C2's 0.1 A.
+    (peak,) = [p for p in sim.peaks if p.name == "in"]
+    assert peak.a == pytest.approx(1.6, rel=0.1), sim.peaks
+
+
+async def test_a_mux_down_from_a_ramp_is_probed_again_stepped():
+    runner = StepOnlyRunner()
+    upload = {"tps2121.lib": MUX_LIB}
+    got = await sc.probe_muxes([_mux_status(), _status()], upload, _muxed(), _muxed_tree(), runner)
+    mux = got["U3"]
+    assert isinstance(mux, sc.Mux) and mux.stepped and mux.wrap
+    assert mux.share == pytest.approx(1e-3)
+    ramped, stepped = runner.decks
+    assert "Vsrc src 0 PWL(0 0 5e-05 5)" in ramped.splitlines()
+    assert stepped.splitlines()[0] == "U3's model probe from VBUS at 5.000 V stepped, 0.1 A"
+    assert "Vsrc src 0 PWL(0 5 5e-05 5)" in stepped.splitlines()
+
+
+async def test_a_mux_down_from_a_step_too_keeps_the_ramps_reason():
+    runner = StepOnlyRunner(stepped=False)
+    upload = {"tps2121.lib": MUX_LIB}
+    got = await sc.probe_muxes([_mux_status(), _status()], upload, _muxed(), _muxed_tree(), runner)
+    assert got["U3"] == "its model's output didn't come up in its probe run (0 mA of 100 mA)"
+    assert len(runner.decks) == 2
+
+
+async def test_a_failed_probe_is_not_run_again_stepped():
+    class Failing(FakeRunner):
+        async def transient(self, netlist: str, files: dict[str, bytes]) -> Run | None:
+            self.decks.append(netlist)
+            return Run(1, None, "Error: unknown subckt: x")
+
+    runner = Failing()
+    upload = {"tps2121.lib": MUX_LIB}
+    got = await sc.probe_muxes([_mux_status(), _status()], upload, _muxed(), _muxed_tree(), runner)
+    assert isinstance(got["U3"], str) and got["U3"].startswith("its model's probe run failed")
+    assert len(runner.decks) == 1
