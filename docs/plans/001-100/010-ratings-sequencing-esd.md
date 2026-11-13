@@ -127,6 +127,20 @@ the order rests on start-up times the netlist can't show (two
 regulators enabled from the same source), it's listed as "may fail"
 with the requirement and both rails, so the reviewer checks it on a
 scope.
+Decided (2026-11-14): the eval case is `orbit-vdda-late`, from orbit.
+The STM32F030's datasheet requires VDDA up before or with VDD. The
+planted edit moves U16's VDDA off +3.3V onto an added RT9013-33 LDO
+(the part rp-micro already uses), fed from +BATT with its EN on +3.3V,
+so the wiring brings VDDA up after VDD (flagged). The unmodified orbit
+board is the fixed variant and must stay silent.
+Decided (2026-11-14): only the order is checked. A time limit in the
+datasheet ("within 10 ms of VDD") is quoted in the finding's text for
+the reviewer to measure, not computed; the netlist can't show
+regulator start-up times.
+Decided (2026-11-14), defaults: the check lives in `sequencing.py`
+with calculation kind `rail_order`; `DatasheetFacts` gets a
+`sequencing` list (the rails by pin, the relation, any time limit, the
+page).
 
 **Check:** `test_debug_facts.py` for the new fields; unit tests for the
 order check; `make eval-app case=<new case>` with a fresh datasheet read;
