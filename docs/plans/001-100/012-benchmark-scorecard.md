@@ -57,6 +57,8 @@ Effort: about 2–3 days, a step per session.
   the issues by severity (won't work, may fail, improvement).
 - Writes a markdown scorecard and a JSON file under `evals/results/`
   (gitignored), so two scorecards can be diffed.
+- Named `evals/scorecard.py`, run as `make eval-score [n=3]
+  [cases=a,b]`, beside `make eval-app`.
 
 Decided (2026-11-14): N = 3 runs per case. It shows run-to-run flips
 (like `rp-micro-no-fault`'s) and a full sweep of ~18 cases takes about
@@ -81,6 +83,10 @@ user before it's added. Rejected: an LLM judge (the judgement itself
 varies between runs, and it's weak evidence for a large company), and
 counting severities only (a planted board's own real flaws would count
 as false alarms).
+Decided (2026-11-14): steps 1–4 run unattended in `/step-loop`. The
+agent's judgements go into `judged.md` marked `draft`, and the scorecard
+counts a draft entry apart from a confirmed one. The user confirms the
+drafts in the loop's whole-branch review; step 5 runs only after that.
 
 **Checks:** a rerun of a judged case scores without new judging, except
 for issues it hasn't raised before.
@@ -103,10 +109,23 @@ for issues it hasn't raised before.
   changelog only, never from the diff.
 - Same export and license rules as the planted cases.
 
+Decided (2026-11-14): real bugs come only from public repos' fix
+commits (a revision note, a fix linked to an issue), permissive
+licenses only, so every case can be committed. The user's own private
+boards stay out of this plan.
+Decided (2026-11-14): in steps 3 and 4 the agent picks the boards and
+commits itself, by these rules: a permissive license, KiCad sources that
+export with KiCad 9, kinds that differ from the existing cases, and (step
+4) a fix whose cause is stated in the commit, issue or changelog, not
+guessed from the diff. Each choice and the candidates passed over are
+written in the step's section, and the user reviews them with the drafts.
+
 **Checks:** each case's ERC and netlist export; one scorecard run.
 
 ## 5. A baseline scorecard recorded: proposed
 
+- Runs only after the user has confirmed the `draft` judgements and the
+  boards picked in steps 2–4.
 - Run the full scorecard and record it in `evals/README.md`: misses on
   planted and on real cases separately, and wrong issues per board.
 - The `/step` **Check** for prompt changes points at the scorecard.
