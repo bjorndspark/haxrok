@@ -24,6 +24,7 @@ from app.features.debug.schemas import (
     PinFact,
     PinRuleFact,
     PinRuleKind,
+    SequencingFact,
 )
 
 # --- pdf: choosing pages ------------------------------------------------------------
@@ -198,6 +199,7 @@ MCU_FACTS = DatasheetFacts(
         ),
     ],
     pin_rules=[],
+    sequencing=[],
 )
 
 VDDA = AppPart(
@@ -218,6 +220,7 @@ LDO_FACTS = DatasheetFacts(
     limits=[_limit("Input voltage", 2.2, 5.5, 3)],
     application=[],
     pin_rules=[],
+    sequencing=[],
 )
 
 
@@ -350,7 +353,7 @@ def test_check_filters_application_pins_to_the_board():
 
 
 def test_check_keeps_a_part_but_drops_a_range_read_from_a_page_not_sent():
-    with_vdda = DatasheetFacts(pins=[], limits=[], application=[VDDA], pin_rules=[])
+    with_vdda = DatasheetFacts(pins=[], limits=[], application=[VDDA], pin_rules=[], sequencing=[])
     [kept] = facts.check(with_vdda, {44, 45}, {"9"}).application
     assert (kept.role, kept.min, kept.unit, kept.range_page) == (
         "VDDA filter capacitor",
@@ -391,7 +394,7 @@ def test_check_keeps_pin_rules_on_sent_pages_and_board_pins_only():
         _pin_rule(["48"], 33),  # no pin left on the board
         _pin_rule(["44"], 99),  # page not sent
     ]
-    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
+    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules, sequencing=[])
     [kept] = facts.check(read, {33}, {"44"}).pin_rules
     assert kept.pins == ["44"] and kept.page == 33
 
@@ -401,7 +404,7 @@ def test_check_drops_rc_numbers_no_datasheet_prints():
         _pin_rule(["44"], 33, internal_pull="high", pull_kohms=45, threshold=0.75, hold_ms=3),
         _pin_rule(["44"], 33, internal_pull="high", pull_kohms=0, threshold=2.0, hold_ms=-1),
     ]
-    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
+    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules, sequencing=[])
     sane, insane = facts.check(read, {33}, {"44"}).pin_rules
     assert (sane.pull_kohms, sane.threshold, sane.hold_ms) == (45, 0.75, 3)
     assert (insane.internal_pull, insane.pull_kohms, insane.threshold, insane.hold_ms) == (
@@ -417,7 +420,7 @@ def test_fact_line_gives_a_strapping_pins_rc_numbers():
         _pin_rule(["27"], 9, internal_pull="high", pull_kohms=45, threshold=0.75, hold_ms=3),
         _pin_rule(["26"], 9, level="low", internal_pull="low"),
     ]
-    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
+    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules, sequencing=[])
     assert [line for _, line in facts._fact_lines(read)] == [
         "pin rule: strapping, pins 27, normal boot needs it high, internal pull-up 45 kΩ, "
         "threshold 0.75 × VDD, hold time 3 ms: Boot mode.",
@@ -430,16 +433,62 @@ def test_fact_line_names_a_pin_rule_with_its_boot_level_and_condition():
         _pin_rule(["27"], 9),
         _pin_rule(["28", "29"], 4, kind="reserved", level="either", condition="with octal PSRAM"),
     ]
-    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules)
+    read = DatasheetFacts(pins=[], limits=[], application=[], pin_rules=rules, sequencing=[])
     assert facts._fact_lines(read) == [
         (9, "pin rule: strapping, pins 27, normal boot needs it high: Boot mode."),
         (4, "pin rule: reserved, pins 28, 29, with octal PSRAM: Boot mode."),
     ]
 
 
+def _seq(first: list[str], then: list[str], page: int, time_limit: str = "") -> SequencingFact:
+    return SequencingFact(
+        first=first,
+        then=then,
+        order="first",
+        time_limit=time_limit,
+        text="VDDA must be provided first.",
+        page=page,
+    )
+
+
+def test_check_keeps_sequencing_on_sent_pages_and_board_pins_only():
+    read = DatasheetFacts(
+        pins=[],
+        limits=[],
+        application=[],
+        pin_rules=[],
+        sequencing=[
+            _seq(["9", "99"], ["1", "24"], 13),  # 99 isn't on the board
+            _seq(["99"], ["1"], 13),  # nothing left on one side
+            _seq(["9"], ["1"], 50),  # page not sent
+        ],
+    )
+    [kept] = facts.check(read, {13}, {"1", "9", "24"}).sequencing
+    assert (kept.first, kept.then, kept.page) == (["9"], ["1", "24"], 13)
+
+
+def test_fact_line_gives_a_sequencing_requirement_and_its_time_limit():
+    read = DatasheetFacts(
+        pins=[],
+        limits=[],
+        application=[],
+        pin_rules=[],
+        sequencing=[_seq(["9"], ["1", "24"], 13, "within 1 ms")],
+    )
+    assert facts._fact_lines(read) == [
+        (
+            13,
+            "power sequencing: pins 9 up before or with pins 1, 24, within 1 ms: "
+            "VDDA must be provided first.",
+        )
+    ]
+
+
 def test_fact_line_shows_the_allowed_range_and_optional_parts():
     vdda = VDDA.model_copy(update={"max": 22})
-    lines = facts._fact_lines(DatasheetFacts(pins=[], limits=[], application=[vdda], pin_rules=[]))
+    lines = facts._fact_lines(
+        DatasheetFacts(pins=[], limits=[], application=[vdda], pin_rules=[], sequencing=[])
+    )
     assert lines == [
         (
             44,

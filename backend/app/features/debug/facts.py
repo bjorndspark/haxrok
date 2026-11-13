@@ -7,7 +7,8 @@ sent, or about a pin the board's part doesn't have, is dropped.
 
 Pin facts replace the hand-written pin table's lines for that IC
 (``pins.lookup``) and are cited as ``pin_function``. Limits, application
-parts and a microcontroller's pin rules (``mcu.check``) are numbered
+parts, a microcontroller's pin rules (``mcu.check``) and the order an IC's
+supplies must come up in (``sequencing.check``) are numbered
 ``ds1``, ``ds2``, … across the board and cited as kind ``datasheet``.
 
 Answers are cached per part (the PDF's key) and per everything that shapes
@@ -39,6 +40,7 @@ from app.features.debug.schemas import (
     LimitFact,
     PinRole,
     PinRuleFact,
+    SequencingFact,
 )
 
 logger = get_logger(__name__)
@@ -100,6 +102,8 @@ class DatasheetReading:
     limits: dict[str, list[LimitFact]] = field(default_factory=dict)
     # ref -> a microcontroller's pin rules, for mcu.check
     rules: dict[str, list[PinRuleFact]] = field(default_factory=dict)
+    # ref -> the order its supplies must come up in, for sequencing.check
+    sequencing: dict[str, list[SequencingFact]] = field(default_factory=dict)
     sources: dict[str, str] = field(default_factory=dict)  # ref -> PDF URL
     failed: dict[str, str] = field(default_factory=dict)  # ref -> why
 
@@ -172,17 +176,21 @@ class FactReader:
                 reading.limits[sheet.ref] = got.limits
             if got.pin_rules:
                 reading.rules[sheet.ref] = got.pin_rules
+            if got.sequencing:
+                reading.sequencing[sheet.ref] = got.sequencing
             for page, body in _fact_lines(got):
                 n += 1
                 reading.facts.append(Fact(f"ds{n}", sheet.ref, page, body))
             logger.info(
-                "datasheet facts %s (%s): %d pins, %d limits, %d application parts, %d pin rules",
+                "datasheet facts %s (%s): %d pins, %d limits, %d application parts, %d pin rules, "
+                "%d sequencing",
                 sheet.ref,
                 sheet.value,
                 len(got.pins),
                 len(got.limits),
                 len(got.application),
                 len(got.pin_rules),
+                len(got.sequencing),
             )
         return reading
 
@@ -223,8 +231,9 @@ class FactReader:
 def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> DatasheetFacts:
     """Drop what the model couldn't have read: facts on pages it wasn't
     sent, pins the board's part doesn't have (and duplicates of a pin),
-    application, limit and pin-rule pins likewise; a pin rule left with no
-    board pin goes too."""
+    application, limit, pin-rule and sequencing pins likewise; a pin rule
+    left with no board pin goes too, as does a sequencing fact left with
+    none on either side."""
     seen: set[str] = set()
     kept = []
     for p in facts.pins:
@@ -240,6 +249,13 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
         _sane_timing(rule.model_copy(update={"pins": on}))
         for rule in facts.pin_rules
         if rule.page in pages and (on := [pin for pin in rule.pins if pin in board_pins])
+    ]
+    sequencing = [
+        s.model_copy(update={"first": first, "then": then})
+        for s in facts.sequencing
+        if s.page in pages
+        and (first := [pin for pin in s.first if pin in board_pins])
+        and (then := [pin for pin in s.then if pin in board_pins])
     ]
     application = [
         a.model_copy(
@@ -258,10 +274,14 @@ def check(facts: DatasheetFacts, pages: set[int], board_pins: set[str]) -> Datas
         - len(application)
         + len(facts.pin_rules)
         - len(rules)
+        + len(facts.sequencing)
+        - len(sequencing)
     )
     if dropped:
         logger.info("datasheet facts: dropped %d not backed by a sent page or board pin", dropped)
-    return DatasheetFacts(pins=kept, limits=limits, application=application, pin_rules=rules)
+    return DatasheetFacts(
+        pins=kept, limits=limits, application=application, pin_rules=rules, sequencing=sequencing
+    )
 
 
 def _sane_timing(rule: PinRuleFact) -> PinRuleFact:
@@ -282,7 +302,8 @@ _NO_RANGE = {"min": None, "max": None, "unit": "", "range_page": None}
 
 
 def _fact_lines(facts: DatasheetFacts) -> list[tuple[int, str]]:
-    """Each limit, typical-application part and pin rule as (page, text)."""
+    """Each limit, typical-application part, pin rule and sequencing fact as
+    (page, text)."""
     lines: list[tuple[int, str]] = []
     for lim in facts.limits:
         bounds = [
@@ -315,6 +336,16 @@ def _fact_lines(facts: DatasheetFacts) -> list[tuple[int, str]]:
                 rule.page,
                 f"pin rule: {_RULE_NAME[rule.kind]}, pins {', '.join(rule.pins)}{level}"
                 f"{_timing_text(rule)}{cond}: {rule.text}",
+            )
+        )
+    for seq in facts.sequencing:
+        how = "up before or with" if seq.order == "first" else "up together with"
+        limit = f", {seq.time_limit}" if seq.time_limit else ""
+        lines.append(
+            (
+                seq.page,
+                f"power sequencing: pins {', '.join(seq.first)} {how} pins "
+                f"{', '.join(seq.then)}{limit}: {seq.text}",
             )
         )
     return lines

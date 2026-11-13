@@ -60,7 +60,9 @@ _ONE_WAY = frozenset({"D", "Q"})
 
 
 @dataclass(frozen=True)
-class _Enable:
+class Enable:
+    """An IC's enable pin, its net and whether it runs while high."""
+
     pin: str  # "U4.3"
     name: str  # "EN"
     net: str
@@ -86,7 +88,7 @@ def walk(design: Design, tree: PowerTree) -> list[OperatingState]:
     for r in tree.rails:
         for ref in r.loads:
             ic_rails.setdefault(ref, set()).add(r.net)
-    enables = {p.ref: _enables(design, p.ref) for p in tree.parts if is_ic(p.ref)}
+    enables = {p.ref: enable_pins(design, p.ref) for p in tree.parts if is_ic(p.ref)}
     states: list[OperatingState] = []
     for chosen in _combinations(sources):
         up = _up(design, tree.parts, set(chosen), set(rails), enables, ic_rails)
@@ -142,7 +144,7 @@ def _up(
     parts: Sequence[PowerPart],
     chosen: set[str],
     rails: set[str],
-    enables: Mapping[str, list[_Enable]],
+    enables: Mapping[str, list[Enable]],
     ic_rails: Mapping[str, set[str]],
 ) -> set[str]:
     """The rails up from ``chosen``, grown until nothing changes: a part's
@@ -168,7 +170,7 @@ def _powered(ic_rails: Mapping[str, set[str]], up: set[str]) -> set[str]:
     return {ref for ref, on in ic_rails.items() if on <= up}
 
 
-def _runs(design: Design, e: _Enable, up: set[str], rails: set[str], powered: set[str]) -> bool:
+def _runs(design: Design, e: Enable, up: set[str], rails: set[str], powered: set[str]) -> bool:
     level = _level(design, e, up, rails, powered).level
     if level in {"driven", "floating"}:
         return True
@@ -180,7 +182,7 @@ def _held_off(
     parts: Sequence[PowerPart],
     up: set[str],
     rails: set[str],
-    enables: Mapping[str, list[_Enable]],
+    enables: Mapping[str, list[Enable]],
     powered: set[str],
 ) -> list[str]:
     """One line per IC whose input is up but whose enable holds it off, and
@@ -200,7 +202,7 @@ def _held_off(
     return lines
 
 
-def _enables(design: Design, ref: str) -> list[_Enable]:
+def enable_pins(design: Design, ref: str) -> list[Enable]:
     """``ref``'s enable pins. ``~{EN}``, ``/EN`` and ``nEN`` are active low;
     ``SHDN`` is active low too, so ``~{SHDN}`` runs high."""
     found = []
@@ -214,11 +216,11 @@ def _enables(design: Design, ref: str) -> list[_Enable]:
             if not _ENABLE.fullmatch(key) and key.startswith("N") and _ENABLE.fullmatch(key[1:]):
                 key, inverted = key[1:], True
             if _ENABLE.fullmatch(key):
-                found.append(_Enable(n.pin_ref, fn, net, (key != "SHDN") != inverted))
+                found.append(Enable(n.pin_ref, fn, net, (key != "SHDN") != inverted))
     return found
 
 
-def _level(design: Design, e: _Enable, up: set[str], rails: set[str], powered: set[str]) -> _Level:
+def _level(design: Design, e: Enable, up: set[str], rails: set[str], powered: set[str]) -> _Level:
     net = e.net
     if is_ground(net):
         return _Level("low", "is tied to ground")
@@ -234,7 +236,7 @@ def _level(design: Design, e: _Enable, up: set[str], rails: set[str], powered: s
     if drivers:
         return _Level("driven", f"is driven by {', '.join(drivers)}")
     ups, downs = [], []
-    for r, other in _resistors(design, net):
+    for r, other in resistors_on(design, net):
         if is_ground(other):
             downs.append(r)
         elif other in rails or named_voltage(other) is not None:
@@ -295,7 +297,7 @@ def _signals(
     for net, nodes in sorted(design.nets.items()):
         if net in rails or is_ground(net) or named_voltage(net) is not None:
             continue
-        resistors = _resistors(design, net)
+        resistors = resistors_on(design, net)
         if any(is_ground(other) for _, other in resistors):
             continue  # a divider or a pull-down: the pins don't float on the dead side
         live = [n.pin_ref for n in nodes if n.ref in powered and _signal(n)]
@@ -351,7 +353,7 @@ def _signal(n: Node) -> bool:
     return name_role(fn, n.pin) not in _POWER_ROLES and not _SENSE.search(fn)
 
 
-def _resistors(design: Design, net: str) -> list[tuple[str, str]]:
+def resistors_on(design: Design, net: str) -> list[tuple[str, str]]:
     """(ref, the net at its other end) for each two-pin resistor on ``net``."""
     found = []
     for n in design.nets.get(net, []):

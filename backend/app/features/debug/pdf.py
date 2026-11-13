@@ -43,7 +43,7 @@ _CORE = re.compile(
     re.IGNORECASE,
 )
 _USEFUL = re.compile(
-    r"boot|reset|power supply|power-up|crystal|oscillator|soft[- ]start|undervoltage|"
+    r"boot|reset|power supply|power-up|sequenc|crystal|oscillator|soft[- ]start|undervoltage|"
     r"thermal|characteristics|feedback|(input|output) voltage",
     re.IGNORECASE,
 )

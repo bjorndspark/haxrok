@@ -338,6 +338,35 @@ class PinRuleFact(_Strict):
     page: int
 
 
+SequenceOrder = Literal["first", "together"]
+"""How two of an IC's supplies must come up (``sequencing.check``): one
+no later than the other, or together."""
+
+
+class SequencingFact(_Strict):
+    """An order the datasheet requires between two of the IC's supplies at
+    power-up, by the board pins that take them."""
+
+    first: list[str] = Field(
+        description="The board pin numbers, as listed to you, of the supply that must come "
+        "up first (or, for together, one of the two)."
+    )
+    then: list[str] = Field(
+        description="The board pin numbers of the supply that must come up after it, or at "
+        "the same time (for together, the other one)."
+    )
+    order: SequenceOrder = Field(
+        description="first: the first supply must be up before the other, or at the same "
+        'time ("VDDA must be provided first", "core before I/O"). together: they must '
+        'come up together or within a time of each other ("VDD and VDDIO within 10 ms").'
+    )
+    time_limit: str = Field(
+        description='Any time printed between them, as printed (e.g. "within 10 ms"); "" if none.'
+    )
+    text: str = Field(description="The requirement in one short sentence, as printed.")
+    page: int
+
+
 class DatasheetFacts(_Strict):
     """Everything one model call reads from one datasheet."""
 
@@ -346,6 +375,10 @@ class DatasheetFacts(_Strict):
     application: list[AppPart]
     pin_rules: list[PinRuleFact] = Field(
         description="The pin rules of a microcontroller, SoC or module; [] for any other part."
+    )
+    sequencing: list[SequencingFact] = Field(
+        description="The order its supplies must come up in at power-up; [] if the datasheet "
+        "sets none."
     )
 
 
@@ -664,7 +697,8 @@ class Calculation(BaseModel):
     its datasheet limits (``voltage.check``, once the datasheets are read), a
     microcontroller pin against its datasheet's pin rules (``mcu.check``), a
     capacitor's voltage or a resistor's power against its rating
-    (``ratings.check``).
+    (``ratings.check``), the order an IC's supplies come up in against its
+    datasheet's (``sequencing.check``).
     Verified, not the model's.
     ``flagged`` means the netlist as drawn contradicts itself or misses what
     every such circuit needs (+3V3 set to 0.73 V, an I²C line with no
@@ -672,7 +706,8 @@ class Calculation(BaseModel):
     capacitor, TX wired to TX, an enable pin on its own output, a BOOT0 with
     no path to ground, a pin on a rail above its absolute maximum, a
     strapping pin tied to the wrong boot level, a capacitor on a rail above
-    its rated voltage, a resistor dissipating above its rated power)."""
+    its rated voltage, a resistor dissipating above its rated power, a
+    supply the wiring brings up after one the datasheet needs after it)."""
 
     id: str
     kind: Literal[
@@ -691,6 +726,7 @@ class Calculation(BaseModel):
         "pin_voltage",
         "mcu_pin",
         "part_rating",
+        "rail_order",
     ]
     ic: str = Field(description="The IC, or the part a part_rating is about.")
     pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")
@@ -946,8 +982,9 @@ class DatasheetFactsEvent(BaseModel):
     calculations: list[Calculation] = Field(
         description="The calculations again, with each IC pin's rail checked against its "
         "datasheet limits (kind pin_voltage), microcontroller pins against their "
-        "datasheet's pin rules (kind mcu_pin) and capacitors and resistors against their "
-        "ratings (kind part_rating); they replace the summary's."
+        "datasheet's pin rules (kind mcu_pin), capacitors and resistors against their "
+        "ratings (kind part_rating) and supplies' power-up order against the datasheet's "
+        "(kind rail_order); they replace the summary's."
     )
 
 

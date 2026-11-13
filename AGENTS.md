@@ -173,4 +173,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `docs/plans/001-100/010-ratings-sequencing-esd.md` step 2
+1. `docs/plans/001-100/010-ratings-sequencing-esd.md` step 3

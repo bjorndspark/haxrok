@@ -1,0 +1,3 @@
+# The schematic Datasheet fields the compact netlist drops: REF URL
+U15 https://www.ti.com/lit/ds/symlink/tps63802.pdf
+U16 http://www.st.com/st-web-ui/static/active/en/resource/technical/document/datasheet/DM00088500.pdf

@@ -659,6 +659,11 @@ holds it, with pull_kohms its typical resistance; threshold, the input \
 threshold for boot_level as a fraction of VDD (VIH for high, VIL for low; \
 null when printed only in volts); hold_ms, how long after reset the chip \
 latches the strapping pins.
+- sequencing: any order the datasheet requires between two of the part's \
+own supplies at power-up or power-down ("VDDA must be provided first", \
+"core supply before I/O", "VDD and VDDIO within 10 ms"); one entry per \
+pair, by the board pins that take each supply. [] when it sets no order: \
+a general start-up time or a reset delay isn't one.
 - page: the N of the '=== Page N ===' header the fact is under."""
 
 

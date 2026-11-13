@@ -46,7 +46,7 @@ Effort: about 1–2 days, a step per session.
 | Step | What | |
 |---|---|---|
 | 1 | A capacitor's voltage rating and a resistor's power against the board | done |
-| 2 | Rail order against the order a datasheet requires | proposed |
+| 2 | Rail order against the order a datasheet requires | done |
 | 3 | External connector lines with no ESD protection | proposed |
 
 Decided (2026-11-14): the plan covers these three checks: part ratings,
@@ -109,7 +109,7 @@ an existing ESLint warning in `shared/ui/button.tsx`, which this step
 didn't touch; `make test` 463 backend + 55 frontend passed. Bugs found: ruff
 SIM114 in `check`'s loop, rewritten.
 
-## 2. Rail order against the order a datasheet requires: proposed
+## 2. Rail order against the order a datasheet requires: done
 
 - The datasheet extraction (`facts.py`, `datasheet.py`) reads each IC's
   sequencing requirement: which supply must be up before which, and any
@@ -145,6 +145,32 @@ page).
 **Check:** `test_debug_facts.py` for the new fields; unit tests for the
 order check; `make eval-app case=<new case>` with a fresh datasheet read;
 `make lint`, `make test`.
+
+Built (2026-11-14): `sequencing.py` (kind `rail_order`), run in
+`context.build` after the ratings check. Each side of a requirement is
+the rail its pins are on; rails joined only by pass parts count as the
+rail they're fed from. A rail is up no later than another when it feeds
+the other's maker, sits on its enable (tied, pulled up, or a power-good
+pin of the regulator that makes it), or supplies the IC driving that
+enable, and so on down the chain; a rail with two makers counts only
+what both wait for. `states.py`'s enable and pull-resistor helpers are
+now public (`enable_pins`, `resistors_on`) for it. `pdf.py` sends pages
+that mention sequencing. The new case `orbit-vdda-late` is orbit with
+U16's VDDA moved onto an added RT9013-33 (U23) fed from +BATT with its
+EN on +3.3V; ERC 208 → 218, all library-configuration warnings and
++BATT's one undriven-input error moving to U23.1.
+
+**Checks:** `test_debug_sequencing.py`, 10 tests; `test_debug_facts.py`
+for the new field. Fed the STM32's VDDA-first fact by hand, the check
+flags the new case and lists nothing on the unmodified orbit board or
+`rp-micro-no-fault`. `make eval-app case=orbit-vdda-late` with a fresh
+read (the facts cache key holds the schema): U16's p.13 gave the
+VDDA-first fact (ds73) and the check flagged it as cf4; debug #1 "VDD up before VDDA: U23 EN from +3.3V", citing
+cf4 (289 s); review #2 may_fail, citing cf4 (281 s), behind the
+board's own TPS63802 inductor value. `make lint` clean apart from the
+existing ESLint warning in `shared/ui/button.tsx`; `make test` 475
+backend + 55 frontend passed. Bugs found: none in the diff review
+beyond an overlong docstring line in `context.build`, rewrapped.
 
 ## 3. External connector lines with no ESD protection: proposed
 

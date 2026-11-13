@@ -1049,6 +1049,7 @@ def _tps63070_facts() -> tuple[DatasheetStatus, FactReader]:
                 )
             ],
             pin_rules=[],
+            sequencing=[],
         )
 
     class Cache:

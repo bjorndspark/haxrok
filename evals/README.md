@@ -22,6 +22,7 @@ cases/<name>/
 | `orbit-uart-swapped` | STM32 USART1 wired TX-to-TX / RX-to-RX with the CP2102 | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `orbit-boot0-high` | BOOT0 pull-down returned to +3.3V, so it always boots the ROM bootloader | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `orbit-l2-shorted` | TPS63802 L2 pin (and the inductor's L2 end) on its own output, +3.3V, so start-up needs 0.8–1.2 A from a bench supply | Planted (Battery-Powered-STM32-Board-With-USB) |
+| `orbit-vdda-late` | STM32 VDDA moved onto an added RT9013 LDO enabled from +3.3V, so VDDA comes up after VDD against the datasheet | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `rp-micro-ldo-en` | RT9013 LDO enable tied to its own output, so it never starts | Planted (siderakb/rp-micro) |
 | `rp-micro-cc-shared` | USB-C CC1 and CC2 tied together on one 5.1 kΩ pull-down, so e-marked USB-C cables get no VBUS | Planted (siderakb/rp-micro) |
 | `rp-micro-no-fault` | None; the cause is a charge-only USB cable. Pass = no schematic fault claimed at any rank | Unmodified board (siderakb/rp-micro) |
