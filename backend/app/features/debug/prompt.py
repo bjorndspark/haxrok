@@ -107,7 +107,12 @@ its consequence. Calculated values (cf...) are exact arithmetic on the \
 netlist's part values; trust them over your own arithmetic. One marked \
 FLAGGED is a verified problem in the netlist as drawn (an output named +3V3 \
 set to 0.73 V, an LED with no resistor, an I²C line with no pull-up); keep \
-any caveat its text gives (a pull-up may sit on a connected module).
+any caveat its text gives (a pull-up may sit on a connected module). A \
+calculated connector line with no ESD part is a design risk, never \
+flagged: as a cause, rank it only when the symptoms fit ESD damage (a port \
+or the IC pin behind it worked, then died, often after something was \
+plugged in or touched); in a review it is may fail at most, and a header's \
+lines only when its names or labels say it leaves the box.
 
 Pin warnings (pw...) are not verified: they compare a transistor's symbol \
 with the pinout most parts in its package share, not with its own \

@@ -698,7 +698,8 @@ class Calculation(BaseModel):
     microcontroller pin against its datasheet's pin rules (``mcu.check``), a
     capacitor's voltage or a resistor's power against its rating
     (``ratings.check``), the order an IC's supplies come up in against its
-    datasheet's (``sequencing.check``).
+    datasheet's (``sequencing.check``), a connector's signal lines with no
+    ESD part before an IC pin (``esd.check``, never flagged).
     Verified, not the model's.
     ``flagged`` means the netlist as drawn contradicts itself or misses what
     every such circuit needs (+3V3 set to 0.73 V, an I²C line with no
@@ -727,8 +728,11 @@ class Calculation(BaseModel):
         "mcu_pin",
         "part_rating",
         "rail_order",
+        "connector_esd",
     ]
-    ic: str = Field(description="The IC, or the part a part_rating is about.")
+    ic: str = Field(
+        description="The IC, or the part a part_rating or the connector a connector_esd is about."
+    )
     pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")
     value: float | None = Field(description="None when the thing to measure is missing.")
     unit: str
@@ -983,8 +987,9 @@ class DatasheetFactsEvent(BaseModel):
         description="The calculations again, with each IC pin's rail checked against its "
         "datasheet limits (kind pin_voltage), microcontroller pins against their "
         "datasheet's pin rules (kind mcu_pin), capacitors and resistors against their "
-        "ratings (kind part_rating) and supplies' power-up order against the datasheet's "
-        "(kind rail_order); they replace the summary's."
+        "ratings (kind part_rating), supplies' power-up order against the datasheet's "
+        "(kind rail_order) and connector lines with no ESD part (kind connector_esd); they "
+        "replace the summary's."
     )
 
 

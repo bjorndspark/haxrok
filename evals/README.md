@@ -19,6 +19,7 @@ cases/<name>/
 | `rust-board-fb-swapped` | SY8088 feedback divider resistors swapped, so +3V3 comes up at 0.73 V | Planted (esp-rs/esp-rust-board) |
 | `rust-board-i2c-vbus` | I²C pull-ups on VBUS instead of +3V3, so the bus fails on battery | Planted (esp-rs/esp-rust-board) |
 | `rust-board-part-ratings` | Two planted edits: a 4 V capacitor on 5 V VBUS (C15) and a 100 Ω VBUS bleeder (R15) dissipating 250 mW in an 0402; the netlist carries footprints | Planted (esp-rs/esp-rust-board) |
+| `rust-board-usb-no-esd` | The USB D+/D- TVS diodes (D5, D8) removed; the C3's USB pin dies after a discharge at the plug, the rest of the board runs | Planted (esp-rs/esp-rust-board) |
 | `orbit-uart-swapped` | STM32 USART1 wired TX-to-TX / RX-to-RX with the CP2102 | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `orbit-boot0-high` | BOOT0 pull-down returned to +3.3V, so it always boots the ROM bootloader | Planted (Battery-Powered-STM32-Board-With-USB) |
 | `orbit-l2-shorted` | TPS63802 L2 pin (and the inductor's L2 end) on its own output, +3.3V, so start-up needs 0.8–1.2 A from a bench supply | Planted (Battery-Powered-STM32-Board-With-USB) |

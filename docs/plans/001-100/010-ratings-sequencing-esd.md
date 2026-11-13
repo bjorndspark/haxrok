@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-14 | 2026-11-14 | in progress | — | `005-whole-board-static-review.md` (power tree, pin limits, operating states), `006-power-chain-simulated.md` (step 4: DC-bias as a corner) |
+| 2026-11-14 | 2026-11-14 | done | — | `005-whole-board-static-review.md` (power tree, pin limits, operating states), `006-power-chain-simulated.md` (step 4: DC-bias as a corner) |
 
 The review now covers most of what a senior reviewer checks on a
 schematic: absolute maximums per pin in every operating state (plan 005
@@ -34,8 +34,10 @@ fault planted, and a version of that board without it.
 
 Acceptance:
 
-- Each check flags its planted eval case and stays silent on the fixed
-  variant and on `rp-micro-no-fault`.
+- Each check flags or lists its planted eval case and adds no flagged
+  finding on the fixed variant or on `rp-micro-no-fault`. The ESD check
+  lists rp-micro's and orbit's real unprotected USB lines as may fail;
+  `rp-micro-no-fault`'s debug answer still must not rank them.
 - `make eval-app` on each new case (debug and review mode) is recorded:
   the answer ranks the planted fault and cites the calculation.
 - No new false alarms on the existing cases (a `make eval-app` sweep, or
@@ -47,7 +49,7 @@ Effort: about 1–2 days, a step per session.
 |---|---|---|
 | 1 | A capacitor's voltage rating and a resistor's power against the board | done |
 | 2 | Rail order against the order a datasheet requires | done |
-| 3 | External connector lines with no ESD protection | proposed |
+| 3 | External connector lines with no ESD protection | done |
 
 Decided (2026-11-14): the plan covers these three checks: part ratings,
 rail sequencing and connector ESD. Absolute max, back-powering, I²C
@@ -172,7 +174,7 @@ existing ESLint warning in `shared/ui/button.tsx`; `make test` 475
 backend + 55 frontend passed. Bugs found: none in the diff review
 beyond an overlong docstring line in `context.build`, rewrapped.
 
-## 3. External connector lines with no ESD protection: proposed
+## 3. External connector lines with no ESD protection: done
 
 - Find connectors (`J*`, `P*`, `USB*`, a connector footprint) whose
   pins reach an IC pin, and the parts on that path: a TVS, an ESD array,
@@ -192,9 +194,53 @@ finding. On-chip HBM protection (about 2 kV) covers handling in the
 factory, not a user touching a port (IEC 61000-4-2, 8 kV contact). The
 line is still listed as "may fail", and the text mentions the chip's
 own rating when the datasheet facts give one.
+Decided (2026-11-14): rp-micro's USB-C (through 27 Ω series resistors
+only) and orbit's USB are really unprotected, so the check lists them
+as may fail on every rp-micro and orbit case, `rp-micro-no-fault`
+included. The acceptance line now asks for no new flagged finding
+there, and the prompt tells debug mode that a missing TVS is a design
+risk, not a cause, unless the symptom fits ESD damage.
+Decided (2026-11-14), defaults: the check lives in `esd.py` with
+calculation kind `connector_esd`; the eval case is
+`rust-board-usb-no-esd`, the original rust-board with the D+/D− TVS
+diodes D5 and D8 removed. The unmodified board is the fixed variant.
 
 **Check:** unit tests (protected, unprotected, a series resistor alone,
 power pins ignored); `make eval-app case=<new case>`; `make lint`,
 `make test`.
+
+Built (2026-11-14): `esd.py` (kind `connector_esd`, never flagged), run
+in `context.build` after the sequencing check. A connector is a J, P,
+CN, CON or USB designator or a `Connector…` symbol; test points are
+not, even in KiCad's Connector library. Each signal pin (not ground, a
+power-tree rail, or a supply or shield pin) is followed through series
+parts (R, FB, L, F, JP, FL) to IC pins; a walk never enters ground or a
+rail, so a pull-up isn't a path. A line is protected by a part named as
+a TVS or ESD array (D_TVS, Power_Protection, USBLC, TPD…, PESD…) or a
+non-LED diode to ground or a rail anywhere on that path. External kinds
+get one may-fail calculation per connector, with the IEC 61000-4-2 vs
+HBM point, a USBLC6-2 fix, and the chip's own ESD fact quoted when the
+datasheets give one. A header gets one context calculation listing up
+to 6 lines. The prompt's verified-inputs paragraph says how to weigh
+them (a cause only when the symptom fits ESD damage; may fail at most
+in a review). The new case `rust-board-usb-no-esd` is the original
+rust-board with D5 and D8 removed from the netlist; its ERC is the
+original's, which names neither.
+
+**Checks:** `test_debug_esd.py`, 12 tests. Over every case the check
+lists J1 on `rust-board-usb-no-esd`, USB1 on the orbit cases and J1
+(through R1/R2) on the rp-micro cases as may fail, and nothing for the
+USB on the other rust-board cases (D5/D8) or furby (USBLC6-2); headers
+(orbit J1/J2, rp-micro J2–J4, furby J3–J16) are context. `make eval-app
+case=rust-board-usb-no-esd`: debug #1 "ESD damage to U3 USB_D+ pin",
+citing cf7 (222 s); review #2 may_fail "User USB D+/D- have no ESD",
+citing cf7 (175 s), behind GPIO2's strapping pull-up (the original
+board's). `make eval-app case=rp-micro-no-fault` (debug): READ, #1
+charge-only cable as before; the answer cites the USB line (cf2) and
+rules it out ("never worked fresh, so not cause") (284 s). `make lint`
+clean; `make test` 487 backend + 55 frontend passed. Bugs found: test
+points (TP*) listed as headers in the first probe, now excluded; two
+E501 lines in `esd.py`, rewrapped; an unused argument to
+`_chip_ratings`, dropped.
 
 ## Log

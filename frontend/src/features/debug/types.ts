@@ -306,6 +306,7 @@ export interface Calculation {
     | "mcu_pin"
     | "part_rating"
     | "rail_order"
+    | "connector_esd"
   ic: string
   pins: string[]
   /** Null when the thing to measure is missing (no pull-up, no resistor). */
