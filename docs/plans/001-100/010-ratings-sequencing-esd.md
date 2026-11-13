@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-14 | 2026-11-14 | proposed | — | `005-whole-board-static-review.md` (power tree, pin limits, operating states), `006-power-chain-simulated.md` (step 4: DC-bias as a corner) |
+| 2026-11-14 | 2026-11-14 | in progress | — | `005-whole-board-static-review.md` (power tree, pin limits, operating states), `006-power-chain-simulated.md` (step 4: DC-bias as a corner) |
 
 The review now covers most of what a senior reviewer checks on a
 schematic: absolute maximums per pin in every operating state (plan 005
@@ -45,7 +45,7 @@ Effort: about 1–2 days, a step per session.
 
 | Step | What | |
 |---|---|---|
-| 1 | A capacitor's voltage rating and a resistor's power against the board | proposed |
+| 1 | A capacitor's voltage rating and a resistor's power against the board | done |
 | 2 | Rail order against the order a datasheet requires | proposed |
 | 3 | External connector lines with no ESD protection | proposed |
 
@@ -54,7 +54,7 @@ rail sequencing and connector ESD. Absolute max, back-powering, I²C
 pull-ups and strapping timing are already covered (plans 002, 005, 009).
 The review workflow (revision diffs, waivers) is a later plan.
 
-## 1. A capacitor's voltage rating and a resistor's power against the board: proposed
+## 1. A capacitor's voltage rating and a resistor's power against the board: done
 
 - An eval case with a capacitor rated below its rail's highest voltage
   (a 6.3 V MLCC on VBUS, say), and a resistor dissipating above its
@@ -86,6 +86,28 @@ package, it's ignored.
 
 **Check:** unit tests for each rule (over, within, at the margin, no
 rating); `make eval-app case=<new case>`; `make lint`, `make test`.
+
+Built (2026-11-14): `ratings.py` (kind `part_rating`), run in
+`context.build` after the MCU check. A rating also comes from a `Rated
+Voltage` / `Power` field variant. The voltage across a part is the
+highest on one end less the lowest on the other, both ends on ground or
+a power-tree rail. Over the rating on an inferred rail is listed, not
+flagged. Resistors take the same 80 % "may fail" line as capacitors (no
+decision covered it). An LED's resistor uses I²R from its `led_current`.
+The new case `rust-board-part-ratings` is the original rust-board
+(R2/R3 unswapped) with C15 4.7uF 16V → 4V and R15 100kR → 100R. Its
+netlist carries footprints, which `parse_compact` now reads (furby's
+too, so furby's prompt now shows them).
+
+**Checks:** `test_debug_ratings.py`, 15 tests. On the new case the check
+flags C15 (125 % of 4 V) and R15 (250 mW, 400 % of an 0402's 62.5 mW).
+On the original board, `rp-micro-no-fault` and every other case it lists
+nothing. `make eval-app case=rust-board-part-ratings`: debug #1 R15, #2
+C15, citing cf8 and cf7 (343 s); review #1 C15 (may_fail), #2 R15
+(will_fail), the same citations (290 s). `make lint` clean apart from
+an existing ESLint warning in `shared/ui/button.tsx`, which this step
+didn't touch; `make test` 463 backend + 55 frontend passed. Bugs found: ruff
+SIM114 in `check`'s loop, rewritten.
 
 ## 2. Rail order against the order a datasheet requires: proposed
 

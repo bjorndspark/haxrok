@@ -662,14 +662,17 @@ class Calculation(BaseModel):
     supply decoupling, a UART's TX/RX wiring, a regulator's enable or an
     STM32's BOOT0, a pull-up above an IC's supply, an IC pin's rail against
     its datasheet limits (``voltage.check``, once the datasheets are read), a
-    microcontroller pin against its datasheet's pin rules (``mcu.check``).
+    microcontroller pin against its datasheet's pin rules (``mcu.check``), a
+    capacitor's voltage or a resistor's power against its rating
+    (``ratings.check``).
     Verified, not the model's.
     ``flagged`` means the netlist as drawn contradicts itself or misses what
     every such circuit needs (+3V3 set to 0.73 V, an I²C line with no
     pull-up, CC1 and CC2 sharing one resistor, a supply rail with no
     capacitor, TX wired to TX, an enable pin on its own output, a BOOT0 with
     no path to ground, a pin on a rail above its absolute maximum, a
-    strapping pin tied to the wrong boot level)."""
+    strapping pin tied to the wrong boot level, a capacitor on a rail above
+    its rated voltage, a resistor dissipating above its rated power)."""
 
     id: str
     kind: Literal[
@@ -687,8 +690,9 @@ class Calculation(BaseModel):
         "overvoltage_pullup",
         "pin_voltage",
         "mcu_pin",
+        "part_rating",
     ]
-    ic: str
+    ic: str = Field(description="The IC, or the part a part_rating is about.")
     pins: list[str] = Field(description="REF.PIN of the IC pin and the resistors used.")
     value: float | None = Field(description="None when the thing to measure is missing.")
     unit: str
@@ -941,8 +945,9 @@ class DatasheetFactsEvent(BaseModel):
     )
     calculations: list[Calculation] = Field(
         description="The calculations again, with each IC pin's rail checked against its "
-        "datasheet limits (kind pin_voltage) and microcontroller pins against their "
-        "datasheet's pin rules (kind mcu_pin); they replace the summary's."
+        "datasheet limits (kind pin_voltage), microcontroller pins against their "
+        "datasheet's pin rules (kind mcu_pin) and capacitors and resistors against their "
+        "ratings (kind part_rating); they replace the summary's."
     )
 
 

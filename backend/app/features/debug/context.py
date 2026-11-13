@@ -3,8 +3,8 @@ is checked against.
 
 ``build`` is pure. It takes the parsed board and what the datasheets said
 and returns a ``ReviewContext``: the pin table and wiring findings, the
-budgeted power tree, the calculations with the datasheet-limit and
-microcontroller checks added, the deviations from each typical
+budgeted power tree, the calculations with the datasheet-limit,
+microcontroller and part-rating checks added, the deviations from each typical
 application, the first call's user message and the ``EvidenceContext``.
 The app's review (``service._review``) and the evals
 (``evals/app_prompts.py``) both call it, so the prompt an eval measures is
@@ -23,6 +23,7 @@ from app.features.debug import (
     pins,
     power,
     prompt,
+    ratings,
     reference,
     roles,
     spice_circuits,
@@ -134,8 +135,8 @@ def build(
     erc_report: str | None = None,
 ) -> ReviewContext:
     """The review's input for one board. ``calculations`` are the
-    netlist's (``calc.lookup``); the datasheet-limit and microcontroller
-    checks are added here, numbered after them. ``erc_report`` is the ERC
+    netlist's (``calc.lookup``); the datasheet-limit, microcontroller and
+    part-rating checks are added here, numbered after them. ``erc_report`` is the ERC
     as the model reads it when it came as kicad-cli's text report (an eval
     case) rather than as parsed ``erc`` entries."""
     table = wiring(design, reading, erc, labels)
@@ -144,6 +145,7 @@ def build(
         design, tree, reading.limits, first_id=len(calculations) + 1
     )
     calcs += mcu.check(design, tree, mcu.rules(design, reading.rules), first_id=len(calcs) + 1)
+    calcs += ratings.check(design, tree, calculations, first_id=len(calcs) + 1)
     deviations = application.check(design, reading.application)
     user = prompt.build_user_message(
         mode=mode,

@@ -76,7 +76,8 @@ ROOT = pathlib.Path(__file__).resolve().parent
 def parse_compact(text: str) -> Design:
     """Read compact_netlist.py's output back into the app's Design, so the
     pin table and wiring check run on eval cases as they do on uploads.
-    Footprints aren't in the compact form; no pin-table entry needs one."""
+    A footprint is read when the case has one ("[Resistor_SMD:R_0402…]",
+    the app's ``compact`` form); older cases have none."""
     parts: dict[str, Part] = {}
     nets: dict[str, list[Node]] = {}
     section = None
@@ -86,9 +87,9 @@ def parse_compact(text: str) -> Design:
         elif not line.strip():
             continue
         elif section == "Components":
-            # "REF  VALUE  (lib:part)"; a value may hold single spaces.
-            ref, value, lib = (line.split("  ") + ["", ""])[:3]
-            parts[ref] = Part(ref, value, lib.strip("()"), "")
+            # "REF  VALUE  (lib:part)  [footprint]"; a value may hold single spaces.
+            ref, value, lib, fp = (line.split("  ") + ["", "", ""])[:4]
+            parts[ref] = Part(ref, value, lib.strip("()"), fp.strip("[]"))
         elif section == "Nets":
             name, _, pins_text = line.partition(": ")
             nodes = []

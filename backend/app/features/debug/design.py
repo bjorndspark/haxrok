@@ -40,6 +40,9 @@ class Part:
     # The symbol's SPICE model (see ``_sim_fields``); "" if absent.
     sim_library: str = ""  # model file, e.g. "${KIPRJMOD}/spice/TPS63802.lib"
     sim_name: str = ""  # subcircuit or model name in that file
+    # Rating fields (see ``_rating_fields``); "" if absent.
+    voltage: str = ""  # a capacitor's rated voltage, "16V"
+    power: str = ""  # a resistor's rated power, "0.1W", "1/8W"
 
 
 @dataclass(frozen=True)
@@ -174,6 +177,7 @@ def parse_netlist(text: str) -> Design:
                 datasheet if datasheet.startswith(("http://", "https://")) else "",
                 **_part_numbers(comp),
                 **_sim_fields(comp),
+                **_rating_fields(comp),
             )
     nets: dict[str, list[Node]] = {}
     for net_block in _children(root, "nets"):
@@ -248,6 +252,28 @@ def _sim_fields(comp: list) -> dict[str, str]:
             value = f[2].strip() if len(f) > 2 and isinstance(f[2], str) else ""
             if key and value and value != "~":
                 found[key] = found[key] or value
+    return found
+
+
+# Rating field names, compared as ``_part_numbers`` compares them.
+_VOLTAGE_KEYS = frozenset({"voltage", "ratedvoltage", "voltagerating"})
+_POWER_KEYS = frozenset({"power", "ratedpower", "powerrating", "wattage"})
+
+
+def _rating_fields(comp: list) -> dict[str, str]:
+    """``voltage`` and ``power`` from a netlist component's ``Voltage`` /
+    ``Power`` symbol fields (or their usual variants); "" when absent."""
+    found = {"voltage": "", "power": ""}
+    for fields in _children(comp, "fields"):
+        for f in _children(fields, "field"):
+            value = f[2].strip() if len(f) > 2 and isinstance(f[2], str) else ""
+            if not value or value == "~":
+                continue
+            key = re.sub(r"[^a-z0-9]", "", _field(f, "name").lower())
+            if key in _VOLTAGE_KEYS:
+                found["voltage"] = found["voltage"] or value
+            elif key in _POWER_KEYS:
+                found["power"] = found["power"] or value
     return found
 
 
