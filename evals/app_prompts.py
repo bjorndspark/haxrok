@@ -123,16 +123,23 @@ def build_input(
     )
 
 
-def keyword_rank(analysis: Analysis[Claim], groups: list[list[str]] | None) -> str:
+def match_rank(analysis: Analysis[Claim], groups: list[list[str]]) -> int | None:
     """Rank of the first hypothesis whose title, summary and claims match
-    every keyword group; READ for cases without a check, MISS? if none do."""
-    if groups is None:
-        return "READ "
+    every keyword group (gonogo.py's Auto-check rule), or None if none do."""
     for h in analysis.hypotheses:
         text = " ".join([h.title, h.summary, *(c.text for c in h.claims)]).lower()
         if all(any(alt in text for alt in group) for group in groups):
-            return f"#{h.rank}   "
-    return "MISS?"
+            return h.rank
+    return None
+
+
+def keyword_rank(analysis: Analysis[Claim], groups: list[list[str]] | None) -> str:
+    """``match_rank`` for printing: READ for cases without a check, MISS? if
+    no hypothesis matches."""
+    if groups is None:
+        return "READ "
+    rank = match_rank(analysis, groups)
+    return "MISS?" if rank is None else f"#{rank}   "
 
 
 def datasheet_urls(case_dir: pathlib.Path) -> dict[str, str]:
@@ -225,6 +232,60 @@ async def simulate(
     ]
 
 
+@dataclasses.dataclass
+class Answer:
+    """One pass of a case through the app's two prompts."""
+
+    ctx: context.ReviewContext
+    diagnosis: str
+    analysis: Analysis[Claim]
+    diagnose_s: float
+    total_s: float
+
+
+async def answer(
+    case_dir: pathlib.Path,
+    reading: DatasheetReading,
+    mode: str,
+    timeout_s: float,
+    diagnosis_path: pathlib.Path,
+) -> Answer:
+    """The case's input built from ``reading``, then the diagnose and
+    structure calls as the app makes them (review prompts for ``review``).
+    The diagnosis is written to ``diagnosis_path`` as soon as it arrives, so
+    it's there to read when the structure call fails."""
+    ctx = build_input(case_dir, reading, mode)
+    review = mode == "review"
+    diagnose_prompt = prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE
+    structure_prompt = prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE
+    start = time.monotonic()
+    diagnosis = await complete_text(
+        [
+            {"role": "system", "content": diagnose_prompt},
+            {"role": "user", "content": ctx.user},
+        ],
+        name="eval_diagnosis",
+        timeout_s=timeout_s,
+    )
+    diagnosed = time.monotonic() - start
+    diagnosis_path.write_text(diagnosis)
+    analysis = await complete_structured(
+        Analysis[Claim],
+        [
+            {"role": "system", "content": structure_prompt},
+            {
+                "role": "user",
+                "content": prompt.build_structure_message(
+                    diagnosis=diagnosis, user=ctx.user
+                ),
+            },
+        ],
+        name="eval_analysis",
+        timeout_s=timeout_s,
+    )
+    return Answer(ctx, diagnosis, analysis, diagnosed, time.monotonic() - start)
+
+
 async def run(
     case: str,
     timeout_s: float,
@@ -243,38 +304,9 @@ async def run(
         if sim
         else None
     )
-    ctx = build_input(case_dir, reading, mode)
-    user = ctx.user
-    review = mode == "review"
-    diagnose_prompt = prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE
-    structure_prompt = prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE
-    stem = "app-review" if review else "app"
-
-    start = time.monotonic()
-    diagnosis = await complete_text(
-        [
-            {"role": "system", "content": diagnose_prompt},
-            {"role": "user", "content": user},
-        ],
-        name="eval_diagnosis",
-        timeout_s=timeout_s,
-    )
-    diagnosed = time.monotonic() - start
-    (out_dir / f"{stem}-diagnosis.md").write_text(diagnosis)
-    analysis = await complete_structured(
-        Analysis[Claim],
-        [
-            {"role": "system", "content": structure_prompt},
-            {
-                "role": "user",
-                "content": prompt.build_structure_message(
-                    diagnosis=diagnosis, user=user
-                ),
-            },
-        ],
-        name="eval_analysis",
-        timeout_s=timeout_s,
-    )
+    stem = "app-review" if mode == "review" else "app"
+    result = await answer(case_dir, reading, mode, timeout_s, out_dir / f"{stem}-diagnosis.md")
+    ctx, analysis = result.ctx, result.analysis
     (out_dir / f"{stem}-analysis.json").write_text(analysis.model_dump_json(indent=1))
 
     mark = keyword_rank(analysis, auto_check(case_dir))
@@ -288,8 +320,8 @@ async def run(
     findings = ",".join(f.pin for f in ctx.table.findings) or "-"
     read = ",".join(reading.sources) or "-"
     print(
-        f"{case:22} {mark}  datasheets {read}  findings {findings}  diagnose {diagnosed:4.0f}s  "
-        f"total {time.monotonic() - start:4.0f}s  {titles}"
+        f"{case:22} {mark}  datasheets {read}  findings {findings}  "
+        f"diagnose {result.diagnose_s:4.0f}s  total {result.total_s:4.0f}s  {titles}"
     )
     if sims is not None:
         done = await sims

@@ -338,3 +338,26 @@ stable. The run also showed the evidence check stripping labels from
 correct claims on boards with nets named like pin numbers (rp-micro's
 `2`, `3`, `A1` matched inside `R3.2`, `J1.A1`); fixed in `24220f7`, after
 these runs.
+
+## Scorecard: every case, several runs
+
+One run of one case can't show a run-to-run flip like `rp-micro-no-fault`'s
+above. `scorecard.py` (plan 012) sends every case, or a list, through the
+review prompts n times (`app_prompts.answer`, the same calls as
+`make eval-app mode=review`), at most three runs at once:
+
+```sh
+make eval-score                                    # all cases, 3 runs each
+make eval-score n=2 cases=rp-micro-no-fault,furby-boot-cap
+```
+
+Per case it prints the rank where the `Auto-check:` keywords first match
+in each run (`miss` if none do, `err` if the run failed), and each run's
+issues as will fail / may fail / improve. A case with `Auto-check: none`
+has no rank: on an unmodified board every issue is a candidate false
+alarm, until plan 012 step 2 judges them. It writes
+`results/scorecard/<model>/<UTC time>/scorecard.md`, `scorecard.json` (to
+diff two scorecards) and each run's diagnosis and analysis under
+`<case>/run-<i>-…`. Reviews skip the AI answer cache (else every run after
+the first is the first run's answer); datasheets still use it. Each run
+takes about 1.5–5 minutes, so a full sweep takes about an hour.

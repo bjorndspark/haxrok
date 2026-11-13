@@ -1,7 +1,7 @@
 .PHONY: help infra infra-down infra-logs dev build install \
 	test test-backend test-frontend \
 	lint lint-ruff lint-ruff-format lint-mypy lint-eslint lint-tsc lint-prettier format \
-	down logs clean purge issues fix-issue docs docs-serve eval-app spice-corpus replay
+	down logs clean purge issues fix-issue docs docs-serve eval-app eval-score spice-corpus replay
 
 help:
 	@echo "Usage: make <target>"
@@ -22,6 +22,7 @@ help:
 	@echo "  docs       regenerate docs/architecture/api/routes.md"
 	@echo "  docs-serve browse docs/ with mkdocs at http://localhost:\$$DOCS_HOST_PORT"
 	@echo "  eval-app   run an eval case through the app's debug prompts: make eval-app case=rust-board-fb-swapped [mode=review] [sim=startup]"
+	@echo "  eval-score score every eval case in review mode over n runs: make eval-score [n=3] [cases=a,b]"
 	@echo "  spice-corpus  download TI's SPICE models (plus data/spice-corpus/manual/) and load-check each in ngspice"
 	@echo "  replay     re-check a recorded run's answer with the current checker, no model call: make replay run=<id>"
 	@echo "  issues     list open GitHub issues"
@@ -110,6 +111,12 @@ eval-app:
 	docker compose exec --user $(shell id -u):$(shell id -g) -e LOG_FILE= \
 		backend .venv/bin/python /evals/app_prompts.py --case $(or $(case),rust-board-fb-swapped) --mode $(or $(mode),debug) \
 		$(if $(sim),--sim $(sim))
+
+# Every case (or cases=a,b) in review mode n times, scored (evals/scorecard.py);
+# the table and JSON land in evals/results/scorecard/.
+eval-score:
+	docker compose exec --user $(shell id -u):$(shell id -g) -e LOG_FILE= \
+		backend .venv/bin/python /evals/scorecard.py --n $(or $(n),3) $(if $(cases),--cases $(cases))
 
 # Real vendor models through the load check (backend/scripts/spice_corpus.py);
 # they're downloaded into data/spice-corpus/, not committed.

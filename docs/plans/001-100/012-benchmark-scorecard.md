@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-14 | 2026-11-14 | proposed | — | `evals/README.md` (cases, `make eval-app`), `001-mvp-scope.md` (review mode), `011-revision-diffs-and-waivers.md` (stable finding keys; this plan goes first) |
+| 2026-11-14 | 2026-11-14 | in progress | — | `evals/README.md` (cases, `make eval-app`), `001-mvp-scope.md` (review mode), `011-revision-diffs-and-waivers.md` (stable finding keys; this plan goes first) |
 
 Plans 002–010 added checks one at a time, and each was judged on the
 eval case it was built for: was the planted bug ranked, and did
@@ -42,13 +42,13 @@ Effort: about 2–3 days, a step per session.
 
 | Step | What | |
 |---|---|---|
-| 1 | One command scores every case over several runs | proposed |
+| 1 | One command scores every case over several runs | done |
 | 2 | Each issue a review raises is judged real or wrong, and the judgement is kept | proposed |
 | 3 | More unmodified boards measure false alarms | proposed |
 | 4 | Real bugs from public fix commits measure misses | proposed |
 | 5 | A baseline scorecard recorded | proposed |
 
-## 1. One command scores every case over several runs: proposed
+## 1. One command scores every case over several runs: done
 
 - A script under `evals/` that runs `app_prompts.py`'s review mode on
   every case (or a list), N times, at most ~3 at once, and collects each
@@ -64,8 +64,36 @@ Decided (2026-11-14): N = 3 runs per case. It shows run-to-run flips
 (like `rp-micro-no-fault`'s) and a full sweep of ~18 cases takes about
 an hour at 3 at once.
 
-**Checks:** the script runs on two cases with N=2 and the table matches
-the per-run outputs; `make lint` and `make test`.
+Decided (2026-11-14): the reviews bypass the AI answer cache. The first
+check run gave `rust-board-usb-no-esd` the same cached answer twice
+(0 s each), so N runs were one answer counted N times. The script reads
+every case's datasheets first, through the cache as the app does (the
+same facts each run), then sets `AI_CACHE_TTL_S = 0` in its own process
+for the reviews.
+
+Decided (2026-11-14): `app_prompts.py`'s two prompt calls moved into
+`answer()` and its keyword rank into `match_rank()`, which the scorecard
+calls, so both scripts send the same review. The diagnosis is still
+written as soon as it arrives, so a failed structure call leaves it to
+read. A case with `Auto-check: none` gets no rank; its issues count as
+candidate false alarms until step 2 judges them. Results go to
+`results/scorecard/<model>/<UTC time>/`, with each run's diagnosis and
+analysis beside `scorecard.md` and `scorecard.json`.
+
+**Checks:** `make eval-score n=2
+cases=rust-board-usb-no-esd,rp-micro-no-fault`: ESD bug ranked #2 and
+#4 (0/2/0 and 0/5/0 issues as will fail/may fail/improve); the clean
+board raised 0 issues, then 3 (1 will fail: SB1/SB2 "shorts" GPIO10/11),
+which is the flip this plan is for. Ranks and counts recounted from each
+run's analysis JSON by a separate script: all four match. Runs took
+90–238 s. `make eval-app case=rust-board-usb-no-esd mode=review` still
+runs through the refactored `answer()`. `make lint` passed and
+`make test` passed (487 backend, 55 frontend); `scorecard.py` and
+`app_prompts.py` also pass ruff check and mypy (they sit outside
+`make lint`'s scope). Bugs found: the cached answers above; the check's
+`|` alternatives split the markdown table (escaped now); the result folder's
+time was UTC with no marker (now `…T…Z`). No unit test: `evals/` has no
+test setup, and the check above compares the table to the raw outputs.
 
 ## 2. Each issue a review raises is judged real or wrong, and the judgement is kept: proposed
 

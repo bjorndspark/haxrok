@@ -108,6 +108,9 @@ frontend/src/
   `evals/cases/` case through the app's debug (or pre-fab review) prompts
   (`evals/app_prompts.py`), and with `sim=` its vendor-model simulations
   too; `evals/README.md` has the rest
+- `make eval-score [n=3] [cases=a,b]` — every eval case (or the list) in
+  review mode n times, scored: per run the bug's rank and the issues by
+  severity, written to `evals/results/scorecard/` (`evals/scorecard.py`)
 - `make spice-corpus` — download TI's SPICE models through the app's finder
   (plus any put in `data/spice-corpus/manual/`) and load-check each in
   ngspice (`backend/scripts/spice_corpus.py`); not committed, not in CI
@@ -173,5 +176,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `docs/plans/001-100/012-benchmark-scorecard.md`: step 1.
+1. `docs/plans/001-100/012-benchmark-scorecard.md`: step 2.
 2. `docs/plans/001-100/011-revision-diffs-and-waivers.md`: step 1, after 012.
