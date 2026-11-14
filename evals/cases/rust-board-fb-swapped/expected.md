@@ -23,4 +23,4 @@ Source: https://github.com/esp-rs/esp-rust-board at efe1e8a,
 Scoring: PASS if the swapped feedback divider (wrong R2/R3 ratio setting
 +3V3 to ~0.73 V) is in the top 3 hypotheses.
 
-Auto-check: r2|r3; fb|feedback; divider|ratio
+Auto-check: r2|r3|u5; fb|feedback|0.73; divider|ratio|resistor|swap

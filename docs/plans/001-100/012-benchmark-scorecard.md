@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-14 | 2026-11-14 | in progress | — | `evals/README.md` (cases, `make eval-app`), `001-mvp-scope.md` (review mode), `011-revision-diffs-and-waivers.md` (stable finding keys; this plan goes first) |
+| 2026-11-14 | 2026-11-14 | done | — | `evals/README.md` (cases, `make eval-app`), `001-mvp-scope.md` (review mode), `011-revision-diffs-and-waivers.md` (stable finding keys; this plan goes first) |
 
 Plans 002–010 added checks one at a time, and each was judged on the
 eval case it was built for: was the planted bug ranked, and did
@@ -46,7 +46,7 @@ Effort: about 2–3 days, a step per session.
 | 2 | Each issue a review raises is judged real or wrong, and the judgement is kept | done |
 | 3 | More unmodified boards measure false alarms | done |
 | 4 | Real bugs from public fix commits measure misses | done |
-| 5 | A baseline scorecard recorded | proposed |
+| 5 | A baseline scorecard recorded | done |
 
 ## 1. One command scores every case over several runs: done
 
@@ -292,7 +292,7 @@ divider|…`) ranked run 1's U9 LDO divider claim as the bug. The check
 now also needs the buck (`u8|mpm54304|buck|…|vout4`), and that run is a
 miss.
 
-## 5. A baseline scorecard recorded: proposed
+## 5. A baseline scorecard recorded: done
 
 - Runs only after the user has confirmed the `draft` judgements and the
   boards picked in steps 2–4.
@@ -300,4 +300,33 @@ miss.
   planted and on real cases separately, and wrong issues per board.
 - The `/step` **Check** for prompt changes points at the scorecard.
 
-**Checks:** the numbers in `evals/README.md` match the scorecard's JSON.
+Decided (2026-11-14): the drafts are confirmed board by board with the
+user (10 boards), each entry confirmed or flipped, and `(draft)`
+removed from every case that repeats it. The two datasheet entries are
+checked first. Then the full sweep runs.
+Decided (2026-11-14): of the 10 boards' drafts, every entry was
+confirmed except orbit's "PWR switch common may be pad 2", which stays
+a draft until the `K3-1270L-F1` drawing is checked.
+Decided (2026-11-14): the full sweep's 12 new unjudged issues got 8
+entries: 6 confirmed (artemia's USB with no ESD array, real; artemia's
+REG_D0/D1 "floating" behind SYS/GND jumpers, enviro's SARA-R5 PWR_ON
+"with no pull-up", furby's TPS3839 "136 s" delay, moist's "undefined"
+VCC range and samd21's "too dim" blue LEDs, wrong) and 2 kept as drafts:
+artemia's ADP5091 BAT with no storage capacitor (the datasheet's
+minimum is unchecked) and orbit's BOOT0 switch that may float (the same
+unchecked pad order as the PWR switch).
+Decided (2026-11-14): the `/step` **Check** for a prompt change runs
+`make eval-score` and records its misses and wrong issues against the
+baseline in `evals/README.md` (`AGENTS.md`).
+
+**Checks:** `make eval-score n=3` (`20261114T065544Z`): 54 runs, 0
+failed, 184 issues. Rescored by `from=` after the entries above: unjudged
+0; planted cases 21/30 runs ranked the bug #1, 30/30 at all; real-bug
+cases 6/12 #1, 7/12 at all, 5 missed; real 80+4d, wrong 60. The numbers
+in `evals/README.md` match `scorecard.json`, board by board. The lint
+and test targets, run one at a time (make 3.81), passed (1 old warning
+in `shared/ui/button.tsx`; 487 backend, 55 frontend); no code changed.
+Bugs found: `rust-board-fb-swapped`'s `Auto-check:` (`r2|r3; fb|feedback;
+divider|ratio`) scored runs 1 and 2 as misses though each put "R2 and R3
+around U5 are swapped… 0.73 V" at #1. The check now reads `r2|r3|u5;
+fb|feedback|0.73; divider|ratio|resistor|swap`, and all 3 runs rank #1.

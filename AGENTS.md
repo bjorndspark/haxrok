@@ -162,7 +162,8 @@ Settings for the `/step` workflow (one plan step per session).
   checks as a short **Checks** paragraph there; there's no separate Log.
 - **Check:** `make lint` and `make test` (both run in the containers;
   `make dev` must be up). A change to the debug prompts also runs
-  `make eval-app case=<name>` on an affected case and records the result.
+  `make eval-score` and records its misses and wrong issues against the
+  baseline in `evals/README.md`.
 - **Docs:** `DECISIONS.md` for a real trade-off, `make docs` when routes
   change, `README.md` / `evals/README.md` when what they describe changes.
 - **Big:** a step is big when it touches both backend and frontend, or
@@ -176,5 +177,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `docs/plans/001-100/012-benchmark-scorecard.md`: step 5.
-2. `docs/plans/001-100/011-revision-diffs-and-waivers.md`: step 1, after 012.
+1. `docs/plans/001-100/011-revision-diffs-and-waivers.md`: step 1.

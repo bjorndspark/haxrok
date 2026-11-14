@@ -392,7 +392,7 @@ in the Auto-check syntax:
 
 ```md
 ## SB1/SB2 short GPIO10/11 to ground
-Verdict: wrong (draft)
+Verdict: wrong
 Cites: sb1|sb2
 Match: gnd|ground
 Why: three-pad jumpers, pads 2-3 bridged by default; GPIO reaches the header.
@@ -410,4 +410,45 @@ make eval-score from=evals/results/scorecard/<model>/<UTC time>
 the table counts those apart (`3+2d`: three by confirmed entries, two by
 drafts). An LLM judge was rejected: its verdicts vary between runs too. Reviews skip the AI answer cache (else every run after
 the first is the first run's answer); datasheets still use it. Each run
-takes about 1.5–5 minutes, so a full sweep takes about an hour.
+takes about 1.5–5 minutes, so a full sweep takes about 1–1.5 hours.
+
+### Baseline, 2026-11-14
+
+`meta/muse-spark-1.3-contributor`, review mode, every case 3 times
+(`results/scorecard/meta_muse-spark-1.3-contributor/20261114T065544Z/`,
+plan 012 step 5): 54 runs, 0 failed, 184 issues, every issue judged by
+the Auto-check or a confirmed `judged.md` entry except 4 by drafts.
+Compare a prompt change against these numbers.
+
+Misses, by case kind:
+
+| Cases | Runs | Bug ranked #1 | Bug ranked at all | Missed |
+|---|---|---|---|---|
+| Planted (10) | 30 | 21 | 30 | 0 |
+| Real bug (4) | 12 | 6 | 7 | 5 |
+
+The 5 misses are `artemia-fet-pinout` in all 3 runs (no issue names the
+FETs' pinout) and `lpddr5-fb-no-divider` in 2 of 3 (no issue names the
+buck's FB pins). Planted faults are cleaner than real bugs, so the
+planted row is not accuracy on real boards.
+
+Issues judged wrong, per board (the 3 or 4 cases of one board added up;
+real counts drafts in brackets):
+
+| Board | Runs | Issues | Bug | Real | Wrong |
+|---|---|---|---|---|---|
+| rust-board (4 planted) | 12 | 32 | 15 | 17 | 0 |
+| orbit (4 planted) | 12 | 52 | 12 | 17 (+2) | 21 |
+| rp-micro (2 planted, 1 unmodified) | 9 | 14 | 6 | 8 | 0 |
+| `samd21-breakout-no-fault` | 3 | 13 | – | 0 | 13 |
+| `usbc-buck-no-fault` | 3 | 9 | – | 5 | 4 |
+| `moist-sensor-no-fault` | 3 | 7 | – | 4 | 3 |
+| `furby-boot-cap` | 3 | 12 | 3 | 2 | 7 |
+| `artemia-fet-pinout` | 3 | 15 | 0 | 9 (+2) | 4 |
+| `enviro-node-usb-backfeed` | 3 | 15 | 3 | 11 | 1 |
+| `lpddr5-fb-no-divider` | 3 | 15 | 1 | 7 | 7 |
+| All | 54 | 184 | 40 | 80 (+4) | 60 |
+
+`rust-board-part-ratings` has two planted edits, so its bug counts 2 per
+run. On the 4 unmodified boards (12 runs) the reviews raised 31 issues,
+8 of them will-fail; 20 of the 31 are wrong.
