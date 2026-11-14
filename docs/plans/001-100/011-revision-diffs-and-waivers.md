@@ -108,6 +108,36 @@ records, and a git diff of it shows what a review changed. Rejected: a
 recorded run id (depends on the server keeping that record, and doesn't
 travel to a teammate); uploading both revisions (two full reviews per
 diff, and the model's run-to-run variation shows up as fake changes).
+Decided (2026-11-14): only the model's issues are marked new or
+unchanged and listed as fixed. The review file still records every keyed
+finding (calculations, wiring findings, pin warnings), so step 3 can
+waive those too. Rejected: marking wiring findings and pin warnings, or
+every calculation (most calculations are checks, not problems).
+Decided (2026-11-14): the baseline is a `<project>.review.json` in the
+dropped folder, picked up with the schematic with no extra step; the
+input view says it was found. The backend computes the diff and sends it
+with the result. Rejected: a separate file picker (one more step every
+revision); a diff in the browser only (logic in TypeScript, and the eval
+pair can't check it).
+Decided (2026-11-14): an issue that matches an earlier one while a part
+it cites has a changed fingerprint is marked unchanged, with a "circuit
+changed" note naming those parts. Rejected: a fourth "changed" mark;
+treating it as new (a value tweak that didn't fix it would look like a
+new problem).
+Decided (2026-11-14), default: review mode only; a debug run ignores the
+review file. Each model issue matches at most one earlier issue, highest
+Jaccard first (≥ 0.5 over cited parts), labelled "likely the same". An
+issue whose key names no parts (`issue:`) is never matched: a new one
+gets no mark, and an old one isn't listed as fixed.
+Decided (2026-11-14), default: only `<project>.review.json` (the
+`.kicad_pro` stem) is the baseline; other `*.review.json` files are
+ignored. It is a Pydantic `ReviewFile`: `version`, `project`, `run_id`,
+`date`, `findings` (key, source, parts, title, severity) and `waivers`
+(empty until step 3). The backend sends the next review file with the
+result, and a "Save review file" button downloads it. A malformed file,
+or one with an unknown `version`, gives a review with no baseline and a
+note saying why, not an error. The logic goes in
+`backend/app/features/debug/review_file.py`.
 
 **Checks:** an eval case pair (rev A, rev B with one fault fixed and one
 added): the diff shows exactly one fixed and one new. Unit tests for the
