@@ -11,6 +11,8 @@ roughly in the order a run writes them:
   check and the diagrams read (``context_data``), so a recorded answer can
   be checked again without a model call;
 - ``model``: one per model call: its name, which prompt, the answer, seconds;
+- ``keys``: each finding's key and its parts' fingerprints (``keys.build``),
+  just before the result event;
 - ``event``: each SSE event as sent, the result included;
 - ``ask``: each follow-up question about the result and its answer
   (``/debug/ask-result`` with the run's id), after the run.

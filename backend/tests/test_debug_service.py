@@ -1272,6 +1272,12 @@ async def test_a_run_records_its_input_context_model_answers_and_events(tmp_path
     assert [(e["data"]["event"], e["data"]["data"]) for e in lines if e["kind"] == "event"] == sent
     assert [k for k in kinds if k in ("context", "model")] == ["context", "model", "model"]
     assert kinds[-1] == "event" and lines[-1]["data"]["event"] == "result"
+    # Each finding's key, recorded before the result.
+    assert kinds.index("keys") < len(kinds) - 1
+    found = lines[kinds.index("keys")]["data"]["findings"]
+    by_id = {f["id"]: (f["key"], sorted(f["parts"])) for f in found}
+    assert by_id["wf1"][0] == "wiring:U2.9"
+    assert by_id["h1"] == ("issue:U2", ["U2"])
 
     given = lines[0]["data"]
     assert (given["mode"], given["language"], given["analyses"]) == ("debug", "en", ["startup"])

@@ -561,6 +561,21 @@ class PinWarning(BaseModel):
     text: str
 
 
+class FindingKey(BaseModel):
+    """What a finding is about, the same on two revisions of one circuit
+    (``keys.build``, plan 011). ``id`` is the finding's id in this run only
+    (cf3, wf1, pw1, h2). ``key`` is exact for the backend's findings
+    (``part_rating:C12``, ``wiring:U2.9``); for a model issue it is
+    ``issue:`` and the parts its verified cites name, which two runs match
+    only loosely. ``parts`` maps each part the finding names to that part's
+    fingerprint, which changes when the part or anything wired to it does."""
+
+    source: Literal["calculation", "wiring", "pin_warning", "issue"]
+    id: str
+    key: str
+    parts: dict[str, str]
+
+
 class ReferenceNote(BaseModel):
     """A fact from a manufacturer's reference design, datasheet or app note
     (``reference.REFERENCES``). ``id`` (rd1, …) is what claims cite."""

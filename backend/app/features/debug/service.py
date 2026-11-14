@@ -37,6 +37,7 @@ from app.features.debug import (
     calc,
     context,
     diagram,
+    keys,
     mcu,
     pins,
     power,
@@ -432,8 +433,8 @@ async def _review(
 ) -> AsyncIterator[SseEvent]:
     """The model's part of the stream: progress, the datasheet facts (when a
     datasheet was found), then result or error. ``reading_task`` is
-    ``_read``'s, shared with the vendor-model runs. The context and each
-    model answer go to ``rec``."""
+    ``_read``'s, shared with the vendor-model runs. The context, each
+    model answer and the findings' keys go to ``rec``."""
     found_sheets = sum(1 for s in prepared.datasheets if s.status == "found")
     if facts is not None and found_sheets:
         yield _progress(
@@ -524,6 +525,10 @@ async def _review(
     )
     yield _progress("checking", "Checking every citation against your schematic.")
     checked = diagram.checked(analysis, ctx.evidence, ctx.table.findings, ctx.calculations)
+    found = keys.build(
+        ctx.evidence.design, checked, ctx.table.findings, ctx.table.warnings, ctx.calculations
+    )
+    rec.append("keys", {"findings": found})
     yield _event("result", checked.model_dump_json())
 
 
