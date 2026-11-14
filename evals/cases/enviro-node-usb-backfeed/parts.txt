@@ -1,0 +1,19 @@
+# The schematic Datasheet fields the compact netlist drops: REF URL
+Q1 http://www.diodes.com/_files/datasheets/ds30088.pdf
+Q2 http://www.infineon.com/dgdl/Infineon-BC847SERIES_BC848SERIES_BC849SERIES_BC850SERIES-DS-v01_01-en.pdf?fileId=db3a304314dca389011541d4630a1657
+Q3 https://www.infineon.com/dgdl/Infineon-BSS214NW-DS-v02_02-en.pdf?fileId=db3a30431b3e89eb011b695aebc01bde
+Q4 http://www.infineon.com/dgdl/Infineon-BC847SERIES_BC848SERIES_BC849SERIES_BC850SERIES-DS-v01_01-en.pdf?fileId=db3a304314dca389011541d4630a1657
+Q5 http://www.infineon.com/dgdl/Infineon-BC847SERIES_BC848SERIES_BC849SERIES_BC850SERIES-DS-v01_01-en.pdf?fileId=db3a304314dca389011541d4630a1657
+U1 https://www.silabs.com/documents/public/data-sheets/cp2102n-datasheet.pdf
+U2 https://www.digikey.com.au/en/products/detail/espressif-systems/ESP32-WROOM-32E-N16/11613144
+U3 https://www.digikey.com.au/en/products/detail/texas-instruments/TCA9534PWR/5004966
+U4 http://www.ti.com/lit/ds/symlink/ina219.pdf
+U5 https://www.analog.com/media/en/technical-documentation/data-sheets/3652fe.pdf
+U6 https://www.digikey.com.au/en/products/detail/texas-instruments/TPS22967DSGR/4331550?s=N4IgTCBcDaICoAUDKYwE4BsB2AIkg4gEogC6AvkA
+U7 http://ww1.microchip.com/downloads/en/DeviceDoc/20001984g.pdf
+U8 http://www.ti.com/lit/ds/symlink/ina219.pdf
+U9 https://www.digikey.com.au/en/products/detail/microchip-technology/MIC2288YD5-TR/1028498?s=N4IgTCBcDaILIEkDCYwA40E0AiBWAtACoBKIAugL5A
+U10 https://www.digikey.com.au/en/products/detail/torex-semiconductor-ltd/XC6215B332MR-G/2138122
+U11 https://www.digikey.com.au/en/products/detail/texas-instruments/TPS22967DSGR/4331550?s=N4IgTCBcDaICoAUDKYwE4BsB2AIkg4gEogC6AvkA
+U12 https://www.digikey.com.au/en/products/detail/u-blox/SARA-R410M-02B/9565822
+U13 https://www.digikey.com.au/en/products/detail/texas-instruments/TXB0104PWR/1629102

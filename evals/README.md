@@ -34,6 +34,9 @@ cases/<name>/
 | `usbc-buck-no-fault` | None; review only, for false alarms | Unmodified board (maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C) |
 | `moist-sensor-no-fault` | None; review only, for false alarms | Unmodified board (Miceuz/rs485-moist-sensor) |
 | `furby-boot-cap` | ESP32-S3 GPIO0 has 100 nF to GND and only the internal pull-up, so it's still low when sampled and every cold boot enters download mode | Real bug (maintainer's board, built) |
+| `artemia-fet-pinout` | BSS123 FETs Q1/Q2 drawn with a D-G-S symbol (BSS123 is G-S-D), so the MCU can't set or clear the boost-enable flip-flop; also 10 kΩ pull-downs on two open-drain lines with pull-ups | Real bug (patlab-ucsd/artemia_hardware, fix a05f688) |
+| `enviro-node-usb-backfeed` | CP2102N VREGIN on USB VBUS and its VDD output on the board's +3.3V, so a USB cable powers the board | Real bug (DPIclimate/enviro-node, fix 1a1253b) |
+| `lpddr5-fb-no-divider` | MPM54304 buck: on all four channels the divider's lower resistor runs from VOUT to GND, not FB to GND, so every output regulates at the FB reference | Real bug (antmicro/lpddr5-testbed, fix 4a6fea22) |
 
 Planted cases take a real open-source board and make one minimal edit that
 KiCad's ERC doesn't flag (ERC checked before and after). Each `expected.md`
@@ -47,6 +50,13 @@ reviews them, and every issue a review raises is judged in their
 `judged.md`, so they measure false alarms. Their `expected.md` lists
 the correct parts a reviewer might wrongly flag, the source commit and
 the license.
+
+Real-bug cases from public repos take the board at the parent of a
+commit that fixes a schematic bug, unmodified. Their `expected.md` holds
+the cause and the fix as the commit message or its linked issue states
+them (never guessed from the diff), the source commit and the license.
+A case has a `symptom.md` only when that source states what was
+observed; without one it's scored in review mode only.
 
 To add a case from a KiCad project:
 

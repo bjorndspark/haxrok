@@ -1,0 +1,19 @@
+# The schematic Datasheet fields the compact netlist drops: REF URL
+Q1 https://www.diodes.com/assets/Datasheets/ds31783.pdf
+Q2 https://www.diodes.com/assets/Datasheets/ds31783.pdf
+U1 https://www.micron.com/search-results?searchRequest=%7B%22term%22%3A%22MT62F1G32D4DR-031%22%7D
+U2 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U3 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U4 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U5 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U6 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U7 http://ww1.microchip.com/downloads/en/devicedoc/Atmel-8815-SEEPROM-AT24CS01-02-Datasheet.pdf
+U8 https://www.monolithicpower.com/en/documentview/productdocument/index/version/2/document_type/Datasheet/lang/en/sku/MPM54304/document_id/4982/
+U9 https://www.analog.com/media/en/technical-documentation/data-sheets/LT3033.pdf
+U10 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U11 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U12 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U13 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U14 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U15 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011
+U16 https://www.ti.com/lit/ds/symlink/sn74axc8t245.pdf?ts=1702327536011

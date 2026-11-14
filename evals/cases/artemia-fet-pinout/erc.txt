@@ -1,0 +1,1122 @@
+ERC report (2026-11-14T04:47:05+0000, Encoding UTF8)
+
+***** Sheet /
+[footprint_link_issues]: The current configuration does not include the footprint library 'MountingHole'.
+    ; warning
+    @(67.31 mm, 139.70 mm): Symbol H1 [MountingHole_Pad]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Mechanical'
+    ; warning
+    @(67.31 mm, 139.70 mm): Symbol H1 [MountingHole_Pad]
+[footprint_link_issues]: The current configuration does not include the footprint library 'MountingHole'.
+    ; warning
+    @(67.31 mm, 147.32 mm): Symbol H2 [MountingHole_Pad]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Mechanical'
+    ; warning
+    @(67.31 mm, 147.32 mm): Symbol H2 [MountingHole_Pad]
+[footprint_link_issues]: The current configuration does not include the footprint library 'MountingHole'.
+    ; warning
+    @(92.71 mm, 139.70 mm): Symbol H3 [MountingHole_Pad]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Mechanical'
+    ; warning
+    @(92.71 mm, 139.70 mm): Symbol H3 [MountingHole_Pad]
+[footprint_link_issues]: The current configuration does not include the footprint library 'MountingHole'.
+    ; warning
+    @(92.71 mm, 147.32 mm): Symbol H4 [MountingHole_Pad]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Mechanical'
+    ; warning
+    @(92.71 mm, 147.32 mm): Symbol H4 [MountingHole_Pad]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(88.90 mm, 152.40 mm): Symbol #PWR022 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(76.20 mm, 62.23 mm): Symbol J1 [Conn_01x03_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(76.20 mm, 62.23 mm): Symbol J1 [Conn_01x03_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(73.66 mm, 67.31 mm): Symbol #PWR04 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(57.15 mm, 93.98 mm): Symbol #PWR01 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(76.20 mm, 80.01 mm): Symbol J2 [Conn_01x03_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(76.20 mm, 80.01 mm): Symbol J2 [Conn_01x03_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(63.50 mm, 92.71 mm): Symbol R1 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(63.50 mm, 92.71 mm): Symbol R1 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(73.66 mm, 85.09 mm): Symbol #PWR05 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(105.41 mm, 59.69 mm): Symbol R7 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(105.41 mm, 59.69 mm): Symbol R7 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(64.77 mm, 102.87 mm): Symbol J12 [Conn_01x01_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(64.77 mm, 102.87 mm): Symbol J12 [Conn_01x01_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(105.41 mm, 73.66 mm): Symbol R8 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(105.41 mm, 73.66 mm): Symbol R8 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(105.41 mm, 78.74 mm): Symbol #PWR010 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(69.85 mm, 114.30 mm): Symbol R45 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(69.85 mm, 114.30 mm): Symbol R45 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(114.30 mm, 77.47 mm): Symbol L1 [L]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(114.30 mm, 77.47 mm): Symbol L1 [L]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(83.82 mm, 114.30 mm): Symbol C1 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(83.82 mm, 114.30 mm): Symbol C1 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(125.73 mm, 77.47 mm): Symbol #FLG02 [PWR_FLAG]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(93.98 mm, 114.30 mm): Symbol R3 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(93.98 mm, 114.30 mm): Symbol R3 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(60.96 mm, 140.97 mm): Symbol #FLG01 [PWR_FLAG]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(102.87 mm, 114.30 mm): Symbol R5 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(102.87 mm, 114.30 mm): Symbol R5 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(60.96 mm, 143.51 mm): Symbol #PWR02 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(69.85 mm, 143.51 mm): Symbol #PWR03 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(111.76 mm, 114.30 mm): Symbol R9 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(111.76 mm, 114.30 mm): Symbol R9 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(93.98 mm, 129.54 mm): Symbol R4 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(93.98 mm, 129.54 mm): Symbol R4 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(153.67 mm, 48.26 mm): Symbol C2 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(153.67 mm, 48.26 mm): Symbol C2 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(153.67 mm, 52.07 mm): Symbol #PWR014 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(77.47 mm, 143.51 mm): Symbol #PWR06 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(102.87 mm, 129.54 mm): Symbol R6 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(102.87 mm, 129.54 mm): Symbol R6 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(83.82 mm, 143.51 mm): Symbol #PWR07 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(152.40 mm, 71.12 mm): Symbol #FLG09 [PWR_FLAG]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(111.76 mm, 129.54 mm): Symbol R10 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(111.76 mm, 129.54 mm): Symbol R10 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(93.98 mm, 143.51 mm): Symbol #PWR08 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(158.75 mm, 66.04 mm): Symbol J13 [Conn_01x01_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(158.75 mm, 66.04 mm): Symbol J13 [Conn_01x01_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(166.37 mm, 48.26 mm): Symbol C3 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(166.37 mm, 48.26 mm): Symbol C3 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(166.37 mm, 52.07 mm): Symbol #PWR015 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(102.87 mm, 143.51 mm): Symbol #PWR09 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(120.65 mm, 129.54 mm): Symbol R12 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(120.65 mm, 129.54 mm): Symbol R12 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_CSP'.
+    ; warning
+    @(149.86 mm, 100.33 mm): Symbol U1 [ADP5091]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Battery_Management'
+    ; warning
+    @(149.86 mm, 100.33 mm): Symbol U1 [ADP5091]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(175.26 mm, 44.45 mm): Symbol #FLG03 [PWR_FLAG]
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(163.83 mm, 77.47 mm): Horizontal Wire, length 1.27 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(111.76 mm, 143.51 mm): Symbol #PWR011 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(120.65 mm, 139.70 mm): Symbol R13 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(120.65 mm, 139.70 mm): Symbol R13 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(120.65 mm, 143.51 mm): Symbol #PWR012 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(184.15 mm, 40.64 mm): Symbol #PWR018 [+BATT]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(172.72 mm, 86.36 mm): Symbol R14 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(172.72 mm, 86.36 mm): Symbol R14 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(190.50 mm, 39.37 mm): Symbol J25 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(190.50 mm, 39.37 mm): Symbol J25 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(147.32 mm, 128.27 mm): Symbol #PWR013 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(176.53 mm, 93.98 mm): Symbol J15 [Conn_01x01_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(176.53 mm, 93.98 mm): Symbol J15 [Conn_01x01_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(182.88 mm, 86.36 mm): Symbol C6 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(182.88 mm, 86.36 mm): Symbol C6 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(182.88 mm, 90.17 mm): Symbol #PWR019 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(176.53 mm, 102.87 mm): Symbol J14 [Conn_01x01_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(176.53 mm, 102.87 mm): Symbol J14 [Conn_01x01_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(168.91 mm, 118.11 mm): Symbol C4 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(168.91 mm, 118.11 mm): Symbol C4 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(168.91 mm, 121.92 mm): Symbol #PWR016 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(195.58 mm, 72.39 mm): Symbol J27 [Conn_01x03_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(195.58 mm, 72.39 mm): Symbol J27 [Conn_01x03_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(181.61 mm, 118.11 mm): Symbol C5 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(181.61 mm, 118.11 mm): Symbol C5 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(181.61 mm, 121.92 mm): Symbol #PWR017 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(218.44 mm, 50.80 mm): Symbol J26 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(218.44 mm, 50.80 mm): Symbol J26 [Conn_01x02_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(212.09 mm, 86.36 mm): Symbol C7 [C_Polarized]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(212.09 mm, 86.36 mm): Symbol C7 [C_Polarized]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(227.33 mm, 55.88 mm): Symbol #PWR021 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(228.60 mm, 77.47 mm): Symbol #FLG010 [PWR_FLAG]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(231.14 mm, 82.55 mm): Symbol J4 [Conn_01x04_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(231.14 mm, 82.55 mm): Symbol J4 [Conn_01x04_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(226.06 mm, 99.06 mm): Symbol J11 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(226.06 mm, 99.06 mm): Symbol J11 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(236.22 mm, 106.68 mm): Symbol #PWR020 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Diode_SMD'.
+    ; warning
+    @(78.74 mm, 62.23 mm): Symbol D2 [D_Schottky]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(78.74 mm, 62.23 mm): Symbol D2 [D_Schottky]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Diode_SMD'.
+    ; warning
+    @(77.47 mm, 76.20 mm): Symbol D1 [D_Schottky]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(77.47 mm, 76.20 mm): Symbol D1 [D_Schottky]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(91.44 mm, 92.71 mm): Symbol C9 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(91.44 mm, 92.71 mm): Symbol C9 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(102.87 mm, 85.09 mm): Symbol Y1 [Crystal]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(102.87 mm, 85.09 mm): Symbol Y1 [Crystal]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(91.44 mm, 97.79 mm): Symbol #PWR035 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(97.79 mm, 92.71 mm): Symbol C10 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(97.79 mm, 92.71 mm): Symbol C10 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(97.79 mm, 97.79 mm): Symbol #PWR036 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(102.87 mm, 97.79 mm): Symbol #PWR037 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(107.95 mm, 92.71 mm): Symbol C11 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(107.95 mm, 92.71 mm): Symbol C11 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(124.46 mm, 76.20 mm): Symbol #FLG04 [PWR_FLAG]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(138.43 mm, 69.85 mm): Symbol R26 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(138.43 mm, 69.85 mm): Symbol R26 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_DFN_QFN'.
+    ; warning
+    @(135.89 mm, 93.98 mm): Symbol U6 [AM1815]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_RTC'
+    ; warning
+    @(135.89 mm, 93.98 mm): Symbol U6 [AM1815]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(152.40 mm, 69.85 mm): Symbol C12 [C_Polarized]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(152.40 mm, 69.85 mm): Symbol C12 [C_Polarized]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(157.48 mm, 62.23 mm): Symbol #FLG05 [PWR_FLAG]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(152.40 mm, 74.93 mm): Symbol #PWR039 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(135.89 mm, 111.76 mm): Symbol #PWR038 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(154.94 mm, 87.63 mm): Symbol #PWR040 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(162.56 mm, 92.71 mm): Symbol R27 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(162.56 mm, 92.71 mm): Symbol R27 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(186.69 mm, 62.23 mm): Symbol J5 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(186.69 mm, 62.23 mm): Symbol J5 [Conn_01x02_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(83.82 mm, 71.12 mm): Symbol C8 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(83.82 mm, 71.12 mm): Symbol C8 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'.
+    ; warning
+    @(100.33 mm, 59.69 mm): Symbol U2 [TLV803EA24DCKR]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Voltage_Supervisor'
+    ; warning
+    @(100.33 mm, 59.69 mm): Symbol U2 [TLV803EA24DCKR]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(91.44 mm, 77.47 mm): Symbol #PWR026 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(111.76 mm, 55.88 mm): Symbol R17 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(111.76 mm, 55.88 mm): Symbol R17 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(86.36 mm, 125.73 mm): Symbol R15 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(86.36 mm, 125.73 mm): Symbol R15 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'.
+    ; warning
+    @(100.33 mm, 118.11 mm): Symbol U3 [TPS22860]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Voltage_Regulator'
+    ; warning
+    @(100.33 mm, 118.11 mm): Symbol U3 [TPS22860]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(86.36 mm, 129.54 mm): Symbol #PWR024 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(120.65 mm, 105.41 mm): Symbol C33 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(120.65 mm, 105.41 mm): Symbol C33 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(120.65 mm, 109.22 mm): Symbol #PWR072 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(100.33 mm, 129.54 mm): Symbol #PWR027 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(161.29 mm, 68.58 mm): Symbol R18 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(161.29 mm, 68.58 mm): Symbol R18 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(161.29 mm, 72.39 mm): Symbol #PWR029 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(171.45 mm, 68.58 mm): Symbol R19 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(171.45 mm, 68.58 mm): Symbol R19 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(171.45 mm, 72.39 mm): Symbol #PWR030 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(86.36 mm, 170.18 mm): Symbol R16 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(86.36 mm, 170.18 mm): Symbol R16 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'.
+    ; warning
+    @(100.33 mm, 162.56 mm): Symbol U4 [TPS22860]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Voltage_Regulator'
+    ; warning
+    @(100.33 mm, 162.56 mm): Symbol U4 [TPS22860]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(184.15 mm, 53.34 mm): Symbol R20 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(184.15 mm, 53.34 mm): Symbol R20 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(120.65 mm, 151.13 mm): Symbol C34 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(120.65 mm, 151.13 mm): Symbol C34 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(86.36 mm, 173.99 mm): Symbol #PWR025 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(120.65 mm, 154.94 mm): Symbol #PWR073 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(100.33 mm, 173.99 mm): Symbol #PWR028 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(198.12 mm, 53.34 mm): Symbol R21 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(198.12 mm, 53.34 mm): Symbol R21 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'.
+    ; warning
+    @(186.69 mm, 91.44 mm): Symbol Q1 [Q_NMOS_DGS]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(186.69 mm, 91.44 mm): Symbol Q1 [Q_NMOS_DGS]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(184.15 mm, 114.30 mm): Symbol #PWR031 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_SO'.
+    ; warning
+    @(214.63 mm, 66.04 mm): Symbol U5 [SN74AUP1G74DCUR]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Memory'
+    ; warning
+    @(214.63 mm, 66.04 mm): Symbol U5 [SN74AUP1G74DCUR]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'.
+    ; warning
+    @(200.66 mm, 106.68 mm): Symbol Q2 [Q_NMOS_DGS]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(200.66 mm, 106.68 mm): Symbol Q2 [Q_NMOS_DGS]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(214.63 mm, 76.20 mm): Symbol #PWR033 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(198.12 mm, 114.30 mm): Symbol #PWR032 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(210.82 mm, 91.44 mm): Symbol R22 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(210.82 mm, 91.44 mm): Symbol R22 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(210.82 mm, 106.68 mm): Symbol R23 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(210.82 mm, 106.68 mm): Symbol R23 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(217.17 mm, 95.25 mm): Symbol R24 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(217.17 mm, 95.25 mm): Symbol R24 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(237.49 mm, 50.80 mm): Symbol C36 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(237.49 mm, 50.80 mm): Symbol C36 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(217.17 mm, 110.49 mm): Symbol R25 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(217.17 mm, 110.49 mm): Symbol R25 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(237.49 mm, 54.61 mm): Symbol #PWR075 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(223.52 mm, 137.16 mm): Symbol J3 [Conn_01x03_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(223.52 mm, 137.16 mm): Symbol J3 [Conn_01x03_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(223.52 mm, 148.59 mm): Symbol J8 [Conn_01x04_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(223.52 mm, 148.59 mm): Symbol J8 [Conn_01x04_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(43.18 mm, 29.21 mm): Symbol C13 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(43.18 mm, 29.21 mm): Symbol C13 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(43.18 mm, 34.29 mm): Symbol #PWR042 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(53.34 mm, 29.21 mm): Symbol C14 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(53.34 mm, 29.21 mm): Symbol C14 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(53.34 mm, 34.29 mm): Symbol #PWR043 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(62.23 mm, 29.21 mm): Symbol C15 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(62.23 mm, 29.21 mm): Symbol C15 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(62.23 mm, 34.29 mm): Symbol #PWR044 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(83.82 mm, 25.40 mm): Symbol L2 [L]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(83.82 mm, 25.40 mm): Symbol L2 [L]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'.
+    ; warning
+    @(83.82 mm, 43.18 mm): Symbol U7 [TLV61070ADBVR]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Voltage_Regulator'
+    ; warning
+    @(83.82 mm, 43.18 mm): Symbol U7 [TLV61070ADBVR]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(97.79 mm, 25.40 mm): Symbol #FLG06 [PWR_FLAG]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(83.82 mm, 62.23 mm): Symbol #PWR045 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(101.60 mm, 52.07 mm): Symbol #FLG07 [PWR_FLAG]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(107.95 mm, 46.99 mm): Symbol R28 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(107.95 mm, 46.99 mm): Symbol R28 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(107.95 mm, 57.15 mm): Symbol R29 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(107.95 mm, 57.15 mm): Symbol R29 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(107.95 mm, 62.23 mm): Symbol #PWR046 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(118.11 mm, 46.99 mm): Symbol C16 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(118.11 mm, 46.99 mm): Symbol C16 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(129.54 mm, 46.99 mm): Symbol C17 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(129.54 mm, 46.99 mm): Symbol C17 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(129.54 mm, 52.07 mm): Symbol #PWR047 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(123.19 mm, 76.20 mm): Symbol J6 [Conn_01x03_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(123.19 mm, 76.20 mm): Symbol J6 [Conn_01x03_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(139.70 mm, 46.99 mm): Symbol C18 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(139.70 mm, 46.99 mm): Symbol C18 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(139.70 mm, 52.07 mm): Symbol #PWR048 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(123.19 mm, 86.36 mm): Symbol J7 [Conn_01x03_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(123.19 mm, 86.36 mm): Symbol J7 [Conn_01x03_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(149.86 mm, 46.99 mm): Symbol C19 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(149.86 mm, 46.99 mm): Symbol C19 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(149.86 mm, 52.07 mm): Symbol #PWR049 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(33.02 mm, 170.18 mm): Symbol #PWR079 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(101.60 mm, 147.32 mm): Symbol AE2 [Antenna_Shield]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(101.60 mm, 147.32 mm): Symbol AE2 [Antenna_Shield]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(104.14 mm, 152.40 mm): Symbol #PWR034 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(81.28 mm, 166.37 mm): Symbol U14 [RFM95W-915S2]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'RF_Module'
+    ; warning
+    @(81.28 mm, 166.37 mm): Symbol U14 [RFM95W-915S2]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(161.29 mm, 99.06 mm): Symbol C21 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(161.29 mm, 99.06 mm): Symbol C21 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(53.34 mm, 185.42 mm): Symbol J9 [Conn_01x08_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(53.34 mm, 185.42 mm): Symbol J9 [Conn_01x08_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(172.72 mm, 99.06 mm): Symbol C20 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(172.72 mm, 99.06 mm): Symbol C20 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(43.18 mm, 196.85 mm): Symbol #PWR078 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(81.28 mm, 186.69 mm): Symbol #PWR023 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(182.88 mm, 111.76 mm): Symbol #PWR053 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_LGA'.
+    ; warning
+    @(194.31 mm, 96.52 mm): Symbol U8 [BME280]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Sensor'
+    ; warning
+    @(194.31 mm, 96.52 mm): Symbol U8 [BME280]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(119.38 mm, 185.42 mm): Symbol J10 [Conn_01x07_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(119.38 mm, 185.42 mm): Symbol J10 [Conn_01x07_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(140.97 mm, 177.80 mm): Symbol #PWR080 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_SO'.
+    ; warning
+    @(226.06 mm, 43.18 mm): Symbol U9 [MX25V16066M2I02]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Memory'
+    ; warning
+    @(226.06 mm, 43.18 mm): Symbol U9 [MX25V16066M2I02]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(171.45 mm, 153.67 mm): Symbol R44 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(171.45 mm, 153.67 mm): Symbol R44 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(226.06 mm, 54.61 mm): Symbol #PWR052 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(171.45 mm, 157.48 mm): Symbol #PWR041 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(218.44 mm, 83.82 mm): Symbol R32 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(218.44 mm, 83.82 mm): Symbol R32 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'.
+    ; warning
+    @(185.42 mm, 146.05 mm): Symbol U13 [TPS22860]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Voltage_Regulator'
+    ; warning
+    @(185.42 mm, 146.05 mm): Symbol U13 [TPS22860]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(210.82 mm, 109.22 mm): Symbol R33 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(210.82 mm, 109.22 mm): Symbol R33 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(210.82 mm, 114.30 mm): Symbol #PWR050 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(227.33 mm, 83.82 mm): Symbol R31 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(227.33 mm, 83.82 mm): Symbol R31 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(185.42 mm, 157.48 mm): Symbol #PWR076 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(205.74 mm, 133.35 mm): Symbol C37 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(205.74 mm, 133.35 mm): Symbol C37 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(198.12 mm, 146.05 mm): Symbol #FLG011 [PWR_FLAG]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(205.74 mm, 137.16 mm): Symbol #PWR077 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(248.92 mm, 26.67 mm): Symbol C35 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(248.92 mm, 26.67 mm): Symbol C35 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(236.22 mm, 83.82 mm): Symbol R30 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(236.22 mm, 83.82 mm): Symbol R30 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(248.92 mm, 30.48 mm): Symbol #PWR074 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'LED_SMD'.
+    ; warning
+    @(245.11 mm, 140.97 mm): Symbol Q3 [Q_Photo_NPN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(245.11 mm, 140.97 mm): Symbol Q3 [Q_Photo_NPN]
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(247.65 mm, 135.89 mm): Vertical Wire, length 1.27 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(247.65 mm, 151.13 mm): Symbol R35 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(247.65 mm, 151.13 mm): Symbol R35 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(247.65 mm, 156.21 mm): Symbol #PWR051 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(26.67 mm, 41.91 mm): Symbol J16 [USB_C_Receptacle_USB2.0]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Connector'
+    ; warning
+    @(26.67 mm, 41.91 mm): Symbol J16 [USB_C_Receptacle_USB2.0]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(45.72 mm, 31.75 mm): Symbol R38 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(45.72 mm, 31.75 mm): Symbol R38 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(45.72 mm, 34.29 mm): Symbol R39 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(45.72 mm, 34.29 mm): Symbol R39 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(53.34 mm, 26.67 mm): Symbol #FLG08 [PWR_FLAG]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(53.34 mm, 34.29 mm): Symbol #PWR056 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(22.86 mm, 64.77 mm): Symbol #PWR054 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(68.58 mm, 35.56 mm): Symbol R40 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(68.58 mm, 35.56 mm): Symbol R40 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'LED_SMD'.
+    ; warning
+    @(72.39 mm, 31.75 mm): Symbol D3 [LED]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(72.39 mm, 31.75 mm): Symbol D3 [LED]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(68.58 mm, 39.37 mm): Symbol #PWR060 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(90.17 mm, 26.67 mm): Symbol J17 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(90.17 mm, 26.67 mm): Symbol J17 [Conn_01x02_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'.
+    ; warning
+    @(60.96 mm, 85.09 mm): Symbol U11 [AP7366EA-33W5-7]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_Voltage_Regulator'
+    ; warning
+    @(60.96 mm, 85.09 mm): Symbol U11 [AP7366EA-33W5-7]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(46.99 mm, 93.98 mm): Symbol C25 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(46.99 mm, 93.98 mm): Symbol C25 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(46.99 mm, 97.79 mm): Symbol #PWR058 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(69.85 mm, 91.44 mm): Symbol #PWR062 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Diode_SMD'.
+    ; warning
+    @(83.82 mm, 86.36 mm): Symbol D5 [D_Schottky]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(83.82 mm, 86.36 mm): Symbol D5 [D_Schottky]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(76.20 mm, 93.98 mm): Symbol C27 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(76.20 mm, 93.98 mm): Symbol C27 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(76.20 mm, 97.79 mm): Symbol #PWR063 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(121.92 mm, 35.56 mm): Symbol R41 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(121.92 mm, 35.56 mm): Symbol R41 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(121.92 mm, 39.37 mm): Symbol #PWR064 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'LED_SMD'.
+    ; warning
+    @(125.73 mm, 31.75 mm): Symbol D4 [LED]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(125.73 mm, 31.75 mm): Symbol D4 [LED]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(106.68 mm, 81.28 mm): Symbol J18 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(106.68 mm, 81.28 mm): Symbol J18 [Conn_01x02_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(55.88 mm, 129.54 mm): Symbol C24 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(55.88 mm, 129.54 mm): Symbol C24 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(55.88 mm, 133.35 mm): Symbol #PWR057 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(143.51 mm, 26.67 mm): Symbol J22 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(143.51 mm, 26.67 mm): Symbol J22 [Conn_01x02_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(73.66 mm, 129.54 mm): Symbol C26 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(73.66 mm, 129.54 mm): Symbol C26 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(73.66 mm, 133.35 mm): Symbol #PWR061 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(38.10 mm, 153.67 mm): Symbol R36 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(38.10 mm, 153.67 mm): Symbol R36 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(38.10 mm, 156.21 mm): Symbol R37 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(38.10 mm, 156.21 mm): Symbol R37 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(21.59 mm, 160.02 mm): Symbol C22 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(21.59 mm, 160.02 mm): Symbol C22 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(26.67 mm, 160.02 mm): Symbol C23 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(26.67 mm, 160.02 mm): Symbol C23 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(24.13 mm, 163.83 mm): Symbol #PWR055 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_SO'.
+    ; warning
+    @(67.31 mm, 156.21 mm): Symbol U10 [FT230XS]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Interface_USB'
+    ; warning
+    @(67.31 mm, 156.21 mm): Symbol U10 [FT230XS]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(104.14 mm, 135.89 mm): Symbol J19 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(104.14 mm, 135.89 mm): Symbol J19 [Conn_01x02_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(104.14 mm, 143.51 mm): Symbol J20 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(104.14 mm, 143.51 mm): Symbol J20 [Conn_01x02_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(104.14 mm, 151.13 mm): Symbol J21 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(104.14 mm, 151.13 mm): Symbol J21 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(67.31 mm, 173.99 mm): Symbol #PWR059 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(187.96 mm, 40.64 mm): Symbol C28 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(187.96 mm, 40.64 mm): Symbol C28 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(187.96 mm, 45.72 mm): Symbol #PWR066 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(201.93 mm, 40.64 mm): Symbol C29 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(201.93 mm, 40.64 mm): Symbol C29 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(201.93 mm, 45.72 mm): Symbol #PWR067 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'.
+    ; warning
+    @(162.56 mm, 128.27 mm): Symbol J23 [Conn_01x02_Pin]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
+    ; warning
+    @(162.56 mm, 128.27 mm): Symbol J23 [Conn_01x02_Pin]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(173.99 mm, 138.43 mm): Symbol R42 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(173.99 mm, 138.43 mm): Symbol R42 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(203.20 mm, 93.98 mm): Symbol U12 [Sparkfun_Artemis]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Marcano_MCU'
+    ; warning
+    @(203.20 mm, 93.98 mm): Symbol U12 [Sparkfun_Artemis]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(173.99 mm, 142.24 mm): Symbol #PWR065 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(203.20 mm, 143.51 mm): Symbol #PWR068 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(248.92 mm, 31.75 mm): Symbol #PWR069 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'.
+    ; warning
+    @(231.14 mm, 115.57 mm): Symbol R43 [R_US]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(231.14 mm, 115.57 mm): Symbol R43 [R_US]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinSocket_1.27mm'.
+    ; warning
+    @(262.89 mm, 26.67 mm): Symbol J24 [Conn_02x05_Odd_Even]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
+    ; warning
+    @(262.89 mm, 26.67 mm): Symbol J24 [Conn_02x05_Odd_Even]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(240.03 mm, 121.92 mm): Symbol Y2 [Crystal]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(240.03 mm, 121.92 mm): Symbol Y2 [Crystal]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(245.11 mm, 115.57 mm): Symbol C31 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(245.11 mm, 115.57 mm): Symbol C31 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(233.68 mm, 142.24 mm): Symbol C30 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(233.68 mm, 142.24 mm): Symbol C30 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'.
+    ; warning
+    @(245.11 mm, 127.00 mm): Symbol C32 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(245.11 mm, 127.00 mm): Symbol C32 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(251.46 mm, 125.73 mm): Symbol #PWR070 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Marcano'.
+    ; warning
+    @(254.00 mm, 133.35 mm): Symbol SW1 [SW_SPST]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Switch'
+    ; warning
+    @(254.00 mm, 133.35 mm): Symbol SW1 [SW_SPST]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(261.62 mm, 142.24 mm): Symbol #PWR071 [GND]
+
+***** Sheet /sMFC_ADP/
+
+***** Sheet /Power Management/
+
+***** Sheet /Time/
+
+***** Sheet /Application/
+
+***** Sheet /Application/Artemia_Artemis/
+
+ ** ERC messages: 369  Errors 0  Warnings 369

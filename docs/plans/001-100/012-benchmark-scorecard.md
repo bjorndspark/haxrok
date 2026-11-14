@@ -45,7 +45,7 @@ Effort: about 2–3 days, a step per session.
 | 1 | One command scores every case over several runs | done |
 | 2 | Each issue a review raises is judged real or wrong, and the judgement is kept | done |
 | 3 | More unmodified boards measure false alarms | done |
-| 4 | Real bugs from public fix commits measure misses | proposed |
+| 4 | Real bugs from public fix commits measure misses | done |
 | 5 | A baseline scorecard recorded | proposed |
 
 ## 1. One command scores every case over several runs: done
@@ -222,7 +222,7 @@ moisture sensor's 1uF on RESET (debugWIRE) and its 16 MHz crystal at
 issue on these boards is a false alarm, mostly from the netlist pin
 names (BAV99) and from a jumper block read as unconnected nets.
 
-## 4. Real bugs from public fix commits measure misses: proposed
+## 4. Real bugs from public fix commits measure misses: done
 
 - At least three cases where a public KiCad repo's commit fixes a
   schematic bug: the board before the fix is the case, the fix is
@@ -240,8 +240,57 @@ export with KiCad 9, kinds that differ from the existing cases, and (step
 4) a fix whose cause is stated in the commit, issue or changelog, not
 guessed from the diff. Each choice and the candidates passed over are
 written in the step's section, and the user reviews them with the drafts.
+Decided (2026-11-14): three boards, each case named for its bug and
+taken at the parent of the fix commit, unmodified:
+`artemia-fet-pinout` (BSS123s on a D-G-S symbol, plus a pull-down
+divider that holds V_GOOD low: patlab-ucsd/artemia_hardware at a19e227,
+fix a05f688 for issue #7 and #6, Solderpad Hardware License v2.1, an
+Apache-2.0 wraparound), `enviro-node-usb-backfeed` (the CP2102N's
+regulator back-feeds +3.3V from USB: DPIclimate/enviro-node at e0eeff4,
+fix 1a1253b, MIT) and `lpddr5-fb-no-divider` (the MPM54304's four FB
+dividers have their lower resistor from VOUT to GND:
+antmicro/lpddr5-testbed at 149cfc8, fix 4a6fea22, Apache-2.0). Passed
+over: smart-pet-tag, IFS08-CE-AMS, picofusion_h20, hicart, kill_cone,
+farpatch and haxo-hw (no license or a non-permissive one), Crystal
+(AGPL), open-ambient-sensor (GPL-3) and openmupp-v1 (CERN-OHL-S);
+tnCart #14 (an FPGA clock fix, not a schematic one), panelclock (the
+same kind as `orbit-uart-swapped`), gps-clock (schematic as images
+only), HAQuDA (Altium) and subira (a CC fix like an existing case, with
+the cause not stated).
+Decided (2026-11-14): a real-bug case has a `symptom.md` only when its
+source states an observation, in the source's words, never one read
+from the diff. Only `enviro-node-usb-backfeed` has one (the fix's "will
+not try to power the board when a USB cable is plugged in"); the other
+two are scored in review mode only. `evals/README.md` says so.
 
-**Checks:** each case's ERC and netlist export; one scorecard run.
+**Checks:** each case exported with KiCad 9 in the backend container:
+`artemia-fet-pinout` ERC 0 errors, 369 warnings;
+`enviro-node-usb-backfeed` 14 errors, 1028 warnings;
+`lpddr5-fb-no-divider` 25 errors, 832 warnings (the upstream boards'
+own, left as they are). `make eval-score n=3
+cases=artemia-fet-pinout,enviro-node-usb-backfeed,lpddr5-fb-no-divider`
+(`20261114T045131Z`): 9 runs, 0 failed, 45 issues. The bug ranked #1
+in all 3 `enviro-node-usb-backfeed` runs and was missed in all 6
+others: no issue in those runs names the FET pinout or the buck's FB
+pins. With the drafts, rescored by `from=`: real 27d, wrong 15d,
+unjudged 0, and every match was listed and read; each of the 45 issues
+matched the right entry. Real (draft): artemia's second fixed fault
+(R19 holding V_GOOD low, raised in every run, and R18 biasing EN_PULSE
+mid-rail), its RTC with no bypass and SWD reset through C30; enviro's
+USB-C B-side data left open, the SARA-R5 with no capacitor after its
+ferrite, two reversed power LEDs and GPIO17 tied high (undone by
+the same fix commit); lpddr5's floating DMI direction lines, DIR2
+strapped low on every translator, the translators' 0.5 V VCCB and
+PWR_GOOD left open (wired in the next upstream commit). Wrong (draft):
+artemia's +BATT "Li-ion overvoltage" (a microbial fuel cell input) and
+J25 "shorted" (a 2-pin terminal), enviro's "open" catch diode and
+floating GPIO0 (internal pull-up), lpddr5's U9 "0.4 V" LDO (a trimmer
+sets it), missing I2C pull-ups (the host's) and the QWIIC power.
+`make lint` passed (1 old warning in `shared/ui/button.tsx`) and `make test` passed (487 backend, 55 frontend); no code changed. Bugs
+found: `lpddr5-fb-no-divider`'s first `Auto-check:` (`fb|feedback;
+divider|…`) ranked run 1's U9 LDO divider claim as the bug. The check
+now also needs the buck (`u8|mpm54304|buck|…|vout4`), and that run is a
+miss.
 
 ## 5. A baseline scorecard recorded: proposed
 

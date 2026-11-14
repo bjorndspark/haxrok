@@ -1,0 +1,2593 @@
+ERC report (2026-11-14T04:48:49+0000, Encoding UTF8)
+
+***** Sheet /
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(188.59 mm, 76.83 mm): Symbol #PWR0102 Hidden pin 1 [+1V1, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(188.59 mm, 76.83 mm): Vertical Wire, length 1.27 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(188.59 mm, 76.83 mm): Symbol #PWR0102 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(188.59 mm, 83.19 mm): Symbol R1 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(188.59 mm, 83.19 mm): Vertical Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(188.59 mm, 83.19 mm): Symbol R1 [R_1k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(188.59 mm, 83.19 mm): Symbol R1 [R_1k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(162.56 mm, 85.09 mm): Horizontal Wire, length 26.04 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(188.59 mm, 85.09 mm): Horizontal Wire, length 10.79 mm
+[hier_label_mismatch]: Sheet pin DMI_A0_DIR has no matching hierarchical label inside the sheet
+    ; error
+    @(184.15 mm, 119.38 mm): Hierarchical Sheet Pin DMI_A0_DIR
+[hier_label_mismatch]: Sheet pin DMI_A1_DIR has no matching hierarchical label inside the sheet
+    ; error
+    @(184.15 mm, 121.92 mm): Hierarchical Sheet Pin DMI_A1_DIR
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(207.01 mm, 78.74 mm): Symbol Q1 [DMG1012T-7]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroTransistorsFETsMOSFETsSingle'
+    ; warning
+    @(207.01 mm, 78.74 mm): Symbol Q1 [DMG1012T-7]
+[pin_to_pin]: Pins of type Bidirectional and Power output are connected
+    ; warning
+    @(207.01 mm, 78.74 mm): Symbol Q1 Pin 1 [G, Bidirectional, Line]
+    @(276.23 mm, 104.14 mm): Symbol #FLG0101 Pin 1 [pwr, Power output, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.26 mm, 76.20 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.26 mm, 76.20 mm): Symbol #PWR0101 Hidden pin 1 [+1V05, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(215.26 mm, 76.20 mm): Symbol #PWR0101 [+1V05]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(207.01 mm, 77.47 mm): Horizontal Wire, length 8.26 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.26 mm, 77.47 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.26 mm, 83.82 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.26 mm, 83.82 mm): Symbol R2 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(215.26 mm, 83.82 mm): Symbol R2 [R_1k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(215.26 mm, 83.82 mm): Symbol R2 [R_1k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.26 mm, 85.09 mm): Horizontal Wire, length 23.50 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(209.55 mm, 85.09 mm): Horizontal Wire, length 5.71 mm
+[hier_label_mismatch]: Sheet pin DMI_A0_DIR has no matching hierarchical label inside the sheet
+    ; error
+    @(184.15 mm, 154.94 mm): Hierarchical Sheet Pin DMI_A0_DIR
+[hier_label_mismatch]: Sheet pin DMI_A1_DIR has no matching hierarchical label inside the sheet
+    ; error
+    @(184.15 mm, 157.48 mm): Hierarchical Sheet Pin DMI_A1_DIR
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(236.22 mm, 120.65 mm): Vertical Bus, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(236.22 mm, 151.76 mm): Horizontal Bus, length 10.16 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(153.67 mm, 57.15 mm): Horizontal Wire, length 13.34 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(153.67 mm, 59.69 mm): Horizontal Wire, length 13.34 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(180.34 mm, 57.15 mm): Horizontal Wire, length 8.26 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(172.09 mm, 57.15 mm): Symbol R26 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(172.09 mm, 57.15 mm): Symbol R26 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(172.09 mm, 57.15 mm): Symbol R26 [R_0R_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(182.88 mm, 59.69 mm): Horizontal Wire, length 10.79 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(172.09 mm, 59.69 mm): Symbol R27 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(172.09 mm, 59.69 mm): Symbol R27 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(172.09 mm, 59.69 mm): Symbol R27 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(177.80 mm, 44.45 mm): Symbol #PWR0142 [+5V]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(118.11 mm, 143.51 mm): Symbol J1 [Edge_Conn_Bus_LPDDR5_testbed]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroMemoryConnectorsPCCardSockets'
+    ; warning
+    @(118.11 mm, 143.51 mm): Symbol J1 [Edge_Conn_Bus_LPDDR5_testbed]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(184.15 mm, 49.53 mm): Symbol #FLG01 [PWR_FLAG]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(193.04 mm, 49.53 mm): Symbol J1 [Edge_Conn_Bus_LPDDR5_testbed]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroMemoryConnectorsPCCardSockets'
+    ; warning
+    @(193.04 mm, 49.53 mm): Symbol J1 [Edge_Conn_Bus_LPDDR5_testbed]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(194.31 mm, 96.52 mm): Symbol U7 [AT24CS01_SOT23]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroMemory'
+    ; warning
+    @(194.31 mm, 96.52 mm): Symbol U7 [AT24CS01_SOT23]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(182.88 mm, 130.81 mm): Horizontal Bus, length 6.99 mm
+[label_dangling]: Label not connected to anything
+    ; error
+    @(88.90 mm, 217.17 mm): Hierarchical Label 'DMI0_DIR_A'
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.90 mm, 96.52 mm): Vertical Wire, length 1.91 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.90 mm, 94.61 mm): Horizontal Wire, length 3.81 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.90 mm, 100.97 mm): Vertical Wire, length 1.91 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(215.90 mm, 100.97 mm): Horizontal Wire, length 3.81 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(219.71 mm, 93.98 mm): Symbol #PWR0140 [+1V8]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(219.71 mm, 93.98 mm): Vertical Wire, length 0.64 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(219.71 mm, 94.61 mm): Vertical Wire, length 0.64 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(219.71 mm, 100.33 mm): Symbol C7 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(219.71 mm, 100.33 mm): Symbol C7 [C_4u7_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(219.71 mm, 100.33 mm): Vertical Wire, length 0.64 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(219.71 mm, 100.97 mm): Vertical Wire, length 0.64 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(242.57 mm, 46.99 mm): Symbol #PWR0143 [+1V8]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(242.57 mm, 53.34 mm): Symbol R28 [R_10k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(242.57 mm, 53.34 mm): Symbol R28 [R_10k_0402]
+[label_dangling]: Label not connected to anything
+    ; error
+    @(182.88 mm, 217.17 mm): Hierarchical Label 'DMI1_DIR_A'
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(254.00 mm, 143.51 mm): Symbol J1 [Edge_Conn_Bus_LPDDR5_testbed]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroMemoryConnectorsPCCardSockets'
+    ; warning
+    @(254.00 mm, 143.51 mm): Symbol J1 [Edge_Conn_Bus_LPDDR5_testbed]
+[label_dangling]: Label not connected to anything
+    ; error
+    @(224.79 mm, 217.17 mm): Hierarchical Label 'DMI0_DIR_B'
+[label_dangling]: Label not connected to anything
+    ; error
+    @(228.60 mm, 217.17 mm): Label 'DMI0_DIR'
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(318.77 mm, 130.81 mm): Horizontal Bus, length 6.99 mm
+[label_dangling]: Label not connected to anything
+    ; error
+    @(314.96 mm, 217.17 mm): Label 'DMI1_DIR'
+[label_dangling]: Label not connected to anything
+    ; error
+    @(318.77 mm, 217.17 mm): Hierarchical Label 'DMI1_DIR_B'
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(76.20 mm, 57.15 mm): Symbol R53 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(76.20 mm, 57.15 mm): Symbol R53 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 39.37 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 39.37 mm): Symbol #PWR0228 Hidden pin 1 [+1V1, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(93.34 mm, 39.37 mm): Symbol #PWR0228 [+1V1]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(76.20 mm, 67.31 mm): Symbol R54 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(76.20 mm, 67.31 mm): Symbol R54 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 40.64 mm): Horizontal Wire, length 4.45 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(97.79 mm, 46.99 mm): Symbol C22 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(97.79 mm, 46.99 mm): Symbol #PWR0226 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(97.79 mm, 46.99 mm): Symbol C22 [C_1u_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 40.64 mm): Vertical Wire, length 11.43 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 40.64 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 52.07 mm): Horizontal Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(105.41 mm, 52.07 mm): Symbol U11 [SN74AXC8T245_UQFN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroLogicTranslatorsLevelShifters'
+    ; warning
+    @(105.41 mm, 52.07 mm): Symbol U11 [SN74AXC8T245_UQFN]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(101.60 mm, 93.98 mm): Symbol R71 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(101.60 mm, 93.98 mm): Symbol R71 [R_0R_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 102.87 mm): Symbol #PWR0261 Hidden pin 1 [+1V1, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 102.87 mm): Vertical Wire, length 1.27 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(93.34 mm, 102.87 mm): Symbol #PWR0261 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 104.14 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 40.64 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(138.43 mm, 40.64 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(128.27 mm, 40.64 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 46.99 mm): Symbol #PWR0229 Pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 46.99 mm): Symbol C25 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(133.99 mm, 46.99 mm): Symbol C25 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(133.99 mm, 46.99 mm): Symbol #PWR0229 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(133.99 mm, 46.99 mm): Symbol C25 [C_1u_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(76.20 mm, 120.65 mm): Symbol R55 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(76.20 mm, 120.65 mm): Symbol R55 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(138.43 mm, 39.37 mm): Symbol #PWR0227 [+0V5]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 104.14 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 104.14 mm): Vertical Wire, length 11.43 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(97.79 mm, 110.49 mm): Symbol C23 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(97.79 mm, 110.49 mm): Symbol #PWR0260 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(97.79 mm, 110.49 mm): Symbol C23 [C_1u_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(76.20 mm, 130.81 mm): Symbol R59 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(76.20 mm, 130.81 mm): Symbol R59 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 115.57 mm): Horizontal Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(144.78 mm, 57.15 mm): Symbol R75 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(144.78 mm, 57.15 mm): Symbol R75 [4x0R_0402_array]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(105.41 mm, 115.57 mm): Symbol U12 [SN74AXC8T245_UQFN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroLogicTranslatorsLevelShifters'
+    ; warning
+    @(105.41 mm, 115.57 mm): Symbol U12 [SN74AXC8T245_UQFN]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(144.78 mm, 67.31 mm): Symbol R76 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(144.78 mm, 67.31 mm): Symbol R76 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(138.43 mm, 104.14 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 104.14 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(128.27 mm, 104.14 mm): Horizontal Wire, length 5.71 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(138.43 mm, 102.87 mm): Symbol #PWR0230 [+0V5]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 110.49 mm): Symbol C27 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 110.49 mm): Symbol #PWR0233 Pin 1 [GND, Power input, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(133.99 mm, 110.49 mm): Symbol C27 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(133.99 mm, 110.49 mm): Symbol #PWR0233 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(133.99 mm, 110.49 mm): Symbol C27 [C_1u_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(97.16 mm, 148.59 mm): Horizontal Wire, length 8.26 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(101.60 mm, 157.48 mm): Symbol R72 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(101.60 mm, 157.48 mm): Symbol R72 [R_0R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(144.78 mm, 120.65 mm): Symbol R77 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(144.78 mm, 120.65 mm): Symbol R77 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(60.96 mm, 179.07 mm): Symbol #PWR0257 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 166.37 mm): Symbol #PWR0258 Hidden pin 1 [+1V1, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 166.37 mm): Vertical Wire, length 1.27 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(93.34 mm, 166.37 mm): Symbol #PWR0258 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(93.34 mm, 167.64 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 57.15 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 58.42 mm): Bus to Wire Entry
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(144.78 mm, 130.81 mm): Symbol R78 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(144.78 mm, 130.81 mm): Symbol R78 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 60.96 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 59.69 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 63.50 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 62.23 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 58.42 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 60.96 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 60.96 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 66.04 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 64.77 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 167.64 mm): Vertical Wire, length 11.43 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 167.64 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 63.50 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 63.50 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 68.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 67.31 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 66.04 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 66.04 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 71.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 69.85 mm): Horizontal Wire, length 31.11 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(76.20 mm, 184.15 mm): Symbol R62 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(76.20 mm, 184.15 mm): Symbol R62 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 68.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 68.58 mm): Vertical Bus, length 2.54 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(97.79 mm, 173.99 mm): Symbol C24 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(97.79 mm, 173.99 mm): Symbol C24 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(97.79 mm, 173.99 mm): Symbol #PWR0259 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 73.66 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 72.39 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 71.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 71.12 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 76.20 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 74.93 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 73.66 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 73.66 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 76.20 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 76.20 mm): Vertical Bus, length 45.72 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 76.20 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(103.50 mm, 179.07 mm): Horizontal Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(105.41 mm, 179.07 mm): Symbol U13 [SN74AXC8T245_UQFN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroLogicTranslatorsLevelShifters'
+    ; warning
+    @(105.41 mm, 179.07 mm): Symbol U13 [SN74AXC8T245_UQFN]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(76.20 mm, 194.31 mm): Symbol R67 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(76.20 mm, 194.31 mm): Symbol R67 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(128.27 mm, 167.64 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 167.64 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(138.43 mm, 167.64 mm): Horizontal Wire, length 4.45 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(138.43 mm, 166.37 mm): Symbol #PWR0267 [+0V5]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 173.99 mm): Symbol C28 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(133.99 mm, 173.99 mm): Symbol #PWR0268 Pin 1 [GND, Power input, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(133.99 mm, 173.99 mm): Symbol C28 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(133.99 mm, 173.99 mm): Symbol C28 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(133.99 mm, 173.99 mm): Symbol #PWR0268 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 121.92 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 120.65 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 121.92 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 123.19 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 124.46 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 121.92 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 121.92 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 121.92 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 127.00 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 125.73 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 124.46 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 128.27 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 129.54 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 127.00 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 127.00 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 132.08 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 132.08 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 132.08 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 130.81 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 129.54 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 129.54 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(85.72 mm, 211.46 mm): Symbol #PWR0264 Hidden pin 1 [+1V1, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(85.72 mm, 211.46 mm): Vertical Wire, length 0.64 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(85.72 mm, 211.46 mm): Symbol #PWR0264 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(85.72 mm, 212.09 mm): Horizontal Wire, length 8.26 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 134.62 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 133.35 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 134.62 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 134.62 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 132.08 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 132.08 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 132.08 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 132.08 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 135.89 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 137.16 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 134.62 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 134.62 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 134.62 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 134.62 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 138.43 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 139.70 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 137.16 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 137.16 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 139.70 mm): Vertical Bus, length 48.26 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 139.70 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 139.70 mm): Vertical Bus, length 2.54 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(99.06 mm, 212.09 mm): Symbol R70 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(99.06 mm, 212.09 mm): Symbol R70 [R_0R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(144.78 mm, 184.15 mm): Symbol R79 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(144.78 mm, 184.15 mm): Symbol R79 [4x0R_0402_array]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(144.78 mm, 194.31 mm): Symbol R80 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(144.78 mm, 194.31 mm): Symbol R80 [4x0R_0402_array]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(101.60 mm, 220.98 mm): Symbol R73 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(101.60 mm, 220.98 mm): Symbol R73 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(170.18 mm, 179.07 mm): Symbol #PWR0269 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 186.69 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 187.96 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 187.96 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 189.23 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 190.50 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(112.39 mm, 241.30 mm): Symbol R74 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(110.49 mm, 241.30 mm): Horizontal Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(112.39 mm, 241.30 mm): Symbol R74 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(112.39 mm, 241.30 mm): Symbol R74 [R_0R_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 190.50 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 190.50 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 193.04 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 191.77 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(117.47 mm, 241.30 mm): Horizontal Wire, length 13.34 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 193.04 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 193.04 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 195.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 194.31 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 195.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 195.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 195.58 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 195.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 195.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 195.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 198.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 198.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 198.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 196.85 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 198.12 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 198.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 198.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 198.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 200.66 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 199.39 mm): Horizontal Wire, length 31.11 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(266.70 mm, 57.15 mm): Symbol R81 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(266.70 mm, 57.15 mm): Symbol R81 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 200.66 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 200.66 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 203.20 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(154.94 mm, 201.93 mm): Horizontal Wire, length 31.11 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(266.70 mm, 67.31 mm): Symbol R82 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(266.70 mm, 67.31 mm): Symbol R82 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 203.20 mm): Vertical Bus, length 33.02 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 203.20 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(187.32 mm, 203.20 mm): Vertical Bus, length 2.54 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(252.73 mm, 115.57 mm): Symbol #PWR0250 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 39.37 mm): Symbol #PWR0237 Hidden pin 1 [+1V1, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 39.37 mm): Vertical Wire, length 1.27 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(283.85 mm, 39.37 mm): Symbol #PWR0237 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 40.64 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 84.45 mm): Vertical Wire, length 0.64 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 84.45 mm): Symbol #PWR0251 Hidden pin 1 [+1V1, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(276.23 mm, 84.45 mm): Symbol #PWR0251 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 85.09 mm): Horizontal Wire, length 8.26 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(288.29 mm, 46.99 mm): Symbol C29 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(288.29 mm, 46.99 mm): Symbol #PWR0238 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(288.29 mm, 46.99 mm): Symbol C29 [C_1u_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(267.97 mm, 120.65 mm): Symbol R83 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(267.97 mm, 120.65 mm): Symbol R83 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(252.09 mm, 151.13 mm): Horizontal Wire, length 26.04 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 40.64 mm): Vertical Wire, length 11.43 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 40.64 mm): Horizontal Wire, length 5.71 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(267.97 mm, 130.81 mm): Symbol R84 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(267.97 mm, 130.81 mm): Symbol R84 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 52.07 mm): Horizontal Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(295.91 mm, 52.07 mm): Symbol U14 [SN74AXC8T245_UQFN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroLogicTranslatorsLevelShifters'
+    ; warning
+    @(295.91 mm, 52.07 mm): Symbol U14 [SN74AXC8T245_UQFN]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(289.56 mm, 85.09 mm): Symbol R91 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(289.56 mm, 85.09 mm): Symbol R91 [R_0R_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 102.87 mm): Symbol #PWR0242 Hidden pin 1 [+1V1, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 102.87 mm): Vertical Wire, length 1.27 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(283.85 mm, 102.87 mm): Symbol #PWR0242 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 104.14 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(188.59 mm, 237.49 mm): Horizontal Bus, length 189.23 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(188.59 mm, 237.49 mm): Bus, length 1.80 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(292.10 mm, 93.98 mm): Symbol R92 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(292.10 mm, 93.98 mm): Symbol R92 [R_0R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(288.29 mm, 110.49 mm): Symbol C71 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(288.29 mm, 110.49 mm): Symbol C71 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(288.29 mm, 110.49 mm): Symbol #PWR0240 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(252.73 mm, 179.07 mm): Symbol #PWR0244 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 104.14 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 104.14 mm): Vertical Wire, length 11.43 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 115.57 mm): Horizontal Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(295.91 mm, 115.57 mm): Symbol U15 [SN74AXC8T245_UQFN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroLogicTranslatorsLevelShifters'
+    ; warning
+    @(295.91 mm, 115.57 mm): Symbol U15 [SN74AXC8T245_UQFN]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(283.21 mm, 148.59 mm): Symbol R87 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(283.21 mm, 148.59 mm): Symbol R87 [R_0R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(283.21 mm, 151.13 mm): Symbol R88 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(283.21 mm, 151.13 mm): Symbol R88 [R_0R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(267.97 mm, 184.15 mm): Symbol R85 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(267.97 mm, 184.15 mm): Symbol R85 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(318.77 mm, 40.64 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(324.49 mm, 40.64 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(328.93 mm, 40.64 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(324.49 mm, 46.99 mm): Symbol #PWR0253 Pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(324.49 mm, 46.99 mm): Symbol C74 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(324.49 mm, 46.99 mm): Symbol C74 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(324.49 mm, 46.99 mm): Symbol C74 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(324.49 mm, 46.99 mm): Symbol #PWR0253 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 166.37 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 166.37 mm): Symbol #PWR0246 Hidden pin 1 [+1V1, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(283.85 mm, 166.37 mm): Symbol #PWR0246 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(283.85 mm, 167.64 mm): Horizontal Wire, length 4.45 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(267.97 mm, 194.31 mm): Symbol R86 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(267.97 mm, 194.31 mm): Symbol R86 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(328.93 mm, 39.37 mm): Symbol #PWR0239 [+0V5]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(288.29 mm, 173.99 mm): Symbol C72 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(288.29 mm, 173.99 mm): Symbol #PWR0243 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(288.29 mm, 173.99 mm): Symbol C72 [C_1u_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 167.64 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 167.64 mm): Vertical Wire, length 11.43 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(335.28 mm, 57.15 mm): Symbol R97 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(335.28 mm, 57.15 mm): Symbol R97 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(318.77 mm, 104.14 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(328.93 mm, 104.14 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(324.49 mm, 104.14 mm): Vertical Wire, length 1.27 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(335.28 mm, 67.31 mm): Symbol R98 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(335.28 mm, 67.31 mm): Symbol R98 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(324.49 mm, 110.49 mm): Symbol C75 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(324.49 mm, 110.49 mm): Symbol #PWR0234 Pin 1 [GND, Power input, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(324.49 mm, 110.49 mm): Symbol C75 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(324.49 mm, 110.49 mm): Symbol C75 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(324.49 mm, 110.49 mm): Symbol #PWR0234 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(294.00 mm, 179.07 mm): Horizontal Wire, length 1.91 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(328.93 mm, 102.87 mm): Symbol #PWR0236 [+0V5]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(295.91 mm, 179.07 mm): Symbol U16 [SN74AXC8T245_UQFN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroLogicTranslatorsLevelShifters'
+    ; warning
+    @(295.91 mm, 179.07 mm): Symbol U16 [SN74AXC8T245_UQFN]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(283.21 mm, 212.09 mm): Symbol R89 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(283.21 mm, 212.09 mm): Symbol R89 [R_0R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(334.01 mm, 120.65 mm): Symbol R93 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(334.01 mm, 120.65 mm): Symbol R93 [4x0R_0402_array]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(283.21 mm, 214.63 mm): Symbol R90 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(283.21 mm, 214.63 mm): Symbol R90 [R_0R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(334.01 mm, 130.81 mm): Symbol R94 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(334.01 mm, 130.81 mm): Symbol R94 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(318.13 mm, 167.64 mm): Horizontal Wire, length 5.71 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(318.13 mm, 179.07 mm): Vertical Wire, length 11.43 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(316.23 mm, 179.07 mm): Horizontal Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(323.85 mm, 173.99 mm): Symbol C73 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(323.85 mm, 173.99 mm): Symbol #PWR0248 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(323.85 mm, 173.99 mm): Symbol C73 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(328.93 mm, 166.37 mm): Symbol #PWR0254 [+0V5]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(359.41 mm, 115.57 mm): Symbol #PWR0256 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 57.15 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 58.42 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 59.69 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 60.96 mm): Bus to Wire Entry
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(334.01 mm, 184.15 mm): Symbol R95 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(334.01 mm, 184.15 mm): Symbol R95 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 63.50 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 62.23 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 64.77 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 66.04 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 58.42 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 68.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 67.31 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 60.96 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 60.96 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 71.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 69.85 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 63.50 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 63.50 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 73.66 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 72.39 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 66.04 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 66.04 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 76.20 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 74.93 mm): Horizontal Wire, length 31.11 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 68.58 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 68.58 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 71.12 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 71.12 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 73.66 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 73.66 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 73.66 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 76.20 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 76.20 mm): Vertical Bus, length 50.80 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(334.01 mm, 194.31 mm): Symbol R96 [4x0R_0402_array]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistorNetworksArrays'
+    ; warning
+    @(334.01 mm, 194.31 mm): Symbol R96 [4x0R_0402_array]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(344.17 mm, 125.73 mm): Horizontal Wire, length 32.38 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 125.73 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 125.73 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 128.27 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 128.27 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(344.17 mm, 128.27 mm): Horizontal Wire, length 32.38 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 125.73 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 125.73 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 127.00 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 128.27 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 128.27 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 129.54 mm): Vertical Bus, length 10.16 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(344.17 mm, 138.43 mm): Horizontal Wire, length 32.38 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 138.43 mm): Bus to Wire Entry
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(359.41 mm, 179.07 mm): Symbol #PWR0249 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 138.43 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 139.70 mm): Vertical Bus, length 50.80 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(344.17 mm, 189.23 mm): Horizontal Wire, length 32.38 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 189.23 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 189.23 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 191.77 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(344.17 mm, 191.77 mm): Horizontal Wire, length 32.38 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 191.77 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 189.23 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 189.23 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 190.50 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(344.17 mm, 194.31 mm): Horizontal Wire, length 32.38 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 194.31 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 191.77 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 193.04 mm): Vertical Bus, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 191.77 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 195.58 mm): Vertical Bus, length 41.91 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(376.56 mm, 194.31 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(377.82 mm, 237.49 mm): Horizontal Bus, length 5.71 mm
+[label_dangling]: Label not connected to anything
+    ; error
+    @(252.09 mm, 151.13 mm): Hierarchical Label 'DMI0_DIR'
+[label_dangling]: Label not connected to anything
+    ; error
+    @(252.73 mm, 214.63 mm): Hierarchical Label 'DMI1_DIR'
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(295.91 mm, 207.01 mm): Horizontal Wire, length 1.27 mm
+[label_dangling]: Label not connected to anything
+    ; error
+    @(379.73 mm, 126.36 mm): Label 'RDQS_{VT}_A0_P'
+[label_dangling]: Label not connected to anything
+    ; error
+    @(379.73 mm, 128.91 mm): Label 'RDQS_{VT}_A0_N'
+[label_dangling]: Label not connected to anything
+    ; error
+    @(379.73 mm, 139.06 mm): Label 'DMI_{VT}_A0'
+[label_dangling]: Label not connected to anything
+    ; error
+    @(379.73 mm, 189.87 mm): Label 'RDQS_{VT}_A1_P'
+[label_dangling]: Label not connected to anything
+    ; error
+    @(379.73 mm, 192.41 mm): Label 'RDQS_{VT}_A1_N'
+[label_dangling]: Label not connected to anything
+    ; error
+    @(379.73 mm, 194.94 mm): Label 'DMI_{VT}_A1'
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(159.38 mm, 56.52 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(159.38 mm, 56.52 mm): Symbol #PWR0217 Pin 1 [+5V, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(159.38 mm, 56.52 mm): Symbol #PWR0217 [+5V]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(141.60 mm, 92.71 mm): Symbol J3 Pin 1 [1, Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(141.60 mm, 92.71 mm): Symbol J3 [JST_SH_1x4_SM04B-SRSS-TB-LF-SN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroWire2BoardConnectors'
+    ; warning
+    @(141.60 mm, 92.71 mm): Symbol J3 [JST_SH_1x4_SM04B-SRSS-TB-LF-SN]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(159.38 mm, 57.78 mm): Horizontal Wire, length 11.43 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(159.38 mm, 57.78 mm): Vertical Wire, length 15.88 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(142.88 mm, 92.71 mm): Horizontal Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(141.60 mm, 95.25 mm): Horizontal Wire, length 17.78 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(141.60 mm, 97.79 mm): Horizontal Wire, length 34.92 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(141.60 mm, 100.33 mm): Horizontal Wire, length 33.02 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(141.60 mm, 102.87 mm): Horizontal Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(142.88 mm, 102.87 mm): Vertical Wire, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(142.88 mm, 102.87 mm): Vertical Wire, length 10.16 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(141.60 mm, 105.41 mm): Horizontal Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(142.88 mm, 105.41 mm): Vertical Wire, length 0.64 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(142.88 mm, 106.05 mm): Symbol #PWR0222 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(142.88 mm, 106.05 mm): Symbol #PWR0222 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(159.38 mm, 81.28 mm): Symbol D1 Pin A [A, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(159.38 mm, 81.28 mm): Vertical Wire, length 13.97 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(159.38 mm, 81.28 mm): Symbol D1 [PTVS48VS1UR]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroDiodesRectifiersSingle'
+    ; warning
+    @(159.38 mm, 81.28 mm): Symbol D1 [PTVS48VS1UR]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.81 mm, 57.78 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.81 mm, 57.78 mm): Horizontal Wire, length 10.16 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.81 mm, 64.14 mm): Symbol #PWR0218 Pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.81 mm, 64.14 mm): Symbol C10 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(170.81 mm, 64.14 mm): Symbol C10 [C_22u_25V_0805]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitorsmisc'
+    ; warning
+    @(170.81 mm, 64.14 mm): Symbol C10 [C_22u_25V_0805]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(170.81 mm, 64.14 mm): Symbol #PWR0218 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(180.97 mm, 57.78 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(180.97 mm, 57.78 mm): Horizontal Wire, length 12.06 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(180.97 mm, 64.14 mm): Symbol C11 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(180.97 mm, 64.14 mm): Symbol #PWR0219 Pin 1 [GND, Power input, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(180.97 mm, 64.14 mm): Symbol C11 [C_22u_25V_0805]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitorsmisc'
+    ; warning
+    @(180.97 mm, 64.14 mm): Symbol C11 [C_22u_25V_0805]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(180.97 mm, 64.14 mm): Symbol #PWR0219 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(177.80 mm, 109.22 mm): Horizontal Wire, length 15.88 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(180.97 mm, 73.66 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(180.97 mm, 80.01 mm): Symbol C12 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(180.97 mm, 80.01 mm): Symbol #PWR0216 Pin 1 [GND, Power input, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(180.97 mm, 80.01 mm): Symbol C12 [C_1u_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(180.97 mm, 80.01 mm): Symbol #PWR0216 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(180.97 mm, 80.01 mm): Symbol C12 [C_1u_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(174.62 mm, 100.33 mm): Horizontal Wire, length 18.41 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(174.62 mm, 100.33 mm): Vertical Wire, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(193.04 mm, 57.78 mm): Vertical Wire, length 20.95 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(175.26 mm, 104.14 mm): Horizontal Bus, length 1.91 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(174.62 mm, 102.87 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(173.35 mm, 104.14 mm): Horizontal Bus, length 3.17 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(174.62 mm, 102.87 mm): Bus to Wire Entry
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(191.13 mm, 73.66 mm): Horizontal Wire, length 10.16 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(191.13 mm, 81.28 mm): Vertical Wire, length 7.62 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(191.13 mm, 81.28 mm): Horizontal Wire, length 3.17 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(177.80 mm, 109.22 mm): Symbol R30 [R_100k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(177.80 mm, 109.22 mm): Symbol R30 [R_100k_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(194.31 mm, 78.74 mm): Symbol U8 [MPM54304GMN-0001]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroPMICVoltageRegulatorsDCDCSwitchingRegulators'
+    ; warning
+    @(194.31 mm, 78.74 mm): Symbol U8 [MPM54304GMN-0001]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(191.13 mm, 93.34 mm): Horizontal Wire, length 1.91 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(191.13 mm, 93.34 mm): Symbol TP2 Pin 1 [1, Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(191.13 mm, 93.34 mm): Symbol TP2 [TP_1mm_SMD]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroTestPoints'
+    ; warning
+    @(191.13 mm, 93.34 mm): Symbol TP2 [TP_1mm_SMD]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(193.04 mm, 97.79 mm): Vertical Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(191.13 mm, 103.50 mm): Horizontal Wire, length 1.91 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(191.13 mm, 103.50 mm): Symbol TP3 Pin 1 [1, Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(191.13 mm, 103.50 mm): Symbol TP3 [TP_1mm_SMD]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroTestPoints'
+    ; warning
+    @(191.13 mm, 103.50 mm): Symbol TP3 [TP_1mm_SMD]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(193.04 mm, 103.50 mm): Vertical Wire, length 3.17 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(160.02 mm, 177.16 mm): Symbol #PWR0156 Hidden pin 1 [+1V1, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(160.02 mm, 177.16 mm): Vertical Wire, length 1.27 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(160.02 mm, 177.16 mm): Symbol #PWR0156 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(160.02 mm, 178.44 mm): Horizontal Wire, length 3.81 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(208.28 mm, 120.65 mm): Symbol #PWR0214 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(163.83 mm, 178.44 mm): Horizontal Wire, length 6.35 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(163.83 mm, 178.44 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.14 mm, 86.36 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(226.69 mm, 86.36 mm): Vertical Wire, length 0.64 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(222.25 mm, 86.36 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(226.69 mm, 87.00 mm): Symbol #PWR0225 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'K410T-devboard'
+    ; warning
+    @(226.69 mm, 87.00 mm): Symbol #PWR0225 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 83.82 mm): Symbol R33 [R_100k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 83.82 mm): Symbol R33 [R_100k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.18 mm, 178.44 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.18 mm, 178.44 mm): Horizontal Wire, length 7.62 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 86.36 mm): Symbol R34 [R_49k9_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 86.36 mm): Symbol R34 [R_49k9_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(163.83 mm, 184.78 mm): Symbol #PWR0158 Pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(163.83 mm, 184.78 mm): Symbol C8 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(163.83 mm, 184.78 mm): Symbol C8 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(163.83 mm, 184.78 mm): Symbol C8 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(163.83 mm, 184.78 mm): Symbol #PWR0158 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'K410T-devboard'
+    ; warning
+    @(228.60 mm, 99.06 mm): Symbol #PWR0220 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 96.52 mm): Symbol R35 [R_100k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 96.52 mm): Symbol R35 [R_100k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(226.69 mm, 106.68 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(226.69 mm, 106.68 mm): Vertical Wire, length 0.64 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(222.25 mm, 106.68 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(226.69 mm, 107.31 mm): Symbol #PWR0221 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'K410T-devboard'
+    ; warning
+    @(226.69 mm, 107.31 mm): Symbol #PWR0221 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.18 mm, 184.78 mm): Symbol C9 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.18 mm, 184.78 mm): Symbol #PWR0157 Pin 1 [GND, Power input, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(170.18 mm, 184.78 mm): Symbol C9 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(170.18 mm, 184.78 mm): Symbol C9 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(170.18 mm, 184.78 mm): Symbol #PWR0157 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 99.06 mm): Symbol R36 [R_200k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 99.06 mm): Symbol R36 [R_200k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(177.80 mm, 178.44 mm): Horizontal Wire, length 20.32 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(177.80 mm, 178.44 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(241.30 mm, 74.30 mm): Horizontal Wire, length 3.81 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(241.30 mm, 74.30 mm): Vertical Wire, length 4.45 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 104.14 mm): Symbol R37 [R_100k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 104.14 mm): Symbol R37 [R_100k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(160.02 mm, 197.49 mm): Horizontal Wire, length 5.08 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 106.68 mm): Symbol R38 [R_130k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 106.68 mm): Symbol R38 [R_130k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(226.69 mm, 116.84 mm): Vertical Wire, length 0.64 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.14 mm, 116.84 mm): Horizontal Wire, length 4.45 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(226.69 mm, 117.47 mm): Symbol #PWR0215 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'K410T-devboard'
+    ; warning
+    @(226.69 mm, 117.47 mm): Symbol #PWR0215 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(245.11 mm, 74.30 mm): Horizontal Wire, length 8.89 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(245.11 mm, 74.30 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(177.80 mm, 184.78 mm): Symbol R31 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(177.80 mm, 184.78 mm): Symbol R31 [R_25k5_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(177.80 mm, 184.78 mm): Symbol R31 [R_25k5_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(177.80 mm, 186.06 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(165.10 mm, 197.49 mm): Symbol R29 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(165.10 mm, 197.49 mm): Symbol R29 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(165.10 mm, 197.49 mm): Symbol R29 [R_0R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 114.30 mm): Symbol R39 [R_100k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 114.30 mm): Symbol R39 [R_100k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(245.11 mm, 80.64 mm): Symbol #PWR0223 Pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(245.11 mm, 80.64 mm): Symbol C14 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(245.11 mm, 80.64 mm): Symbol C14 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(245.11 mm, 80.64 mm): Symbol #PWR0223 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0603'
+    ; warning
+    @(245.11 mm, 80.64 mm): Symbol C14 [C_22u_0603]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 116.84 mm): Symbol R40 [R_120k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 116.84 mm): Symbol R40 [R_120k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(184.15 mm, 183.51 mm): Vertical Wire, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(170.18 mm, 197.49 mm): Horizontal Wire, length 7.62 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(184.15 mm, 186.06 mm): Horizontal Wire, length 6.35 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(245.11 mm, 95.25 mm): Symbol C15 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0603'
+    ; warning
+    @(245.11 mm, 95.25 mm): Symbol C15 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(245.11 mm, 95.25 mm): Symbol #PWR0224 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(254.00 mm, 74.30 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(254.00 mm, 74.30 mm): Horizontal Wire, length 7.62 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(189.23 mm, 186.06 mm): Vertical Wire, length 5.08 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(189.23 mm, 186.06 mm): Symbol TP1 Pin 1 [1, Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(189.23 mm, 186.06 mm): Symbol TP1 [TP_0.75mm_SMD]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroTestPoints'
+    ; warning
+    @(189.23 mm, 186.06 mm): Symbol TP1 [TP_0.75mm_SMD]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(177.80 mm, 197.49 mm): Vertical Wire, length 11.43 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(254.00 mm, 80.64 mm): Symbol #PWR0207 Pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(254.00 mm, 80.64 mm): Symbol C16 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(254.00 mm, 80.64 mm): Symbol C16 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(254.00 mm, 80.64 mm): Symbol #PWR0207 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0603'
+    ; warning
+    @(254.00 mm, 80.64 mm): Symbol C16 [C_22u_0603]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(198.12 mm, 178.44 mm): Symbol U9 Pin 1 [IN, Power input, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(198.12 mm, 178.44 mm): Symbol U9 [LT3033EUDC_QFN]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroPMICVoltageRegulatorsLinear'
+    ; warning
+    @(198.12 mm, 178.44 mm): Symbol U9 [LT3033EUDC_QFN]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(198.12 mm, 183.51 mm): Horizontal Wire, length 13.97 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(254.00 mm, 95.25 mm): Symbol C17 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0603'
+    ; warning
+    @(254.00 mm, 95.25 mm): Symbol C17 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(254.00 mm, 95.25 mm): Symbol #PWR0150 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(198.12 mm, 186.06 mm): Horizontal Wire, length 8.89 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(189.23 mm, 196.22 mm): Symbol R32 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(189.23 mm, 196.22 mm): Vertical Wire, length 1.27 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(189.23 mm, 196.22 mm): Symbol R32 [R_25k5_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(189.23 mm, 196.22 mm): Symbol R32 [R_25k5_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(189.23 mm, 197.49 mm): Symbol #PWR0166 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(189.23 mm, 197.49 mm): Symbol #PWR0166 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(196.85 mm, 191.13 mm): Vertical Wire, length 5.08 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(198.12 mm, 191.13 mm): Horizontal Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(266.70 mm, 74.30 mm): Horizontal Wire, length 6.35 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(266.70 mm, 74.30 mm): Symbol R43 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(266.70 mm, 74.30 mm): Symbol R43 [R_0R_22.4A_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0603'
+    ; warning
+    @(266.70 mm, 74.30 mm): Symbol R43 [R_0R_22.4A_0603]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(254.00 mm, 110.49 mm): Symbol C18 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(254.00 mm, 110.49 mm): Symbol #PWR0153 [GND]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0603'
+    ; warning
+    @(254.00 mm, 110.49 mm): Symbol C18 [C_22u_0603]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(196.85 mm, 196.22 mm): Horizontal Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(196.85 mm, 197.49 mm): Symbol #PWR0163 Pin 1 [GND, Power input, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(196.85 mm, 197.49 mm): Vertical Wire, length 1.27 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(196.85 mm, 197.49 mm): Symbol #PWR0163 [GND]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(266.70 mm, 88.90 mm): Symbol R44 [R_0R_22.4A_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0603'
+    ; warning
+    @(266.70 mm, 88.90 mm): Symbol R44 [R_0R_22.4A_0603]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(218.44 mm, 178.44 mm): Horizontal Wire, length 62.87 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(273.05 mm, 72.39 mm): Symbol #PWR0209 [+1V8]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(273.05 mm, 74.30 mm): Horizontal Wire, length 3.17 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(273.05 mm, 72.39 mm): Vertical Wire, length 1.91 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(254.00 mm, 125.73 mm): Symbol C19 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0603'
+    ; warning
+    @(254.00 mm, 125.73 mm): Symbol C19 [C_22u_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(254.00 mm, 125.73 mm): Symbol #PWR0213 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 74.30 mm): Symbol #FLG0105 Pin 1 [pwr, Power output, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(276.23 mm, 74.30 mm): Symbol #FLG0105 [PWR_FLAG]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(266.70 mm, 104.14 mm): Symbol R45 [R_0R_22.4A_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0603'
+    ; warning
+    @(266.70 mm, 104.14 mm): Symbol R45 [R_0R_22.4A_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(273.05 mm, 87.63 mm): Symbol #PWR0208 [+0V9]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(218.44 mm, 186.06 mm): Horizontal Wire, length 42.55 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(273.05 mm, 88.90 mm): Horizontal Wire, length 3.17 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 88.90 mm): Symbol #FLG0104 Pin 1 [pwr, Power output, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(276.23 mm, 88.90 mm): Symbol #FLG0104 [PWR_FLAG]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(273.05 mm, 102.87 mm): Symbol #PWR0149 [+1V05]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(218.44 mm, 193.68 mm): Horizontal Wire, length 8.89 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(266.70 mm, 119.38 mm): Symbol R46 [R_0R_22.4A_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0603'
+    ; warning
+    @(266.70 mm, 119.38 mm): Symbol R46 [R_0R_22.4A_0603]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(218.44 mm, 196.22 mm): Horizontal Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(219.71 mm, 196.22 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(273.05 mm, 104.14 mm): Horizontal Wire, length 3.17 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 104.14 mm): Symbol #FLG0101 Pin 1 [pwr, Power output, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(276.23 mm, 104.14 mm): Symbol #FLG0101 [PWR_FLAG]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(273.05 mm, 118.11 mm): Symbol #PWR0152 [+1V1]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(227.33 mm, 193.68 mm): Vertical Wire, length 20.95 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(219.71 mm, 202.56 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(219.71 mm, 202.56 mm): Symbol C13 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(219.71 mm, 202.56 mm): Symbol C13 [C_10n_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(219.71 mm, 202.56 mm): Symbol C13 [C_10n_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(219.71 mm, 203.84 mm): Symbol #PWR0211 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(219.71 mm, 203.84 mm): Symbol #PWR0211 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 119.38 mm): Symbol #FLG0102 Pin 1 [pwr, Power output, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(273.05 mm, 119.38 mm): Horizontal Wire, length 3.17 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(276.23 mm, 119.38 mm): Symbol #FLG0102 [PWR_FLAG]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.14 mm, 193.68 mm): Vertical Wire, length 8.26 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(231.14 mm, 193.68 mm): Symbol #PWR0270 Pin 1 [+1V8, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(231.14 mm, 193.68 mm): Symbol #PWR0270 [+1V8]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(231.14 mm, 207.01 mm): Symbol R41 [R_25k5_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(231.14 mm, 207.01 mm): Symbol R41 [R_25k5_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(243.84 mm, 193.04 mm): Symbol R42 [R_1k_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(243.84 mm, 193.04 mm): Symbol #PWR0212 [+5V]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(243.84 mm, 193.04 mm): Symbol R42 [R_1k_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(243.84 mm, 198.75 mm): Symbol D2 Pin 1 [1, Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(243.84 mm, 198.12 mm): Vertical Wire, length 0.64 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(243.84 mm, 198.75 mm): Symbol D2 [LED_G_0603_KP-1608CGCK]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroLEDIndicationDiscrete'
+    ; warning
+    @(243.84 mm, 198.75 mm): Symbol D2 [LED_G_0603_KP-1608CGCK]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(243.84 mm, 206.38 mm): Vertical Wire, length 0.64 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(237.49 mm, 214.63 mm): Symbol Q2 [DMG1012T-7]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroTransistorsFETsMOSFETsSingle'
+    ; warning
+    @(237.49 mm, 214.63 mm): Symbol Q2 [DMG1012T-7]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(260.99 mm, 186.06 mm): Vertical Wire, length 7.62 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(260.99 mm, 193.68 mm): Horizontal Wire, length 15.24 mm
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(243.84 mm, 218.44 mm): Symbol #PWR0210 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 186.06 mm): Horizontal Wire, length 5.08 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(281.31 mm, 178.44 mm): Horizontal Wire, length 14.61 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 187.32 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(281.31 mm, 179.71 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(281.31 mm, 184.78 mm): Symbol R51 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(281.31 mm, 184.78 mm): Vertical Wire, length 1.27 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(281.31 mm, 184.78 mm): Symbol R51 [R_3k9_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(281.31 mm, 184.78 mm): Symbol R51 [R_3k9_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 192.41 mm): Symbol R47 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 192.41 mm): Vertical Wire, length 1.27 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(276.23 mm, 192.41 mm): Symbol R47 [R_0R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(276.23 mm, 192.41 mm): Symbol R47 [R_0R_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(281.31 mm, 186.06 mm): Vertical Wire, length 3.81 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 193.68 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(277.50 mm, 193.68 mm): Horizontal Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 200.03 mm): Symbol R50 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 200.03 mm): Vertical Wire, length 1.27 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(276.23 mm, 200.03 mm): Symbol R50 [R_3k9_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(276.23 mm, 200.03 mm): Symbol R50 [R_3k9_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(276.23 mm, 201.29 mm): Symbol #PWR0206 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(276.23 mm, 201.29 mm): Symbol #PWR0206 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(281.31 mm, 197.49 mm): Symbol POT1 Pin 1 [1, Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(281.31 mm, 197.49 mm): Symbol POT1 [TC33X-2-203E]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroTrimmerPotentiometers'
+    ; warning
+    @(281.31 mm, 197.49 mm): Symbol POT1 [TC33X-2-203E]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(295.91 mm, 178.44 mm): Vertical Wire, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(295.91 mm, 178.44 mm): Horizontal Wire, length 6.35 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(295.91 mm, 186.06 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(295.91 mm, 186.06 mm): Symbol C20 Pin 1 [Passive, Line]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(295.91 mm, 186.06 mm): Symbol C20 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(295.91 mm, 186.06 mm): Symbol C20 [C_4u7_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(295.91 mm, 187.32 mm): Symbol #PWR0204 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(295.91 mm, 187.32 mm): Symbol #PWR0204 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(302.26 mm, 178.44 mm): Vertical Wire, length 2.54 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(302.26 mm, 178.44 mm): Horizontal Wire, length 25.40 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(302.26 mm, 186.06 mm): Symbol C21 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(302.26 mm, 186.06 mm): Vertical Wire, length 1.27 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(302.26 mm, 186.06 mm): Symbol C21 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(302.26 mm, 186.06 mm): Symbol C21 [C_4u7_0402]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(302.26 mm, 187.32 mm): Symbol #PWR0205 Pin 1 [GND, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(302.26 mm, 187.32 mm): Symbol #PWR0205 [GND]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(332.74 mm, 178.44 mm): Symbol R52 Pin 1 [Passive, Line]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(332.74 mm, 178.44 mm): Horizontal Wire, length 9.53 mm
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(332.74 mm, 178.44 mm): Symbol R52 [R_0R_22.4A_0603]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0603'
+    ; warning
+    @(332.74 mm, 178.44 mm): Symbol R52 [R_0R_22.4A_0603]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(342.26 mm, 177.16 mm): Vertical Wire, length 1.27 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(342.26 mm, 177.16 mm): Symbol #PWR0167 Hidden pin 1 [+0V5, Power input, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(342.26 mm, 177.16 mm): Symbol #PWR0167 [+0V5]
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(342.26 mm, 178.44 mm): Horizontal Wire, length 3.17 mm
+[endpoint_off_grid]: Symbol pin or wire end off connection grid
+    ; warning
+    @(345.44 mm, 178.44 mm): Symbol #FLG0103 Pin 1 [pwr, Power output, Line]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(345.44 mm, 178.44 mm): Symbol #FLG0103 [PWR_FLAG]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(100.33 mm, 66.04 mm): Symbol #PWR0148 [+0V5]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(105.41 mm, 73.66 mm): Symbol C36 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(105.41 mm, 73.66 mm): Symbol C36 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(119.38 mm, 49.53 mm): Symbol #PWR0165 [+1V8]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(123.19 mm, 57.15 mm): Symbol C35 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(123.19 mm, 57.15 mm): Symbol C35 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(114.30 mm, 73.66 mm): Symbol C39 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(114.30 mm, 73.66 mm): Symbol C39 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(105.41 mm, 87.63 mm): Symbol C37 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(105.41 mm, 87.63 mm): Symbol C37 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(123.19 mm, 73.66 mm): Symbol C42 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(123.19 mm, 73.66 mm): Symbol C42 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(132.08 mm, 57.15 mm): Symbol C38 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(132.08 mm, 57.15 mm): Symbol C38 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(114.30 mm, 87.63 mm): Symbol C40 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(114.30 mm, 87.63 mm): Symbol C40 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(123.19 mm, 87.63 mm): Symbol C43 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(123.19 mm, 87.63 mm): Symbol C43 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(132.08 mm, 73.66 mm): Symbol C45 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(132.08 mm, 73.66 mm): Symbol C45 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(140.97 mm, 57.15 mm): Symbol C41 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(140.97 mm, 57.15 mm): Symbol C41 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(132.08 mm, 87.63 mm): Symbol C46 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(132.08 mm, 87.63 mm): Symbol C46 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(140.97 mm, 73.66 mm): Symbol C47 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(140.97 mm, 73.66 mm): Symbol C47 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(149.86 mm, 57.15 mm): Symbol C44 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(149.86 mm, 57.15 mm): Symbol C44 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(140.97 mm, 87.63 mm): Symbol C48 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(140.97 mm, 87.63 mm): Symbol C48 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(149.86 mm, 73.66 mm): Symbol C49 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(149.86 mm, 73.66 mm): Symbol C49 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(149.86 mm, 87.63 mm): Symbol C50 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(149.86 mm, 87.63 mm): Symbol C50 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(102.87 mm, 142.24 mm): Symbol U1 [MT62F1G32D4DR-031]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroMemory'
+    ; warning
+    @(102.87 mm, 142.24 mm): Symbol U1 [MT62F1G32D4DR-031]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(179.07 mm, 53.34 mm): Symbol U1 [MT62F1G32D4DR-031]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroMemory'
+    ; warning
+    @(179.07 mm, 53.34 mm): Symbol U1 [MT62F1G32D4DR-031]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(170.18 mm, 82.55 mm): Symbol R69 [R_240R_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroResistors0402'
+    ; warning
+    @(170.18 mm, 82.55 mm): Symbol R69 [R_240R_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(229.87 mm, 40.64 mm): Symbol C53 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(229.87 mm, 40.64 mm): Symbol C53 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(229.87 mm, 54.61 mm): Symbol C54 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(229.87 mm, 54.61 mm): Symbol C54 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(229.87 mm, 73.66 mm): Symbol C51 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(229.87 mm, 73.66 mm): Symbol C51 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(238.76 mm, 40.64 mm): Symbol C57 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(238.76 mm, 40.64 mm): Symbol C57 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(238.76 mm, 54.61 mm): Symbol C58 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(238.76 mm, 54.61 mm): Symbol C58 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(229.87 mm, 87.63 mm): Symbol C52 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(229.87 mm, 87.63 mm): Symbol C52 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(238.76 mm, 73.66 mm): Symbol C55 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(238.76 mm, 73.66 mm): Symbol C55 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(247.65 mm, 40.64 mm): Symbol C61 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(247.65 mm, 40.64 mm): Symbol C61 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(247.65 mm, 54.61 mm): Symbol C62 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(247.65 mm, 54.61 mm): Symbol C62 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(238.76 mm, 87.63 mm): Symbol C56 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(238.76 mm, 87.63 mm): Symbol C56 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(247.65 mm, 73.66 mm): Symbol C59 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(247.65 mm, 73.66 mm): Symbol C59 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(256.54 mm, 40.64 mm): Symbol C65 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(256.54 mm, 40.64 mm): Symbol C65 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(256.54 mm, 54.61 mm): Symbol C66 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(256.54 mm, 54.61 mm): Symbol C66 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(247.65 mm, 87.63 mm): Symbol C60 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(247.65 mm, 87.63 mm): Symbol C60 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(256.54 mm, 73.66 mm): Symbol C63 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(256.54 mm, 73.66 mm): Symbol C63 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(265.43 mm, 40.64 mm): Symbol C67 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(265.43 mm, 40.64 mm): Symbol C67 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(260.35 mm, 66.04 mm): Symbol #PWR0147 [+0V9]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(265.43 mm, 54.61 mm): Symbol C68 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(265.43 mm, 54.61 mm): Symbol C68 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(256.54 mm, 87.63 mm): Symbol C64 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(256.54 mm, 87.63 mm): Symbol C64 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(236.22 mm, 142.24 mm): Symbol U1 [MT62F1G32D4DR-031]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroMemory'
+    ; warning
+    @(236.22 mm, 142.24 mm): Symbol U1 [MT62F1G32D4DR-031]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(274.32 mm, 40.64 mm): Symbol C69 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(274.32 mm, 40.64 mm): Symbol C69 [C_4u7_0402]
+[footprint_link_issues]: The current configuration does not include the footprint library 'antmicro-footprints'.
+    ; warning
+    @(274.32 mm, 54.61 mm): Symbol C70 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicroCapacitors0402'
+    ; warning
+    @(274.32 mm, 54.61 mm): Symbol C70 [C_4u7_0402]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'antmicropower'
+    ; warning
+    @(278.13 mm, 33.02 mm): Symbol #PWR0146 [+1V05]
+
+***** Sheet /Translators/
+[hier_label_mismatch]: Hierarchical label DMI0_DIR has no matching sheet pin in the parent sheet
+    ; error
+    @(252.09 mm, 151.13 mm): Hierarchical Label 'DMI0_DIR'
+[hier_label_mismatch]: Hierarchical label DMI1_DIR has no matching sheet pin in the parent sheet
+    ; error
+    @(252.73 mm, 214.63 mm): Hierarchical Label 'DMI1_DIR'
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(577.85 mm, 162.56 mm): No Connect
+
+***** Sheet /SODIMM/
+[pin_not_connected]: Pin not connected
+    ; error
+    @(218.44 mm, 62.23 mm): Symbol J1 Pin 7 [PWR_GOOD, Passive, Line]
+[missing_unit]: Symbol J1 has unplaced units [ Unit D ]
+    ; warning
+    @(254.00 mm, 143.51 mm): Symbol J1 [Edge_Conn_Bus_LPDDR5_testbed]
+[multiple_net_names]: Both DQL_DIR and DQL_DIR_B are attached to the same items; DQL_DIR will be used in the netlist
+    ; warning
+    @(228.60 mm, 214.63 mm): Label 'DQL_DIR'
+    @(224.79 mm, 214.63 mm): Hierarchical Label 'DQL_DIR_B'
+[multiple_net_names]: Both DMI0_DIR and DMI0_DIR_B are attached to the same items; DMI0_DIR will be used in the netlist
+    ; warning
+    @(228.60 mm, 217.17 mm): Label 'DMI0_DIR'
+    @(224.79 mm, 217.17 mm): Hierarchical Label 'DMI0_DIR_B'
+[multiple_net_names]: Both DQH_DIR and DQH_DIR_B are attached to the same items; DQH_DIR will be used in the netlist
+    ; warning
+    @(314.96 mm, 214.63 mm): Label 'DQH_DIR'
+    @(318.77 mm, 214.63 mm): Hierarchical Label 'DQH_DIR_B'
+[multiple_net_names]: Both DMI1_DIR and DMI1_DIR_B are attached to the same items; DMI1_DIR will be used in the netlist
+    ; warning
+    @(314.96 mm, 217.17 mm): Label 'DMI1_DIR'
+    @(318.77 mm, 217.17 mm): Hierarchical Label 'DMI1_DIR_B'
+
+***** Sheet /LPDDR5/
+
+***** Sheet /Power supply/
+[pin_to_pin]: Pins of type Power output and Power output are connected
+    ; error
+    @(222.25 mm, 86.36 mm): Symbol U8 Pin 17 [SGND1, Power output, Line]
+    @(222.25 mm, 106.68 mm): Symbol U8 Pin 30 [SGND2, Power output, Line]
+[pin_to_pin]: Pins of type Bidirectional and Power output are connected
+    ; warning
+    @(243.84 mm, 217.17 mm): Symbol Q2 Pin 2 [S, Bidirectional, Line]
+    @(222.25 mm, 106.68 mm): Symbol U8 Pin 30 [SGND2, Power output, Line]
+[hier_label_mismatch]: Hierarchical label PWRGD has no matching sheet pin in the parent sheet
+    ; error
+    @(247.65 mm, 227.33 mm): Hierarchical Label 'PWRGD'
+
+***** Sheet /Translators1/
+[hier_label_mismatch]: Hierarchical label DMI0_DIR has no matching sheet pin in the parent sheet
+    ; error
+    @(252.09 mm, 151.13 mm): Hierarchical Label 'DMI0_DIR'
+[hier_label_mismatch]: Hierarchical label DMI1_DIR has no matching sheet pin in the parent sheet
+    ; error
+    @(252.73 mm, 214.63 mm): Hierarchical Label 'DMI1_DIR'
+[no_connect_dangling]: Unconnected "no connection" flag
+    ; warning
+    @(577.85 mm, 162.56 mm): No Connect
+
+ ** ERC messages: 857  Errors 25  Warnings 832

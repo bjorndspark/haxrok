@@ -1,0 +1,18 @@
+# The schematic Datasheet fields the compact netlist drops: REF URL
+Q1 https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/4847/DS_4530_BSS123.pdf
+Q2 https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/4847/DS_4530_BSS123.pdf
+Q3 https://www.inolux-corp.com/datasheet/IR/Sensor/Ambient%20Light%20Sensor/IN-S63DTLS_V1.0.pdf
+U1 https://www.analog.com/media/en/technical-documentation/data-sheets/ADP5091-5092.pdf
+U2 https://www.ti.com/lit/ds/symlink/tlv803e.pdf
+U3 https://www.ti.com/lit/ds/symlink/tps22860.pdf
+U4 https://www.ti.com/lit/ds/symlink/tps22860.pdf
+U5 https://www.ti.com/lit/ds/symlink/sn74aup1g74.pdf
+U6 https://ambiq.com/artasie-am1815/
+U7 https://www.ti.com/lit/ds/symlink/tlv61070a.pdf
+U8 https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf
+U9 https://www.macronix.com/Lists/Datasheet/Attachments/8879/MX25V16066,%202.5V,%2016Mb,%20v1.4.pdf
+U10 https://www.ftdichip.com/Support/Documents/DataSheets/ICs/DS_FT230X.pdf
+U11 https://www.diodes.com/assets/Datasheets/AP7366EA.pdf
+U12 https://cdn.sparkfun.com/assets/learn_tutorials/9/0/9/Artemis_Integration_Guide.pdf
+U13 https://www.ti.com/lit/ds/symlink/tps22860.pdf
+U14 https://www.hoperf.com/data/upload/portal/20181127/5bfcbea20e9ef.pdf
