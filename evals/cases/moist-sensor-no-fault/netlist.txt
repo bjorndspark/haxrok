@@ -1,0 +1,51 @@
+# Components
+C1  13p  (rs485-moist-sensor-rescue:C)
+C2  13p  (rs485-moist-sensor-rescue:C)
+C3  1u  (rs485-moist-sensor-rescue:C)
+C4  1n  (rs485-moist-sensor-rescue:C)
+C5  1n  (rs485-moist-sensor-rescue:C)
+C6  1u  (rs485-moist-sensor-rescue:C)
+C7  1u  (rs485-moist-sensor-rescue:C)
+C8  1u  (rs485-moist-sensor-rescue:C)
+C9  1u  (rs485-moist-sensor-rescue:C)
+D1  MMDL770T1G  (rs485-moist-sensor-rescue:DIODESCH)
+D2  MMDL770T1G  (rs485-moist-sensor-rescue:DIODESCH)
+D4  NUP4004M5T1G  (rs485-moist-sensor-rescue:TVS-ARRAY)
+IC1  ATTINY441-SSU  (rs485-moist-sensor-rescue:ATTINY441-SSU)
+P1  CONN_02X03  (rs485-moist-sensor-rescue:CONN_02X03)
+P2  CONN_01X04  (rs485-moist-sensor-rescue:CONN_01X04)
+Q1  Q_PMOS_GSD  (rs485-moist-sensor-rescue:Q_PMOS_GSD-RESCUE-rs485-moist-sensor)
+R1  10k  (rs485-moist-sensor-rescue:R)
+R2  10k 0.1%  (rs485-moist-sensor-rescue:R)
+R3  10k  (rs485-moist-sensor-rescue:R)
+R4  330  (rs485-moist-sensor-rescue:R)
+R5  1M  (rs485-moist-sensor-rescue:R)
+R6  1M  (rs485-moist-sensor-rescue:R)
+R7  1M  (rs485-moist-sensor-rescue:R)
+R8  1M  (rs485-moist-sensor-rescue:R)
+R9  10k  (rs485-moist-sensor-rescue:R)
+TH1  NCP18XH103F03RB  (rs485-moist-sensor-rescue:THERMISTOR)
+U1  SN65HVD72  (rs485-moist-sensor-rescue:SP3481EN-RESCUE-rs485-moist-sensor)
+U2  MCP1702  (rs485-moist-sensor-rescue:MCP1702)
+X1  16MHz  (rs485-moist-sensor-rescue:CRYSTAL)
+
+# Nets
++3V3: C3.1 C7.1 C9.1 IC1.1(VCC) P1.2(P2) R1.2 R3.1 U1.8(VCC) U2.2(VO)
+/EXCITATION: IC1.5((PCINT10/RXD0/ICP2/CLKO/TOCC7/ADC8)PB2) R4.2
+/MOSI: IC1.7((PCINT6/MOSI/SDA/XCK1/TOCC5/ACO1/ADC6)PA6) P1.4(P4) R2.1 R5.2 R6.2
+/RESET: C6.1 IC1.4((PCINT11/dW/~{RESET}/ADC9)PB3) P1.5(P5) R1.1
+/RS485A: D4.4 P2.2(P2) U1.6(A)
+/RS485B: D4.3 P2.3(P3) U1.7(B)
+/RS485_READER_ENABLE: IC1.13((PCINT0/MISO/AREF/ADC0)PA0) R3.2 U1.2(~{RE})
+/RX: IC1.11((PCINT2/~{SS}/RXD0/TOCC1/AIN01/ADC2)PA2) U1.1(RO)
+/SCK: IC1.9((PCINT4/SCK/SCL/RXD1/T1/TOCC3/AIN11/ADC4)PA4) P1.3(P3) R9.1 U1.3(DE)
+/SENSE_HIGH{slash}MISO: C5.1 D2.2(K) IC1.8((PCINT5/MISO/TXD1/T2/TOCC4/ACO0/ADC5)PA5) P1.1(P1) R6.1 R8.2
+/SENSE_LOW: C4.1 D1.1(A) IC1.6((PCINT7/~{SS}/TXD0/ICP1/TOCC6/ADC7)PA7) R5.1 R7.2
+/SENSOR_TRACK: D1.2(K) D2.1(A) R4.1
+/THERMISTOR: IC1.10((PCINT3/SCK/XCK0/T0/TOCC2/AIN10/ADC3)PA3) R2.2 TH1.1
+/TX: IC1.12((PCINT1/MOSI/TXD0/TOCC0/AIN00/ADC1)PA1) U1.4(DI)
+GND: C1.2 C2.2 C3.2 C4.2 C5.2 C6.2 C7.2 C8.2 C9.2 D4.2 IC1.14(GND) P1.6(P6) P2.4(P4) Q1.1(G) R7.1 R8.1 R9.2 TH1.2 U1.5(GND) U2.1(GND)
+Net-(IC1-(PCINT8{slash}CLKI{slash}XTAL1{slash}ADC11)PB0): C2.1 IC1.2((PCINT8/CLKI/XTAL1/ADC11)PB0) X1.2(2)
+Net-(IC1-(PCINT9{slash}INT0{slash}XTAL2{slash}ADC10)PB1): C1.1 IC1.3((PCINT9/INT0/XTAL2/ADC10)PB1) X1.1(1)
+Net-(Q1-S): C8.1 Q1.2(S) U2.3(VI)
+VCC: D4.1 D4.5 P2.1(P1) Q1.3(D)

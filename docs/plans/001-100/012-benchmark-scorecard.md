@@ -44,7 +44,7 @@ Effort: about 2–3 days, a step per session.
 |---|---|---|
 | 1 | One command scores every case over several runs | done |
 | 2 | Each issue a review raises is judged real or wrong, and the judgement is kept | done |
-| 3 | More unmodified boards measure false alarms | proposed |
+| 3 | More unmodified boards measure false alarms | done |
 | 4 | Real bugs from public fix commits measure misses | proposed |
 | 5 | A baseline scorecard recorded | proposed |
 
@@ -169,7 +169,7 @@ ENABLE issue has its own entry. A loose entry hides a new issue, so
 each rerun's matches should be read, not just the unjudged count. The
 sweep process had loaded the old `scorecard.py`; `from=` rescored it.
 
-## 3. More unmodified boards measure false alarms: proposed
+## 3. More unmodified boards measure false alarms: done
 
 - At least three open-source KiCad boards, unmodified, with permissive
   licenses, of different kinds (an MCU board, a power board, a sensor or
@@ -177,7 +177,50 @@ sweep process had loaded the old `scorecard.py`; `from=` rescored it.
 - Review mode only; `expected.md` says there's no planted fault and
   lists what a reviewer might wrongly flag.
 
-**Checks:** each case's ERC and netlist export; one scorecard run.
+Decided (2026-11-14): three boards, each a review-only case named
+`<board>-no-fault`, with no `symptom.md`:
+`samd21-breakout-no-fault` (MCU: atoomnetmarc/SAMD21-breakout at
+464fac8, Apache-2.0), `usbc-buck-no-fault` (power: a USB-C sink with no
+PD controller and a TPS54331 buck,
+maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C at 8638856,
+MIT) and `moist-sensor-no-fault` (sensor and interface: an RS485 soil
+moisture sensor sold on Tindie, Miceuz/rs485-moist-sensor at 8cba0cd,
+Apache-2.0). Passed over: atoomnetmarc/IoT12's power supply and control
+boards (its README says "Experimental and incomplete. Do not replicate
+yet."), siderakb/mdbt-micro (an nRF52840 module board, exported fine;
+a second MCU board, kept for later), pms67/STM32F4-Reference-PCB and
+TG9541/rs485-ch340e (legacy `.sch` only, and an STM32 board is already
+a case), and BlueDrink9/supermini-nrf52840-kicad (no schematic in the
+repo).
+Decided (2026-11-14): `evals/README.md` lists review-only cases in the
+case table and says what they measure; its case layout gains
+`parts.txt` and `judged.md`. Each case's `judged.md` holds the drafts
+below; each `expected.md` lists the same wrong flags.
+
+**Checks:** each case exported with KiCad 9 in the backend container:
+`samd21-breakout-no-fault` ERC 0 errors, 106 warnings;
+`usbc-buck-no-fault` 1 error (U1 EN `power_pin_not_driven`; BUCK-EN is
+driven by the P-FET Q2), 327 warnings; `moist-sensor-no-fault` 3 errors
+(`power_pin_not_driven` on the rescued symbols), 51 warnings. The buck
+board's unfed CC REF divider was checked against the `.kicad_pcb` pad
+nets: J2 and J3 are one 2×3 jumper block. `make eval-score n=3
+cases=samd21-breakout-no-fault,usbc-buck-no-fault,moist-sensor-no-fault`
+(`20261114T040256Z`): 9 runs, 0 failed, 30 issues (12 will fail), all
+unjudged. With the drafts, rescored by `from=`: real 9d, wrong 21d,
+unjudged 0, and every match was listed and read; each of the 30 issues
+matched the right entry. Wrong (draft): the SAMD21's BAV99 clamps
+"shorting" +3.3V and its VBUS diode "backwards" (the netlist's pin
+names are the KiCad symbol's, not the part's; all 6 will-fail issues on
+this board), RESET with no pull-up (internal), the secondary I2C pairs
+with no pull-ups, the buck's CC REF "stuck at 5 V" (the jumper block)
+and J5 "not on +5V" (BUCK-EN is the switched +5V), the MCP1702's
+missing voltage suffix, and the RS485 DE sharing ISP SCK. Real (draft):
+the AMS1117's 10uF output cap (the datasheet asks for 22uF tantalum),
+the buck's CC lines with no ESD and its floating shield (improve), the
+moisture sensor's 1uF on RESET (debugWIRE) and its 16 MHz crystal at
+3.3 V (rated from 4.5 V). `make lint` passed (1 old warning in `shared/ui/button.tsx`) and `make test` passed (487 backend, 55 frontend); no code changed. Bugs found: none in the code. Every will-fail
+issue on these boards is a false alarm, mostly from the netlist pin
+names (BAV99) and from a jumper block read as unconnected nets.
 
 ## 4. Real bugs from public fix commits measure misses: proposed
 

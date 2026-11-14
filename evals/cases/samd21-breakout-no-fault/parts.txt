@@ -1,0 +1,2 @@
+# The schematic Datasheet fields the compact netlist drops: REF URL
+U2 http://www.advanced-monolithic.com/pdf/ds1117.pdf

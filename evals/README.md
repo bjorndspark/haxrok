@@ -8,10 +8,13 @@ the real bug?
 
 ```
 cases/<name>/
-  symptom.md    what was observed — never the root cause
+  symptom.md    what was observed — never the root cause; review-only
+                cases have none
   netlist.txt   compact netlist (compact_netlist.py output)
   erc.txt       KiCad ERC report, optional
   expected.md   confirmed root cause, fix, and the pass rule
+  parts.txt     datasheet URLs the compact netlist drops, optional
+  judged.md     each review issue judged real or wrong (`judged.py`)
 ```
 
 | Case | Bug | Source |
@@ -27,6 +30,9 @@ cases/<name>/
 | `rp-micro-ldo-en` | RT9013 LDO enable tied to its own output, so it never starts | Planted (siderakb/rp-micro) |
 | `rp-micro-cc-shared` | USB-C CC1 and CC2 tied together on one 5.1 kΩ pull-down, so e-marked USB-C cables get no VBUS | Planted (siderakb/rp-micro) |
 | `rp-micro-no-fault` | None; the cause is a charge-only USB cable. Pass = no schematic fault claimed at any rank | Unmodified board (siderakb/rp-micro) |
+| `samd21-breakout-no-fault` | None; review only, for false alarms | Unmodified board (atoomnetmarc/SAMD21-breakout) |
+| `usbc-buck-no-fault` | None; review only, for false alarms | Unmodified board (maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C) |
+| `moist-sensor-no-fault` | None; review only, for false alarms | Unmodified board (Miceuz/rs485-moist-sensor) |
 | `furby-boot-cap` | ESP32-S3 GPIO0 has 100 nF to GND and only the internal pull-up, so it's still low when sampled and every cold boot enters download mode | Real bug (maintainer's board, built) |
 
 Planted cases take a real open-source board and make one minimal edit that
@@ -34,6 +40,13 @@ KiCad's ERC doesn't flag (ERC checked before and after). Each `expected.md`
 records the exact edit, the source commit and the license. Planted faults
 are cleaner than real bugs, so scores on them are not accuracy on real
 boards.
+
+Review-only cases take an unmodified open-source board of a kind the
+other cases don't cover and have no `symptom.md`: `make eval-score`
+reviews them, and every issue a review raises is judged in their
+`judged.md`, so they measure false alarms. Their `expected.md` lists
+the correct parts a reviewer might wrongly flag, the source commit and
+the license.
 
 To add a case from a KiCad project:
 
