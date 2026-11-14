@@ -43,7 +43,7 @@ Effort: about 2–3 days, a step per session.
 | Step | What | |
 |---|---|---|
 | 1 | One command scores every case over several runs | done |
-| 2 | Each issue a review raises is judged real or wrong, and the judgement is kept | proposed |
+| 2 | Each issue a review raises is judged real or wrong, and the judgement is kept | done |
 | 3 | More unmodified boards measure false alarms | proposed |
 | 4 | Real bugs from public fix commits measure misses | proposed |
 | 5 | A baseline scorecard recorded | proposed |
@@ -95,7 +95,7 @@ runs through the refactored `answer()`. `make lint` passed and
 time was UTC with no marker (now `…T…Z`). No unit test: `evals/` has no
 test setup, and the check above compares the table to the raw outputs.
 
-## 2. Each issue a review raises is judged real or wrong, and the judgement is kept: proposed
+## 2. Each issue a review raises is judged real or wrong, and the judgement is kept: done
 
 A review's other issues are not all false alarms: the planted boards are
 real open-source boards with their own real flaws. Precision needs each
@@ -116,8 +116,58 @@ agent's judgements go into `judged.md` marked `draft`, and the scorecard
 counts a draft entry apart from a confirmed one. The user confirms the
 drafts in the loop's whole-branch review; step 5 runs only after that.
 
+Decided (2026-11-14): `evals/judged.py` parses `judged.md` (one
+`## <title>` entry per issue with `Verdict: real|wrong [(draft)]`,
+`Cites:`, `Match:` and `Why:`) and judges each issue. The `Auto-check:`
+match comes first as the planted bug; otherwise the first entry whose
+`Cites` (the parts, pins and nets the claims cite, compared whole) and
+`Match` (keywords in the title, summary and claims) both hold wins.
+Otherwise the issue is unjudged. A malformed entry raises an error
+naming its line, so a typo can't drop a judgement. `app_prompts.py`'s
+`match_rank()` uses the same keyword matcher. The scorecard gains a
+"Judged per run (bug/real/wrong/unjudged)" column, with a draft count
+shown as `3+2d`, and writes `unjudged.md` listing each unjudged issue
+with its text and cites to judge next. `make eval-score from=<folder>`
+rescores a saved sweep from its analysis JSONs after a `judged.md`
+edit, with no model call.
+
+Decided (2026-11-14): the cases sharing a board (four orbit, three
+rp-micro, four rust-board) each repeat the same entries, as the
+per-case `judged.md` decision has it. The first drafts cover 18 issues:
+real (draft) are the USB lines with no ESD array (orbit, rp-micro), the
+rust-board's GPIO2 strap with no pull-up, its buck dropping out at low
+battery, its two Schottkys in series, its 32k crystal with DNP load
+caps, the furby's floating PS/SYNC, the orbit's PWR switch cutting the
+charger off, its PWR switch possibly using pad 2 as the common, and its
+UART back-powering the unpowered side. Wrong (draft) are the orbit's L1
+"fitted as 2.2uH" (`DFE201612E-2R2M` is the footprint's name; the
+value is 0.47uH), its 30pF HSE caps, the rp-micro's 20pF crystal caps
+(Y1's CL is unknown), its SB1/SB2 "shorts", the furby's "unwired" mic
+(it is off-board, on solder-wire pads), its GPIO3 strap (unused without
+the eFuse), the rust-board's GPIO8 strap (R17 pulls it up) and its
+ENABLE pin "into a 3.3V chip" (U4 is the edge header). The PWR switch
+common and PS/SYNC need a datasheet look when confirming.
+
 **Checks:** a rerun of a judged case scores without new judging, except
-for issues it hasn't raised before.
+for issues it hasn't raised before. The step 1 sweep
+(`20261113T175417Z`, 12 cases × 3, 3 runs failed on the gateway's 503)
+rescored with the drafts: 99 issues, real 39d, wrong 25d, unjudged 0.
+Every match was listed and read: each of the 64 issues matched the
+right entry. `make eval-score n=2
+cases=rust-board-usb-no-esd,orbit-boot0-high` (`20261113T184710Z`):
+13 issues, 0 unjudged; 12 matched the right entry, and one new issue
+(ENABLE pull-up) matched the buck entry, below. A scratch test of
+`judged.py` passed: bad entries raise, a draft wrong entry matches, the
+bug wins over an entry, and an unmatched issue is unjudged. `make lint`
+passed (1 old warning in `shared/ui/button.tsx`) and `make test` passed
+(487 backend, 55 frontend); `judged.py`, `scorecard.py` and
+`app_prompts.py` pass ruff check and mypy. Bugs found: the buck entry's
+`+5v` cite and `drop` keyword were broad enough to catch the rerun's new
+ENABLE issue, so an issue it had never raised came out judged rather
+than unjudged. The entry now needs `buck` and a dropout word, and the
+ENABLE issue has its own entry. A loose entry hides a new issue, so
+each rerun's matches should be read, not just the unjudged count. The
+sweep process had loaded the old `scorecard.py`; `from=` rescored it.
 
 ## 3. More unmodified boards measure false alarms: proposed
 

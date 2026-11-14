@@ -113,10 +113,12 @@ eval-app:
 		$(if $(sim),--sim $(sim))
 
 # Every case (or cases=a,b) in review mode n times, scored (evals/scorecard.py);
-# the table and JSON land in evals/results/scorecard/.
+# the table and JSON land in evals/results/scorecard/. from=<that folder>
+# scores a saved sweep again with the current judged.md files, no model calls.
 eval-score:
 	docker compose exec --user $(shell id -u):$(shell id -g) -e LOG_FILE= \
-		backend .venv/bin/python /evals/scorecard.py --n $(or $(n),3) $(if $(cases),--cases $(cases))
+		backend .venv/bin/python /evals/scorecard.py \
+		$(if $(from),--rescore $(from),--n $(or $(n),3) $(if $(cases),--cases $(cases)))
 
 # Real vendor models through the load check (backend/scripts/spice_corpus.py);
 # they're downloaded into data/spice-corpus/, not committed.

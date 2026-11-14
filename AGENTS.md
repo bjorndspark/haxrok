@@ -176,5 +176,5 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `docs/plans/001-100/012-benchmark-scorecard.md`: step 2.
+1. `docs/plans/001-100/012-benchmark-scorecard.md`: step 3.
 2. `docs/plans/001-100/011-revision-diffs-and-waivers.md`: step 1, after 012.

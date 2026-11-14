@@ -38,6 +38,7 @@ import sys
 import time
 
 from gonogo import auto_check  # same directory: /evals
+from judged import hypothesis_text, matches
 
 # The backend lives at /app in the container; put it on sys.path so
 # `import app.*` works from here.
@@ -127,8 +128,7 @@ def match_rank(analysis: Analysis[Claim], groups: list[list[str]]) -> int | None
     """Rank of the first hypothesis whose title, summary and claims match
     every keyword group (gonogo.py's Auto-check rule), or None if none do."""
     for h in analysis.hypotheses:
-        text = " ".join([h.title, h.summary, *(c.text for c in h.claims)]).lower()
-        if all(any(alt in text for alt in group) for group in groups):
+        if matches(hypothesis_text(h.model_dump()), groups):
             return h.rank
     return None
 

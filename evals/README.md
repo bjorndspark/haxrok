@@ -352,12 +352,39 @@ make eval-score n=2 cases=rp-micro-no-fault,furby-boot-cap
 ```
 
 Per case it prints the rank where the `Auto-check:` keywords first match
-in each run (`miss` if none do, `err` if the run failed), and each run's
-issues as will fail / may fail / improve. A case with `Auto-check: none`
-has no rank: on an unmodified board every issue is a candidate false
-alarm, until plan 012 step 2 judges them. It writes
+in each run (`miss` if none do, `err` if the run failed), each run's
+issues as will fail / may fail / improve, and each run's issues judged as
+bug / real / wrong / unjudged (below). A case with `Auto-check: none`
+has no rank. It writes
 `results/scorecard/<model>/<UTC time>/scorecard.md`, `scorecard.json` (to
-diff two scorecards) and each run's diagnosis and analysis under
-`<case>/run-<i>-…`. Reviews skip the AI answer cache (else every run after
+diff two scorecards), `unjudged.md` and each run's diagnosis and analysis
+under `<case>/run-<i>-…`.
+
+The issues besides the planted bug are judged by each case's `judged.md`
+(`judged.py`; plan 012 step 2): one entry per issue a review has raised,
+`real` (a true flaw or a fair improvement of the board: the planted boards
+have their own) or `wrong` (a correct part called an error, or a false
+fact), matched by the parts, pins or nets the issue cites and by keywords,
+in the Auto-check syntax:
+
+```md
+## SB1/SB2 short GPIO10/11 to ground
+Verdict: wrong (draft)
+Cites: sb1|sb2
+Match: gnd|ground
+Why: three-pad jumpers, pads 2-3 bridged by default; GPIO reaches the header.
+```
+
+The first entry that matches wins. An issue no entry matches is listed in
+`unjudged.md` with its summary and cites, to write the next entry from;
+then rescore the same sweep, no model calls:
+
+```sh
+make eval-score from=evals/results/scorecard/<model>/<UTC time>
+```
+
+`(draft)` marks an entry the agent wrote that the user hasn't confirmed;
+the table counts those apart (`3+2d`: three by confirmed entries, two by
+drafts). An LLM judge was rejected: its verdicts vary between runs too. Reviews skip the AI answer cache (else every run after
 the first is the first run's answer); datasheets still use it. Each run
 takes about 1.5–5 minutes, so a full sweep takes about an hour.
