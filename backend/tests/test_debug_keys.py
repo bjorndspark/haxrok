@@ -1,5 +1,5 @@
-"""Each finding's stable key and its parts' fingerprints (``keys.build``,
-plan 011 step 1). Hand-built designs; pure functions."""
+"""Each finding's stable key and its pins' fingerprints (``keys.build``,
+plan 011 steps 1 and 3). Hand-built designs; pure functions."""
 
 from app.features.debug import keys
 from app.features.debug.design import Design, Node, Part
@@ -118,24 +118,34 @@ ISSUE = _analysis(
 
 def _keys(design: Design) -> dict[str, tuple[str, dict[str, str]]]:
     found = keys.build(design, ISSUE, WIRING, WARNINGS, CALCS)
-    return {f.id: (f.key, f.parts) for f in found}
+    return {f.id: (f.key, f.pins) for f in found}
 
 
-def test_each_finding_is_keyed_by_what_it_is_about():
+def test_each_finding_is_keyed_by_what_it_is_about_and_names_its_pins():
     found = {
-        f.id: (f.source, f.key, sorted(f.parts))
+        f.id: (f.source, f.key, sorted(f.pins))
         for f in keys.build(_design(), ISSUE, WIRING, WARNINGS, CALCS)
     }
     assert found == {
-        "cf1": ("calculation", "divider:U1.3", ["R1", "R2", "U1"]),
-        "cf2": ("calculation", "part_rating:C1", ["C1"]),
-        "cf3": ("calculation", "connector_esd:J1", ["J1"]),
-        "wf1": ("wiring", "wiring:U1.5", ["C1", "U1"]),
-        "pw1": ("pin_warning", "pin_convention:D1", ["D1"]),
-        # U1 from its pin, C1 from the calculation it cites; not D1, whose
-        # claim was downgraded.
-        "h1": ("issue", "issue:C1,U1", ["C1", "U1"]),
+        "cf1": ("calculation", "divider:U1.3", ["R1.2", "R2.1", "U1.3"]),
+        # About the whole part: all its pins.
+        "cf2": ("calculation", "part_rating:C1", ["C1.1", "C1.2"]),
+        "cf3": ("calculation", "connector_esd:J1", ["J1.1", "J1.2"]),
+        # The finding's pin alone, not the pins it conflicts with.
+        "wf1": ("wiring", "wiring:U1.5", ["U1.5"]),
+        "pw1": ("pin_warning", "pin_convention:D1", ["D1.1", "D1.2"]),
+        # U1.3 from its pin cite, C1's pins from the calculation it cites;
+        # not D1.1, whose claim was downgraded.
+        "h1": ("issue", "issue:C1.1,C1.2,U1.3", ["C1.1", "C1.2", "U1.3"]),
     }
+
+
+def test_a_cited_calculation_with_no_pins_adds_none():
+    bare = [_calc("cf1", "part_rating", "C1", [])]
+    cites = _analysis(_claim(_pin("U1.3"), Cite(kind="reference", pin=None, net=None, id="cf1")))
+    found = {f.id: f for f in keys.build(_design(), cites, [], [], bare)}
+    assert found["h1"].key == "issue:U1.3"
+    assert sorted(found["cf1"].pins) == ["C1.1", "C1.2"]
 
 
 def test_reordered_parts_and_nets_give_the_same_keys_and_fingerprints():
@@ -151,22 +161,23 @@ def test_a_renamed_net_gives_the_same_keys_and_fingerprints():
 def test_a_changed_value_changes_the_fingerprint_not_the_key():
     before, after = _keys(_design()), _keys(_design({"C1": "22uF"}))
     assert after["cf2"][0] == before["cf2"][0] == "part_rating:C1"
-    assert after["cf2"][1]["C1"] != before["cf2"][1]["C1"]
+    assert after["cf2"][1]["C1.1"] != before["cf2"][1]["C1.1"]
 
 
-def test_a_changed_neighbour_on_a_small_net_changes_the_fingerprint():
-    # R2 shares U1's feedback net, so U1's circuit changed; C1 shares only
-    # +3V3 (through R1) and GND, so it didn't.
+def test_a_changed_neighbour_changes_only_the_pin_on_its_net():
+    # R2 shares U1's feedback net (U1.3), so that pin's circuit changed;
+    # U1's output pin (U1.5) and C1 share only +3V3 and GND with it.
     before, after = _keys(_design()), _keys(_design({"R2": "47k"}))
-    assert after["cf1"][1]["U1"] != before["cf1"][1]["U1"]
-    assert after["cf2"][1]["C1"] == before["cf2"][1]["C1"]
+    assert after["cf1"][1]["U1.3"] != before["cf1"][1]["U1.3"]
+    assert after["wf1"] == before["wf1"]
+    assert after["cf2"] == before["cf2"]
 
 
 def test_a_far_part_on_ground_changes_no_fingerprint():
     # D1 is on GND with U1 and C1, but GND counts by name only.
     before, after = _keys(_design()), _keys(_design({"D1": "LED red"}))
     assert after["h1"] == before["h1"]
-    assert after["pw1"][1]["D1"] != before["pw1"][1]["D1"]
+    assert after["pw1"][1]["D1.1"] != before["pw1"][1]["D1.1"]
 
 
 def test_a_big_net_counts_by_name_only():
@@ -175,8 +186,8 @@ def test_a_big_net_counts_by_name_only():
     sda = [Node("U1", "4", "SDA"), *(Node(ref, "1", "SDA") for ref in bus)]
     big = Design(small.parts | bus, small.nets | {"SDA": sda})
     changed = Design(big.parts | {"U9": _part("U9", "TMP116")}, big.nets)
-    # Nine pins: the bus is big, so U1's fingerprint ignores U9's value.
-    assert keys.fingerprints(big)["U1"] == keys.fingerprints(changed)["U1"]
+    # Nine pins: the bus is big, so U1.4's fingerprint ignores U9's value.
+    assert keys.fingerprints(big)["U1.4"] == keys.fingerprints(changed)["U1.4"]
     eight = Design(big.parts, big.nets | {"SDA": sda[:-1]})
     changed8 = Design(eight.parts | {"U8": _part("U8", "TMP116")}, eight.nets)
-    assert keys.fingerprints(eight)["U1"] != keys.fingerprints(changed8)["U1"]
+    assert keys.fingerprints(eight)["U1.4"] != keys.fingerprints(changed8)["U1.4"]

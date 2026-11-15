@@ -7,12 +7,13 @@ against it, and the baseline's issues with no match are listed as fixed.
 After the review the backend sends the next review file, which the user
 saves over the old one, moving the baseline on.
 
-Only model issues are compared. Their key is the set of parts their
-verified cites name (``keys``), which two runs word and split differently,
-so two issues match when those sets mostly overlap (Jaccard ≥
-``MATCH_JACCARD``), each at most once, best overlap first; the UI calls a
-match "likely the same". An issue whose cites name no part can't be
-matched: a new one gets no mark, an old one isn't listed as fixed.
+Only model issues are compared. Their key is the set of pins their verified
+cites name (``keys``), which two runs word and split differently, so two
+issues match when those sets mostly overlap (Jaccard ≥ ``MATCH_JACCARD``),
+each at most once, best overlap first; the UI calls a match "likely the
+same". Pins, not whole parts, so two issues on different pins of the same
+two ICs don't match. An issue whose cites name no pin can't be matched: a
+new one gets no mark, an old one isn't listed as fixed.
 
 Applied after the evidence check, for display only: the model never sees
 the review file. Pure functions; the service reads the upload and the clock.
@@ -40,8 +41,9 @@ from app.features.debug.schemas import (
     WiringFinding,
 )
 
-# Two model issues are likely the same when their cited parts overlap this
-# much (|A ∩ B| / |A ∪ B|); tuned on the recorded runs (plan 011 step 1).
+# Two model issues are likely the same when their cited pins overlap this
+# much (|A ∩ B| / |A ∪ B|); tuned over parts on the recorded runs (plan 011
+# step 1), kept for pins (step 3).
 MATCH_JACCARD = 0.5
 
 
@@ -72,7 +74,7 @@ def read(project: Project) -> Baseline:
         raw = json.loads(data)
     except (UnicodeDecodeError, json.JSONDecodeError):
         return Baseline(note="unreadable")
-    if isinstance(raw, dict) and "version" in raw and raw["version"] != 1:
+    if isinstance(raw, dict) and "version" in raw and raw["version"] != 2:
         return Baseline(note="unknown_version")
     try:
         return Baseline(file=ReviewFile.model_validate(raw))
@@ -106,7 +108,7 @@ def next_file(
             ReviewFinding(
                 key=f.key,
                 source=f.source,
-                parts=f.parts,
+                pins=f.pins,
                 title=titles.get((f.source, f.id), ""),
                 severity=severity.get(f.id) if f.source == "issue" else None,
             )
@@ -121,11 +123,11 @@ def diff(baseline: Baseline, found: Sequence[FindingKey], next: ReviewFile) -> R
     baseline, and ``next`` to save. No baseline: no marks, nothing fixed."""
     if baseline.file is None:
         return ReviewDiff(note=baseline.note, next=next)
-    earlier = [f for f in baseline.file.findings if f.source == "issue" and f.parts]
-    issues = [f for f in found if f.source == "issue" and f.parts]
+    earlier = [f for f in baseline.file.findings if f.source == "issue" and f.pins]
+    issues = [f for f in found if f.source == "issue" and f.pins]
     # Best overlap first; ties go to the higher-ranked issue.
     pairs = sorted(
-        (-jaccard(now.parts, old.parts), i, j)
+        (-jaccard(now.pins, old.pins), i, j)
         for i, now in enumerate(issues)
         for j, old in enumerate(earlier)
     )
@@ -144,11 +146,9 @@ def diff(baseline: Baseline, found: Sequence[FindingKey], next: ReviewFile) -> R
             marks.append(IssueMark(id=now.id, mark="new"))
             continue
         old = earlier[matched[i]]
-        changed = sorted(
-            r for r in now.parts.keys() & old.parts.keys() if now.parts[r] != old.parts[r]
-        )
+        changed = sorted(p for p in now.pins.keys() & old.pins.keys() if now.pins[p] != old.pins[p])
         marks.append(
-            IssueMark(id=now.id, mark="unchanged", earlier=old.title, changed_parts=changed)
+            IssueMark(id=now.id, mark="unchanged", earlier=old.title, changed_pins=changed)
         )
     return ReviewDiff(
         baseline_run_id=baseline.file.run_id,
@@ -160,7 +160,7 @@ def diff(baseline: Baseline, found: Sequence[FindingKey], next: ReviewFile) -> R
 
 
 def jaccard(a: Iterable[str], b: Iterable[str]) -> float:
-    """|A ∩ B| / |A ∪ B| of two sets of part refs; 0 when both are empty."""
+    """|A ∩ B| / |A ∪ B| of two sets of pin refs; 0 when both are empty."""
     x, y = set(a), set(b)
     union = x | y
     return len(x & y) / len(union) if union else 0.0

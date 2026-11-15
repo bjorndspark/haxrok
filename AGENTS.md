@@ -177,4 +177,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `docs/plans/001-100/011-revision-diffs-and-waivers.md`: step 3.
+1. `docs/plans/001-100/011-revision-diffs-and-waivers.md`: step 4.

@@ -567,24 +567,26 @@ class FindingKey(BaseModel):
     (``keys.build``, plan 011). ``id`` is the finding's id in this run only
     (cf3, wf1, pw1, h2). ``key`` is exact for the backend's findings
     (``part_rating:C12``, ``wiring:U2.9``); for a model issue it is
-    ``issue:`` and the parts its verified cites name, which two runs match
-    only loosely. ``parts`` maps each part the finding names to that part's
-    fingerprint, which changes when the part or anything wired to it does."""
+    ``issue:`` and the pins its verified cites name (``issue:U16.7,U22.25``),
+    which two runs match only loosely. ``pins`` maps each pin the finding
+    names (all its part's pins, for a finding about a whole part) to that
+    pin's fingerprint, which changes when its part or anything on its net
+    does."""
 
     source: Literal["calculation", "wiring", "pin_warning", "issue"]
     id: str
     key: str
-    parts: dict[str, str]
+    pins: dict[str, str]
 
 
 class ReviewFinding(BaseModel):
     """One finding as the review file keeps it: its key, where it came from,
-    its parts' fingerprints, and its title (a model issue's title, the
+    its pins' fingerprints, and its title (a model issue's title, the
     backend finding's text) and severity (model issues only)."""
 
     key: str
     source: Literal["calculation", "wiring", "pin_warning", "issue"]
-    parts: dict[str, str]
+    pins: dict[str, str]
     title: str
     severity: Severity | None = None
 
@@ -593,9 +595,11 @@ class ReviewFile(BaseModel):
     """``<project>.review.json`` (plan 011): the last review's findings, the
     baseline the next review is compared with. The user keeps it next to the
     ``.kicad_pro``, so it travels with the project and git shows what a
-    review changed. ``waivers`` is kept as sent (plan 011 step 3 fills it)."""
+    review changed. ``waivers`` is kept as sent (plan 011 step 4 fills it).
+    Version 2 keys and fingerprints pins (plan 011 step 3); version 1 keyed
+    whole parts."""
 
-    version: Literal[1] = 1
+    version: Literal[2] = 2
     project: str
     run_id: str
     date: datetime
@@ -606,13 +610,13 @@ class ReviewFile(BaseModel):
 class IssueMark(BaseModel):
     """How a model issue compares with the baseline. ``unchanged`` is
     "likely the same" as the baseline issue titled ``earlier``: their cited
-    parts mostly overlap. ``changed_parts`` names the parts both cite whose
+    pins mostly overlap. ``changed_pins`` names the pins both cite whose
     circuit changed since."""
 
     id: str = Field(description="The hypothesis id in this run (h1, …).")
     mark: Literal["new", "unchanged"]
     earlier: str | None = None
-    changed_parts: list[str] = Field(default_factory=list)
+    changed_pins: list[str] = Field(default_factory=list)
 
 
 class ReviewDiff(BaseModel):

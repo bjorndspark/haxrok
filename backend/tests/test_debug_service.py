@@ -1276,9 +1276,9 @@ async def test_a_run_records_its_input_context_model_answers_and_events(tmp_path
     # Each finding's key, recorded before the result.
     assert kinds.index("keys") < len(kinds) - 1
     found = lines[kinds.index("keys")]["data"]["findings"]
-    by_id = {f["id"]: (f["key"], sorted(f["parts"])) for f in found}
-    assert by_id["wf1"][0] == "wiring:U2.9"
-    assert by_id["h1"] == ("issue:U2", ["U2"])
+    by_id = {f["id"]: (f["key"], sorted(f["pins"])) for f in found}
+    assert by_id["wf1"] == ("wiring:U2.9", ["U2.9"])
+    assert by_id["h1"] == ("issue:U2.9", ["U2.9"])
 
     given = lines[0]["data"]
     assert (given["mode"], given["language"], given["analyses"]) == ("debug", "en", ["startup"])
@@ -1846,7 +1846,7 @@ async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
 async def _review_run(
     files: list[tuple[str, bytes]], mode: Mode = "review"
 ) -> tuple[list[str], dict | None]:
-    """A run on ``files`` with ``_analysis``'s one issue (``issue:U2``): its
+    """A run on ``files`` with ``_analysis``'s one issue (``issue:U2.9``): its
     event names, and the review_diff event's data if there is one."""
     prepared = await service.prepare(
         files, "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels(), mode
@@ -1862,9 +1862,9 @@ async def test_a_review_with_no_review_file_sends_the_next_one_and_marks_nothing
     assert names.index("review_diff") == names.index("result") - 1
     assert (diff["marks"], diff["fixed"], diff["note"]) == ([], [], None)
     found = {f["key"]: f for f in diff["next"]["findings"]}
-    assert found["issue:U2"]["title"] == "L2 is on the output rail"
+    assert found["issue:U2.9"]["title"] == "L2 is on the output rail"
     assert found["wiring:U2.9"]["source"] == "wiring"
-    assert (diff["next"]["project"], diff["next"]["version"]) == ("board", 1)
+    assert (diff["next"]["project"], diff["next"]["version"]) == ("board", 2)
 
 
 async def test_a_saved_review_file_is_the_next_reviews_baseline():
@@ -1873,12 +1873,12 @@ async def test_a_saved_review_file_is_the_next_reviews_baseline():
     saved = json.dumps(first["next"]).encode()
     _, diff = await _review_run([*_files(), ("board/board.review.json", saved)])
     assert diff is not None
-    assert [(m["id"], m["mark"], m["changed_parts"]) for m in diff["marks"]] == [
+    assert [(m["id"], m["mark"], m["changed_pins"]) for m in diff["marks"]] == [
         ("h1", "unchanged", [])
     ]
     assert diff["fixed"] == []
 
-    gone = {"key": "issue:J9", "source": "issue", "parts": {"J9": "x"}, "title": "J9 gone"}
+    gone = {"key": "issue:J9.1", "source": "issue", "pins": {"J9.1": "x"}, "title": "J9 gone"}
     older = {**first["next"], "findings": [*first["next"]["findings"], gone]}
     _, diff = await _review_run(
         [*_files(), ("board/board.review.json", json.dumps(older).encode())]

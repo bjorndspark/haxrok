@@ -188,7 +188,7 @@ Used outdoors, so it may see -10 °C.`,
   hypothesis: {
     markNew: "new",
     markSame: (title: string) => `likely the same as “${title}”`,
-    circuitChanged: (parts: string[]) => `circuit changed: ${parts.join(", ")}`,
+    circuitChanged: (pins: string[]) => `circuit changed: ${pins.join(", ")}`,
     explains: "Explains",
     claimsBacked: "Claims backed",
     labelledBy: (label: string, reason: string) =>
@@ -624,7 +624,7 @@ USB 5 V では動く: マイコンが起動する。
   hypothesis: {
     markNew: "新規",
     markSame: (title: string) => `前回の「${title}」とおそらく同じ`,
-    circuitChanged: (parts: string[]) => `回路が変わった部品: ${parts.join(", ")}`,
+    circuitChanged: (pins: string[]) => `回路が変わったピン: ${pins.join(", ")}`,
     explains: "説明できる症状",
     claimsBacked: "裏づけのある主張",
     labelledBy: (label: string, reason: string) =>

@@ -1,28 +1,32 @@
-"""Each finding's stable key and the fingerprints of the parts it names
-(plan 011 step 1), so a later review can tell the same finding on a new
-revision, and whether the circuit it is about changed.
+"""Each finding's stable key and the fingerprints of the pins it names
+(plan 011 steps 1 and 3), so a later review can tell the same finding on a
+new revision, and whether the circuit it is about changed.
 
 A finding's id (``cf3``, ``wf1``, ``h2``) is its place in one run's list, so
 it can't be the key. The backend's findings get an exact key from what they
 are about: a calculation's kind and the pins of its part, a wiring finding's
 pin, a pin warning's part. A model issue is free text, so its key is the set
-of parts its verified cites name; a later step matches two such sets
+of pins its verified cites name; a later review matches two such sets
 loosely, never as "the same".
 
-A part's fingerprint hashes its value, footprint and, for each of its pins,
-the net it is on. A small net counts by its other pins (refs and values),
-never by name, since KiCad's auto names (``Net-(C12-Pad1)``) change when
-parts are renumbered. A ground net or one with more than ``_BIG_NET`` pins
-counts by name only, so a part added anywhere on GND or a rail doesn't
-change every part on it.
+Each finding carries a ``pins`` map: every pin it names, with that pin's
+fingerprint. A finding about a whole part (``part_rating``,
+``connector_esd``, ``pin_convention``) names all that part's pins. A pin's
+fingerprint hashes its part's value and footprint and the net the pin is
+on. A small net counts by its other pins (refs and values), never by name,
+since KiCad's auto names (``Net-(C12-Pad1)``) change when parts are
+renumbered. A ground net or one with more than ``_BIG_NET`` pins counts by
+name only, so a part added anywhere on GND or a rail doesn't change every
+pin on it. An edit on one pin of an IC leaves its other pins' fingerprints
+alone.
 
 Pure functions over the design and the run's findings; the review records
-the keys (``record``'s ``keys`` line) and nothing reads them back yet.
+the keys (``record``'s ``keys`` line) and ``review_file`` compares them.
 """
 
 import hashlib
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 
 from app.features.debug.calc import is_ground
 from app.features.debug.design import Design, Node, normalize_pin
@@ -56,18 +60,26 @@ def build(
     """Every finding's key: the calculations, wiring findings and pin
     warnings, then the model's issues, each in its list's order."""
     prints = fingerprints(design)
+    by_part: dict[str, list[str]] = {}
+    for pin in prints:
+        by_part.setdefault(_ref(pin), []).append(pin)
 
-    def keyed(source: str, id: str, key: str, refs: Iterable[str]) -> FindingKey:
-        parts = {ref: prints[ref] for ref in sorted(set(refs)) if ref in prints}
-        return FindingKey.model_validate({"source": source, "id": id, "key": key, "parts": parts})
+    def keyed(source: str, id: str, key: str, pins: Iterable[str]) -> FindingKey:
+        named = {p: prints[p] for p in sorted(set(pins)) if p in prints}
+        return FindingKey.model_validate({"source": source, "id": id, "key": key, "pins": named})
 
-    found = [keyed("calculation", c.id, calculation_key(c), _calc_parts(c)) for c in calculations]
-    found += [keyed("wiring", w.id, f"wiring:{w.pin}", _wiring_parts(w)) for w in wiring]
-    found += [keyed("pin_warning", w.id, f"pin_convention:{w.ref}", [w.ref]) for w in warnings]
+    def whole(ref: str) -> list[str]:
+        return by_part.get(ref, [])
+
+    found = [
+        keyed("calculation", c.id, calculation_key(c), _calc_pins(c, whole)) for c in calculations
+    ]
+    found += [keyed("wiring", w.id, f"wiring:{w.pin}", [w.pin]) for w in wiring]
+    found += [keyed("pin_warning", w.id, f"pin_convention:{w.ref}", whole(w.ref)) for w in warnings]
     by_id = {c.id: c for c in calculations}
     for h in analysis.hypotheses:
-        refs = sorted(_issue_parts(h.claims, by_id) & prints.keys())
-        found.append(keyed("issue", h.id, "issue:" + ",".join(refs), refs))
+        pins = sorted(_issue_pins(h.claims, by_id) & prints.keys())
+        found.append(keyed("issue", h.id, "issue:" + ",".join(pins), pins))
     return found
 
 
@@ -83,23 +95,22 @@ def calculation_key(calc: Calculation) -> str:
 
 
 def fingerprints(design: Design) -> dict[str, str]:
-    """Each part's fingerprint: 16 hex digits of a SHA-256 over its value,
-    footprint and the nets its pins are on (see the module docstring)."""
-    pins: dict[str, list[tuple[str, str]]] = {ref: [] for ref in design.parts}
+    """Each pin's fingerprint (``U2.9`` -> 16 hex digits of a SHA-256 over
+    its part's value and footprint and the net the pin is on; see the
+    module docstring). Pins of parts the netlist doesn't list are left out."""
+    prints: dict[str, str] = {}
     for name, nodes in design.nets.items():
         for node in nodes:
-            if node.ref in pins:
-                pins[node.ref].append((node.pin, _net(design, name, nodes, node)))
-    return {
-        ref: hashlib.sha256(
-            json.dumps([part.value, part.footprint, sorted(pins[ref])]).encode()
-        ).hexdigest()[:16]
-        for ref, part in design.parts.items()
-    }
+            part = design.parts.get(node.ref)
+            if part is None:
+                continue
+            seen = json.dumps([part.value, part.footprint, _net(design, name, nodes, node)])
+            prints[node.pin_ref] = hashlib.sha256(seen.encode()).hexdigest()[:16]
+    return prints
 
 
 def _net(design: Design, name: str, nodes: Sequence[Node], node: Node) -> str:
-    """How one pin's net counts in its part's fingerprint."""
+    """How one pin's net counts in its fingerprint."""
     if is_ground(name) or len(nodes) > _BIG_NET:
         return f"net {name}"
     others = sorted(
@@ -110,29 +121,29 @@ def _net(design: Design, name: str, nodes: Sequence[Node], node: Node) -> str:
     return " ".join(others)
 
 
-def _calc_parts(calc: Calculation) -> list[str]:
-    return [calc.ic, *(_ref(p) for p in calc.pins)]
+def _calc_pins(calc: Calculation, whole: Callable[[str], list[str]]) -> list[str]:
+    """The pins a calculation names: all its part's pins when it is about the
+    whole part (checked once per part, or listing no pins), else its pins."""
+    if calc.kind in _ONE_PER_PART or not calc.pins:
+        return [*whole(calc.ic), *calc.pins]
+    return list(calc.pins)
 
 
-def _wiring_parts(finding: WiringFinding) -> list[str]:
-    return [_ref(p) for p in [finding.pin, *finding.conflicts, *finding.inductors]]
-
-
-def _issue_parts(claims: Sequence[CheckedClaim], by_id: dict[str, Calculation]) -> set[str]:
-    """The parts a hypothesis's verified claims cite: each cited pin's part,
-    and the parts of each cited calculation. A downgraded claim's cites
-    don't count; nor do nets (GND would name half the board), ERC entries
-    or datasheet facts."""
-    parts: set[str] = set()
+def _issue_pins(claims: Sequence[CheckedClaim], by_id: dict[str, Calculation]) -> set[str]:
+    """The pins a hypothesis's verified claims cite: each cited pin, and the
+    pins each cited calculation lists (none when it lists none). A
+    downgraded claim's cites don't count; nor do nets (GND would name half
+    the board), ERC entries or datasheet facts."""
+    pins: set[str] = set()
     for claim in claims:
         if claim.downgraded:
             continue
         for cite in claim.cites:
             if cite.kind in _PIN_CITES and cite.pin:
-                parts.add(_ref(normalize_pin(cite.pin)))
+                pins.add(normalize_pin(cite.pin))
             elif cite.kind == "reference" and cite.id in by_id:
-                parts.update(_calc_parts(by_id[cite.id]))
-    return parts
+                pins.update(by_id[cite.id].pins)
+    return pins
 
 
 def _ref(pin_ref: str) -> str:

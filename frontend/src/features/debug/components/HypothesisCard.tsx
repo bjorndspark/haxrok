@@ -314,8 +314,8 @@ function MarkLine({ mark }: { mark: IssueMark }) {
   return (
     <p className="pt-1 text-xs text-muted-foreground">
       {t.markSame(mark.earlier ?? "")}
-      {mark.changed_parts.length > 0 && (
-        <span className="text-info"> · {t.circuitChanged(mark.changed_parts)}</span>
+      {mark.changed_pins.length > 0 && (
+        <span className="text-info"> · {t.circuitChanged(mark.changed_pins)}</span>
       )}
     </p>
   )

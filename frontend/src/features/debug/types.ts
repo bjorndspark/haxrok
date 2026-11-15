@@ -528,15 +528,15 @@ export interface ProgressEvent {
 export interface ReviewFinding {
   key: string
   source: "calculation" | "wiring" | "pin_warning" | "issue"
-  /** Part ref → fingerprint of its connections. */
-  parts: Record<string, string>
+  /** Pin ref (`U2.9`) → fingerprint of its part and net. */
+  pins: Record<string, string>
   title: string
   severity: Severity | null
 }
 
 /** `<project>.review.json`: the last review's findings, the next baseline. */
 export interface ReviewFile {
-  version: 1
+  version: 2
   project: string
   run_id: string
   date: string
@@ -550,8 +550,8 @@ export interface IssueMark {
   mark: "new" | "unchanged"
   /** The earlier issue's title, when unchanged. */
   earlier: string | null
-  /** Parts both cite whose connections changed since. */
-  changed_parts: string[]
+  /** Pins both cite whose circuit changed since. */
+  changed_pins: string[]
 }
 
 /** The review against the uploaded review file, and the file to save next. */

@@ -35,7 +35,7 @@ Two constraints shape it:
 |---|---|---|
 | 1 | Every finding has a stable key, recorded in the run | done |
 | 2 | A review against an earlier run shows new, fixed and unchanged issues | done |
-| 3 | Issues match and fingerprint on the pins they cite, not whole parts | proposed |
+| 3 | Issues match and fingerprint on the pins they cite, not whole parts | done |
 | 4 | Waivers: an accepted finding stays quiet until its circuit changes | proposed |
 
 ## 1. Every finding has a stable key, recorded in the run: done
@@ -168,7 +168,7 @@ cited pins, not whole parts, would separate these: step 3. `make lint` and
 its own. Bugs found: `lint-tsc` caught two `Run` literals in
 `present.test.ts` missing the new `reviewDiff`.
 
-## 3. Issues match and fingerprint on the pins they cite, not whole parts: proposed
+## 3. Issues match and fingerprint on the pins they cite, not whole parts: done
 
 - A model issue's key is the set of pins its verified cites name
   (`U16.7`, `U22.25`), not their parts, so two issues on the same two
@@ -208,10 +208,32 @@ none. The issue key is `issue:` and the sorted pins
 `changed_pins`.
 
 **Checks:** step 2's eval pair (`orbit-boot0-high` → `orbit-uart-swapped`,
-the 9 pairs from the stored scorecard reviews): more pairs show exactly
-BOOT0 fixed and the UART swap new than step 2's 1 of 9, and no match
-outside the edited pins says "circuit changed". Unit tests for pin keys
-and pin fingerprints.
+the 9 pairs keyed from the stored scorecard reviews, `20261114T065544Z`)
+improved. BOOT0 fixed and the UART swap new: 6 of 9 pairs, up from 4.
+Exactly one fixed and one new: 1 of 9, as in step 2, but now the right
+ones (A3 → B2). "Circuit changed" names only the swapped UART pins
+(`U16.30`, `U16.31`, `U22.25`, `U22.26`), never the HSE caps or ESD. The
+misses that remain:
+
+- B3's "slide-switch common" cites BOOT0's switch pins, so it matches
+  A's BOOT0 issue and BOOT0 isn't fixed (all 3 pairs with B3).
+- A3's "MCU drives unpowered CP2102" cites the UART pins, so in A3 → B3
+  it matches the UART swap, marked "circuit changed" on those 4 pins. In
+  A3 → B1 and A3 → B2 it matches B's back-drive issue, which is right.
+- Pin drift: HSE cites the caps' pins in A1 and the caps' plus U10's and
+  U16's pins in B1 and B2 (Jaccard 0.25), so it shows as new plus fixed
+  in 2 pairs that parts would have matched (0.5). ESD cites J1 and J2 in
+  B1 and U22 and USB1 in A (no overlap); parts lost it too.
+
+Pin keys gained more than drift lost (2 pairs, both HSE), so no fallback.
+`tests/test_debug_keys.py` (9 tests): each finding names its pins, all its
+part's pins for a whole-part finding; a cited calculation with no pins
+adds none; a changed neighbour changes only the pin on its net. In
+`tests/test_debug_review_file.py` (12 tests), version 1 gives
+`unknown_version`, and two issues on other pins of the same two ICs don't
+match. `make lint` and `make test` passed (511 backend, 56 frontend), each
+sub-target run on its own. Bugs found: `ruff format` reflowed one long
+line in `review_file.diff`.
 
 ## 4. Waivers: an accepted finding stays quiet until its circuit changes: proposed
 
