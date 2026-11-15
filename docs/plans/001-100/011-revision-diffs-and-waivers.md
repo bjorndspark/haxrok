@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-14 | 2026-11-15 | in progress | — | `010-ratings-sequencing-esd.md` (deferred the review workflow here), `012-benchmark-scorecard.md` (goes first; its scorecard measures this plan), `007-one-review-path-recorded.md` (run records), `DECISIONS.md` ("No database", "Runs are recorded as files", "Review mode reuses the debug pipeline") |
+| 2026-11-14 | 2026-11-15 | done | — | `010-ratings-sequencing-esd.md` (deferred the review workflow here), `012-benchmark-scorecard.md` (goes first; its scorecard measures this plan), `007-one-review-path-recorded.md` (run records), `DECISIONS.md` ("No database", "Runs are recorded as files", "Review mode reuses the debug pipeline") |
 
 A review today is a single shot: upload a schematic and get back a list of
 issues. Real boards go through several revisions, and on each one a
@@ -36,7 +36,7 @@ Two constraints shape it:
 | 1 | Every finding has a stable key, recorded in the run | done |
 | 2 | A review against an earlier run shows new, fixed and unchanged issues | done |
 | 3 | Issues match and fingerprint on the pins they cite, not whole parts | done |
-| 4 | Waivers: an accepted finding stays quiet until its circuit changes | proposed |
+| 4 | Waivers: an accepted finding stays quiet until its circuit changes | done |
 
 ## 1. Every finding has a stable key, recorded in the run: done
 
@@ -235,7 +235,7 @@ match. `make lint` and `make test` passed (511 backend, 56 frontend), each
 sub-target run on its own. Bugs found: `ruff format` reflowed one long
 line in `review_file.diff`.
 
-## 4. Waivers: an accepted finding stays quiet until its circuit changes: proposed
+## 4. Waivers: an accepted finding stays quiet until its circuit changes: done
 
 - The user marks an issue accepted, with a reason; later reviews show it
   folded away with that reason, and bring it back when its fingerprint
@@ -261,7 +261,34 @@ pins they cite. A lapsed finding shows which pins changed and the old
 reason.
 Decided (2026-11-15): a waived finding stays at its rank, folded to one
 line (title, reason, who, date), expandable, and out of the issue counts.
+Decided (2026-11-15): the UI offers "Accept" on model issues only. The
+backend still applies a waiver on any keyed finding by its exact key, so
+one written into the file for a wiring finding or pin warning works.
+Rejected: accept controls on the design summary's lines (more UI for the
+smaller share of the noise).
+Decided (2026-11-15), default: a waiver stays in the review file until
+the user removes it or accepts its finding again (which replaces it at
+the new fingerprints): a lapsed waiver, or one whose finding is gone this
+run, is carried over as it is. Accept and remove work on the latest run
+only. `ReviewFile` stays `version` 2: `waivers` was always empty, so a
+saved version 2 file still reads. The downloaded report is unchanged.
 
-**Checks:** unit tests for apply and lapse; the eval pair with a waiver
-on one finding shows it folded on rev B, and back after its part's value
-changes.
+**Checks:** step 2's eval pair (`orbit-boot0-high` → `orbit-uart-swapped`,
+the 9 pairs keyed from the stored scorecard reviews, `20261114T065544Z`),
+with a waiver on A's first issue that B marks unchanged (the TPS63802
+inductor, L1, in all 9): folded on rev B in 9 of 9. With L1's value
+changed in B, back in 9 of 9, the lapse naming `L1.1`, `L1.2`, `U15.7`
+and `U15.9` (U15's pins are on L1's nets, so their fingerprints change
+too). In `tests/test_debug_review_file.py` (19 tests), a waiver quiets the
+issue it loosely matches; a backend waiver needs the exact key; a changed
+shared pin lapses it and a dropped pin doesn't; each waiver takes one
+finding, the tie going to the higher rank; a waiver that finds nothing is
+kept and not listed; waivers round-trip through `read`.
+`tests/test_debug_service.py` gains a run whose uploaded file's waiver
+finds its issue and is carried into the next file. `waivers.test.ts` (4
+tests): accept writes a waiver at the current pins and quiets the issue,
+accepting a lapsed issue replaces its waiver, remove reindexes the rest,
+a lapsed waiver doesn't quiet its issue. `make lint` and `make test`
+passed (519 backend, 60 frontend), each sub-target run on its own. Bugs
+found: `tsc` rejected `Array.prototype.at` in the test (the target lib is
+older than ES2022); it indexes by length now.

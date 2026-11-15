@@ -1,7 +1,7 @@
 /**
  * Debug behavior behind the components: run an analysis, re-run with a
- * measurement, cancel, read a dropped or picked project. Components only
- * render and call these.
+ * measurement, cancel, read a dropped or picked project, accept a review's
+ * issues. Components only render and call these.
  */
 import { useMutation } from "@tanstack/react-query"
 import { useCallback, useEffect, useState } from "react"
@@ -24,6 +24,7 @@ import type {
   SimCircuit,
   Simulation,
 } from "./types"
+import { accept, removeWaiver, saveReviewer } from "./waivers"
 
 function applyEvent(run: Run, ev: AnalysisEvent): Partial<Run> {
   switch (ev.type) {
@@ -54,6 +55,10 @@ export interface DebugActions {
   downloadReport: (run: Run) => void
   /** Save the run's next review file, to drop with the next revision. */
   saveReviewFile: (run: Run) => void
+  /** Accept issue `id` of `run` with a reason, as `by` (remembered for next time). */
+  acceptIssue: (run: Run, id: string, title: string, reason: string, by: string) => void
+  /** Drop the waiver on issue `id` of `run` from the review file to save. */
+  removeWaiver: (run: Run, id: string) => void
 }
 
 /** Hand the browser a file to save. */
@@ -188,6 +193,22 @@ export function useDebugActions(): DebugActions {
     )
   }, [])
 
+  const acceptIssue = useCallback(
+    (run: Run, id: string, title: string, reason: string, by: string) => {
+      saveReviewer(by)
+      useDebugStore.getState().updateRun(run.number, (r) => ({
+        reviewDiff: r.reviewDiff && accept(r.reviewDiff, id, title, reason, by, new Date()),
+      }))
+    },
+    [],
+  )
+
+  const unwaive = useCallback((run: Run, id: string) => {
+    useDebugStore.getState().updateRun(run.number, (r) => ({
+      reviewDiff: r.reviewDiff && removeWaiver(r.reviewDiff, id),
+    }))
+  }, [])
+
   return {
     analyze,
     rerunWithMeasurement,
@@ -196,6 +217,8 @@ export function useDebugActions(): DebugActions {
     dropFiles,
     downloadReport,
     saveReviewFile,
+    acceptIssue,
+    removeWaiver: unwaive,
   }
 }
 

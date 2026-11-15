@@ -750,3 +750,28 @@ how fast this request's earlier runs went, so the same board can come
 back once with it and once without; the setup always says which. The
 estimate counts the runs still going and queued, at two at once, but
 not a run that would itself time out.
+
+## Waivers live in the user's review file
+
+**Decision:** a review's history and its waivers (findings the team
+accepted, with a reason, who and when) live in `<project>.review.json`,
+which the browser downloads and the user keeps next to the `.kicad_pro`
+in their own git (plan 011). The next review uploads it with the
+schematic; `features/debug/review_file.py` diffs against it, finds which
+waivers still apply, and returns the next file to save. Each waiver keeps
+its pins' fingerprints, so it lapses when its circuit changes. The server
+keeps none of it.
+
+**Why:** a team reviews a board over several revisions and must not
+re-triage the same accepted findings each time. Like KiCad's ERC
+exclusions, the record belongs with the project: git shows who accepted
+what, and a PR reviews it.
+
+**Alternatives rejected:** waivers stored on the server (needs a database
+and accounts, against "No database" and "No auth"); waivers in
+localStorage (one browser only, not shared with the team).
+
+**Consequence:** "who" is the name the user types, with nothing to check
+it against; the git history of the file is the real record. A review
+uploaded without the file shows no diff and no waivers. Two people
+saving the file from different runs merge it in git like any other file.

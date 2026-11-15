@@ -33,6 +33,7 @@ import { DatasheetLineText } from "./DatasheetLineText"
 import { GlossaryText } from "./GlossaryText"
 import { MarkedText } from "./MarkedText"
 import { SimulationPlot } from "./SimulationPlot"
+import { WaivedFold, WaiverBar, type WaiverProps } from "./WaiverControls"
 import { WiringDiagram } from "./WiringDiagram"
 
 const EVIDENCE_TONE: Record<Evidence, BadgeProps["tone"]> = {
@@ -300,6 +301,8 @@ interface HypothesisCardProps {
   onRerun: (step: ConfirmStep, value: string) => void
   /** Against the last review's file; null without one. */
   mark: IssueMark | null
+  /** Its waiver, and accepting or removing one (plan 011 step 4). */
+  waiver: WaiverProps
 }
 
 /** "new", or "likely the same as …" with the parts whose circuit changed. */
@@ -332,7 +335,46 @@ export function HypothesisCard({
   busy,
   onRerun,
   mark,
+  waiver,
 }: HypothesisCardProps) {
+  const [unfolded, setUnfolded] = useState(false)
+  const quiet = waiver.hit !== null && waiver.hit.lapsed_pins.length === 0
+  if (quiet && waiver.hit && !unfolded)
+    return (
+      <WaivedFold rank={h.rank} title={h.title} hit={waiver.hit} onOpen={() => setUnfolded(true)} />
+    )
+  return (
+    <HypothesisBody
+      hypothesis={h}
+      diagram={diagram}
+      summary={summary}
+      simulations={simulations}
+      glossary={glossary}
+      problems={problems}
+      latest={latest}
+      busy={busy}
+      onRerun={onRerun}
+      mark={mark}
+      waiver={waiver}
+      onFold={quiet ? () => setUnfolded(false) : null}
+    />
+  )
+}
+
+function HypothesisBody({
+  hypothesis: h,
+  diagram,
+  summary,
+  simulations,
+  glossary,
+  problems,
+  latest,
+  busy,
+  onRerun,
+  mark,
+  waiver,
+  onFold,
+}: HypothesisCardProps & { onFold: (() => void) | null }) {
   const primary = h.rank === 1
   const stepIds = new Set(h.confirm.map((s) => s.id))
   const ownProblems = problems.filter((p) => p.where === h.id || stepIds.has(p.where))
@@ -491,6 +533,7 @@ export function HypothesisCard({
           ))}
         </div>
       )}
+      <WaiverBar {...waiver} onFold={onFold} />
     </div>
   )
 }

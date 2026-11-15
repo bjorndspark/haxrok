@@ -591,20 +591,34 @@ class ReviewFinding(BaseModel):
     severity: Severity | None = None
 
 
+class Waiver(BaseModel):
+    """A finding the team accepted (plan 011 step 4): its key, source and
+    title, and its pins' fingerprints when it was accepted, so a later review
+    can tell when its circuit changed. The browser writes it; the server
+    only reads it back from the review file."""
+
+    key: str
+    source: Literal["calculation", "wiring", "pin_warning", "issue"]
+    pins: dict[str, str]
+    title: str
+    reason: str
+    by: str = Field(description="The name the user typed; there is no auth.")
+    date: datetime
+
+
 class ReviewFile(BaseModel):
     """``<project>.review.json`` (plan 011): the last review's findings, the
-    baseline the next review is compared with. The user keeps it next to the
-    ``.kicad_pro``, so it travels with the project and git shows what a
-    review changed. ``waivers`` is kept as sent (plan 011 step 4 fills it).
-    Version 2 keys and fingerprints pins (plan 011 step 3); version 1 keyed
-    whole parts."""
+    baseline the next review is compared with, and the waivers. The user
+    keeps it next to the ``.kicad_pro``, so it travels with the project and
+    git shows what a review changed. Version 2 keys and fingerprints pins
+    (plan 011 step 3); version 1 keyed whole parts."""
 
     version: Literal[2] = 2
     project: str
     run_id: str
     date: datetime
     findings: list[ReviewFinding]
-    waivers: list[dict[str, object]] = Field(default_factory=list)
+    waivers: list[Waiver] = Field(default_factory=list)
 
 
 class IssueMark(BaseModel):
@@ -619,18 +633,34 @@ class IssueMark(BaseModel):
     changed_pins: list[str] = Field(default_factory=list)
 
 
+class WaiverHit(BaseModel):
+    """A waiver that found a finding of this run: a backend finding by its
+    exact key, a model issue by the same loose match as ``IssueMark``.
+    ``lapsed_pins`` names the pins both name whose circuit changed since the
+    waiver; when it is empty the finding stays quiet."""
+
+    id: str = Field(description="The finding's id in this run (h1, wf1, …).")
+    index: int = Field(description="The waiver's place in the next file's waivers.")
+    waiver: Waiver
+    lapsed_pins: list[str] = Field(default_factory=list)
+
+
 class ReviewDiff(BaseModel):
     """The ``review_diff`` event, review mode only, just before the result:
     each model issue against the baseline, the baseline's issues that are
-    gone, and the review file to save for the next revision. With no
-    baseline, ``marks`` and ``fixed`` are empty; ``note`` says why a review
-    file that was sent couldn't be used."""
+    gone, the waivers that found a finding, this run's keyed findings (what
+    the browser writes a new waiver from), and the review file to save for
+    the next revision. With no baseline, ``marks``, ``fixed`` and ``waived``
+    are empty; ``note`` says why a review file that was sent couldn't be
+    used."""
 
     baseline_run_id: str = ""
     baseline_date: datetime | None = None
     note: Literal["unreadable", "unknown_version"] | None = None
     marks: list[IssueMark] = Field(default_factory=list)
     fixed: list[ReviewFinding] = Field(default_factory=list)
+    waived: list[WaiverHit] = Field(default_factory=list)
+    found: list[FindingKey] = Field(default_factory=list)
     next: ReviewFile
 
 

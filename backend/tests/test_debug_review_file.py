@@ -1,5 +1,5 @@
-"""The review file and the diff against it (``review_file``, plan 011 steps 2
-and 3).
+"""The review file, the diff against it and its waivers (``review_file``,
+plan 011 steps 2–4).
 Hand-built findings; pure functions."""
 
 import json
@@ -16,6 +16,7 @@ from app.features.debug.schemas import (
     PinWarning,
     ReviewFile,
     ReviewFinding,
+    Waiver,
 )
 
 DATE = datetime(2026, 11, 14, 9, 0, tzinfo=UTC)
@@ -94,6 +95,8 @@ def test_without_a_baseline_nothing_is_marked_or_fixed():
         review_file.Baseline(note="unreadable"), [_issue("h1", {"U1.1": "a"})], NEXT
     )
     assert (got.marks, got.fixed, got.note, got.next) == ([], [], "unreadable", NEXT)
+    # Still sent, so the first review's issues can be accepted.
+    assert [f.id for f in got.found] == ["h1"]
 
 
 def test_one_fixed_one_new_one_unchanged():
@@ -183,10 +186,91 @@ def test_the_next_file_keeps_every_keyed_finding_with_its_title_and_the_waivers(
         _issue("h1", {"U2.9": "a"}),
     ]
     warning = PinWarning(id="pw1", ref="Q1", pins=[], nets=[], text="Q1 pinout")
-    waivers: list[dict[str, object]] = [{"key": "pin_convention:Q1", "reason": "checked"}]
+    waivers = [_waiver("pin_convention:Q1", {"Q1.1": "q"}, source="pin_warning")]
     got = review_file.next_file("board", "r2", DATE, found, analysis, [], [warning], [], waivers)
     assert [(f.key, f.title, f.severity) for f in got.findings] == [
         ("pin_convention:Q1", "Q1 pinout", None),
         ("issue:U2.9", "L2 on the rail", "will_fail"),
     ]
     assert (got.version, got.project, got.run_id, got.waivers) == (2, "board", "r2", waivers)
+
+
+# --- waivers ----------------------------------------------------------------------------
+
+
+def _waiver(key: str, pins: dict[str, str], source: str = "issue") -> Waiver:
+    return Waiver.model_validate(
+        {
+            "key": key,
+            "source": source,
+            "pins": pins,
+            "title": "accepted",
+            "reason": "never sees USB",
+            "by": "tm",
+            "date": DATE,
+        }
+    )
+
+
+def _waived(waivers: list[Waiver], found: list[FindingKey]) -> list[tuple[str, int, list[str]]]:
+    next = NEXT.model_copy(update={"waivers": waivers})
+    got = review_file.diff(_baseline(), found, next)
+    return [(h.id, h.index, h.lapsed_pins) for h in got.waived]
+
+
+def test_a_waiver_quiets_the_issue_it_loosely_matches():
+    waiver = _waiver("issue:C12.1,U3.4", {"C12.1": "a", "U3.4": "u"})
+    found = [_issue("h1", {"J1.1": "j"}), _issue("h2", {"C12.1": "a", "U3.4": "u", "R1.1": "r"})]
+    assert _waived([waiver], found) == [("h2", 0, [])]
+
+
+def test_a_waiver_on_a_backend_finding_needs_its_exact_key():
+    waiver = _waiver("wiring:U2.9", {"U2.9": "a"}, source="wiring")
+    same = FindingKey(source="wiring", id="wf1", key="wiring:U2.9", pins={"U2.9": "a"})
+    other = FindingKey(source="wiring", id="wf2", key="wiring:U2.10", pins={"U2.9": "a"})
+    assert _waived([waiver], [other, same]) == [("wf1", 0, [])]
+    # A model issue citing the same pin isn't the backend finding.
+    assert _waived([waiver], [_issue("h1", {"U2.9": "a"})]) == []
+
+
+def test_a_waiver_lapses_when_a_pin_both_name_changes():
+    waiver = _waiver("issue:C12.1,U3.4", {"C12.1": "a", "U3.4": "u"})
+    assert _waived([waiver], [_issue("h1", {"C12.1": "b", "U3.4": "u"})]) == [("h1", 0, ["C12.1"])]
+
+
+def test_a_pin_that_drops_out_doesnt_lapse_a_waiver():
+    waiver = _waiver("issue:C12.1,U3.4", {"C12.1": "a", "U3.4": "u"})
+    # U3.4 isn't cited this run; C12.1 is unchanged. Jaccard 0.5.
+    assert _waived([waiver], [_issue("h1", {"C12.1": "a"})]) == [("h1", 0, [])]
+
+
+def test_each_waiver_quiets_one_finding_and_each_finding_takes_one_waiver():
+    a = _waiver("issue:U1.1,R1.1", {"U1.1": "a", "R1.1": "b"})
+    b = _waiver("wiring:U2.9", {"U2.9": "c"}, source="wiring")
+    twin = _waiver("wiring:U2.9", {"U2.9": "old"}, source="wiring")
+    found = [
+        _issue("h1", {"U1.1": "a", "R1.1": "b"}),
+        _issue("h2", {"U1.1": "a", "R1.1": "b"}),
+        FindingKey(source="wiring", id="wf1", key="wiring:U2.9", pins={"U2.9": "c"}),
+    ]
+    # h2 ties h1 and loses to the higher rank; the first waiver for wf1's key wins.
+    assert _waived([a, b, twin], found) == [("h1", 0, []), ("wf1", 1, [])]
+
+
+def test_a_waiver_that_finds_nothing_is_kept_and_not_listed():
+    waiver = _waiver("issue:U9.1", {"U9.1": "a"})
+    next = NEXT.model_copy(update={"waivers": [waiver]})
+    got = review_file.diff(_baseline(), [_issue("h1", {"J1.1": "j"})], next)
+    assert (got.waived, got.next.waivers) == ([], [waiver])
+
+
+def test_waivers_round_trip_through_the_review_file():
+    sent = ReviewFile(
+        project="board",
+        run_id="r1",
+        date=DATE,
+        findings=[],
+        waivers=[_waiver("issue:U1.1", {"U1.1": "a"})],
+    )
+    got = review_file.read(_project(sent.model_dump_json().encode()))
+    assert got.file == sent

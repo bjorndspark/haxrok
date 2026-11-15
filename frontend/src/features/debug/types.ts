@@ -534,14 +534,45 @@ export interface ReviewFinding {
   severity: Severity | null
 }
 
-/** `<project>.review.json`: the last review's findings, the next baseline. */
+/** What a finding of this run is about: its id here, key and pins. */
+export interface FindingKey {
+  source: ReviewFinding["source"]
+  /** The finding's id in this run (h1, wf1, …). */
+  id: string
+  key: string
+  pins: Record<string, string>
+}
+
+/** A finding the team accepted, with its pins' fingerprints at the time. */
+export interface Waiver {
+  key: string
+  source: ReviewFinding["source"]
+  pins: Record<string, string>
+  title: string
+  reason: string
+  /** The name the user typed; there is no auth. */
+  by: string
+  date: string
+}
+
+/** A waiver that found a finding of this run. */
+export interface WaiverHit {
+  id: string
+  /** The waiver's place in `next.waivers`. */
+  index: number
+  waiver: Waiver
+  /** Pins both name whose circuit changed since; empty: the finding stays quiet. */
+  lapsed_pins: string[]
+}
+
+/** `<project>.review.json`: the last review's findings and the waivers. */
 export interface ReviewFile {
   version: 2
   project: string
   run_id: string
   date: string
   findings: ReviewFinding[]
-  waivers: Record<string, unknown>[]
+  waivers: Waiver[]
 }
 
 /** A model issue against the baseline: new, or likely the same as `earlier`. */
@@ -562,6 +593,9 @@ export interface ReviewDiff {
   note: "unreadable" | "unknown_version" | null
   marks: IssueMark[]
   fixed: ReviewFinding[]
+  waived: WaiverHit[]
+  /** This run's keyed findings, what a new waiver is written from. */
+  found: FindingKey[]
   next: ReviewFile
 }
 

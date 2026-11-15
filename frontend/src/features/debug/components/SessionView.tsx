@@ -9,6 +9,7 @@ import { isReview } from "../present"
 import { useDebugStore } from "../store"
 import type { ReviewDiff, Run } from "../types"
 import { formatElapsed, type DebugActions } from "../useDebug"
+import { quietIds, waiverOn } from "../waivers"
 import { AnalyzingPanel } from "./AnalyzingPanel"
 import { DesignSummaryCard } from "./DesignSummaryCard"
 import { GlossaryText } from "./GlossaryText"
@@ -47,14 +48,17 @@ function ReviewDiffCard({ diff }: { diff: ReviewDiff }) {
         {diff.note ? t.note[diff.note] : t.none}
       </Card>
     )
-  const fresh = diff.marks.filter((m) => m.mark === "new").length
+  // An accepted issue is out of the counts (plan 011 step 4).
+  const quiet = quietIds(diff)
+  const marks = diff.marks.filter((m) => !quiet.has(m.id))
+  const fresh = marks.filter((m) => m.mark === "new").length
   return (
     <Card className="space-y-3 p-4 sm:p-5">
       <Title as="h3">{t.title}</Title>
       <p className="text-xs text-muted-foreground">
         {t.since(new Date(diff.baseline_date).toLocaleString())}{" "}
         <span className="text-foreground">
-          {t.counts(fresh, diff.marks.length - fresh, diff.fixed.length)}
+          {t.counts(fresh, marks.length - fresh, diff.fixed.length, quiet.size)}
         </span>
       </p>
       {diff.fixed.length > 0 && (
@@ -143,6 +147,14 @@ function RunBody({
           busy={busy}
           onRerun={(step, value) => void actions.rerunWithMeasurement(step, value)}
           mark={marks.get(h.id) ?? null}
+          waiver={{
+            hit: waiverOn(run.reviewDiff, h.id),
+            onAccept:
+              latest && run.reviewDiff
+                ? (reason, by) => actions.acceptIssue(run, h.id, h.title, reason, by)
+                : null,
+            onRemove: latest && run.reviewDiff ? () => actions.removeWaiver(run, h.id) : null,
+          }}
         />
       ))}
 

@@ -174,8 +174,9 @@ Used outdoors, so it may see -10 °C.`,
     diff: {
       title: "Against the last review",
       since: (date: string) => `Compared with the review of ${date}.`,
-      counts: (fresh: number, same: number, fixed: number) =>
-        `${String(fresh)} new · ${String(same)} likely the same · ${String(fixed)} fixed`,
+      counts: (fresh: number, same: number, fixed: number, accepted: number) =>
+        `${String(fresh)} new · ${String(same)} likely the same · ${String(fixed)} fixed` +
+        (accepted > 0 ? ` · ${String(accepted)} accepted` : ""),
       fixedTitle: "Fixed since then",
       none: "No review file was dropped. Save this one next to the .kicad_pro, and the next review shows what changed.",
       note: {
@@ -189,6 +190,21 @@ Used outdoors, so it may see -10 °C.`,
     markNew: "new",
     markSame: (title: string) => `likely the same as “${title}”`,
     circuitChanged: (pins: string[]) => `circuit changed: ${pins.join(", ")}`,
+    waiver: {
+      accept: "Accept",
+      acceptAgain: "Accept again",
+      accepted: "accepted",
+      because: (reason: string) => `“${reason}”`,
+      byOn: (by: string, date: string) => `${by}, ${date}`,
+      lapsed: (pins: string[]) =>
+        `Accepted earlier, back because its circuit changed (${pins.join(", ")}):`,
+      reason: "Why it's fine",
+      reasonPlaceholder: "e.g. this rail never sees USB",
+      by: "Your name",
+      cancel: "Cancel",
+      fold: "Fold",
+      remove: "Remove acceptance",
+    },
     explains: "Explains",
     claimsBacked: "Claims backed",
     labelledBy: (label: string, reason: string) =>
@@ -611,8 +627,9 @@ USB 5 V では動く: マイコンが起動する。
     diff: {
       title: "前回のレビューとの比較",
       since: (date: string) => `${date} のレビューと比べています。`,
-      counts: (fresh: number, same: number, fixed: number) =>
-        `新規 ${String(fresh)} · おそらく同じ ${String(same)} · 解消 ${String(fixed)}`,
+      counts: (fresh: number, same: number, fixed: number, accepted: number) =>
+        `新規 ${String(fresh)} · おそらく同じ ${String(same)} · 解消 ${String(fixed)}` +
+        (accepted > 0 ? ` · 許容 ${String(accepted)}` : ""),
       fixedTitle: "前回から解消した指摘",
       none: "レビューファイルはありません。これを .kicad_pro の隣に保存すると、次のレビューで変化がわかります。",
       note: {
@@ -625,6 +642,21 @@ USB 5 V では動く: マイコンが起動する。
     markNew: "新規",
     markSame: (title: string) => `前回の「${title}」とおそらく同じ`,
     circuitChanged: (pins: string[]) => `回路が変わったピン: ${pins.join(", ")}`,
+    waiver: {
+      accept: "許容する",
+      acceptAgain: "もう一度許容する",
+      accepted: "許容済み",
+      because: (reason: string) => `「${reason}」`,
+      byOn: (by: string, date: string) => `${by}、${date}`,
+      lapsed: (pins: string[]) =>
+        `以前許容した指摘ですが、回路が変わったため再表示しています (${pins.join(", ")}):`,
+      reason: "問題ない理由",
+      reasonPlaceholder: "例: このレールに USB はつながらない",
+      by: "名前",
+      cancel: "キャンセル",
+      fold: "たたむ",
+      remove: "許容を取り消す",
+    },
     explains: "説明できる症状",
     claimsBacked: "裏づけのある主張",
     labelledBy: (label: string, reason: string) =>

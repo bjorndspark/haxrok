@@ -1887,6 +1887,26 @@ async def test_a_saved_review_file_is_the_next_reviews_baseline():
     assert [f["title"] for f in diff["fixed"]] == ["J9 gone"]
 
 
+async def test_a_waiver_in_the_review_file_finds_the_issue_and_is_carried_over():
+    _, first = await _review_run(_files())
+    assert first is not None
+    issue = next(f for f in first["found"] if f["source"] == "issue")
+    waiver = {
+        "key": issue["key"],
+        "source": "issue",
+        "pins": issue["pins"],
+        "title": "L2 is on the output rail",
+        "reason": "intended",
+        "by": "tm",
+        "date": "2026-11-15T00:00:00Z",
+    }
+    saved = json.dumps({**first["next"], "waivers": [waiver]}).encode()
+    _, diff = await _review_run([*_files(), ("board/board.review.json", saved)])
+    assert diff is not None
+    assert [(h["id"], h["index"], h["lapsed_pins"]) for h in diff["waived"]] == [("h1", 0, [])]
+    assert [w["reason"] for w in diff["next"]["waivers"]] == ["intended"]
+
+
 async def test_an_unreadable_review_file_is_a_note_not_an_error():
     names, diff = await _review_run([*_files(), ("board/board.review.json", b"{oops")])
     assert diff is not None
