@@ -251,6 +251,16 @@ accepted at, a reason, who and when.
 Decided (2026-11-14), default: with no auth, "who" is a name the user
 types once, kept in the browser (localStorage) as a convenience. The
 file in git is the real record of who accepted what.
+Decided (2026-11-15): a waiver finds a model issue by the review file's
+loose match (Jaccard ≥ `MATCH_JACCARD` over pins), the same rule as the
+new and unchanged marks; a backend finding by its exact key.
+Decided (2026-11-15): a waiver lapses when a pin both it and the current
+finding name has a different fingerprint, the same test as "circuit
+changed". A pin that drops out doesn't lapse it, since runs drift on the
+pins they cite. A lapsed finding shows which pins changed and the old
+reason.
+Decided (2026-11-15): a waived finding stays at its rank, folded to one
+line (title, reason, who, date), expandable, and out of the issue counts.
 
 **Checks:** unit tests for apply and lapse; the eval pair with a waiver
 on one finding shows it folded on rev B, and back after its part's value
