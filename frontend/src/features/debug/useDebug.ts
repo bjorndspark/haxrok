@@ -10,7 +10,7 @@ import { useLanguage, type Language } from "@/shared/lib/language"
 import { errorMessage } from "@/shared/lib/utils"
 
 import { askResult, askSimulation, rerunSimulation, streamAnalysis } from "./api"
-import { fromDataTransfer, fromFileList } from "./files"
+import { fromDataTransfer, fromFileList, REVIEW_SUFFIX } from "./files"
 import { currentMessages, useMessages } from "./messages"
 import { formatSi, parseSi, toMarkdown, whatIfLabels } from "./present"
 import { useDebugStore } from "./store"
@@ -36,6 +36,8 @@ function applyEvent(run: Run, ev: AnalysisEvent): Partial<Run> {
       return { summary: run.summary && { ...run.summary, ...ev.facts } }
     case "simulation":
       return { simulations: [...run.simulations, ev.simulation] }
+    case "review_diff":
+      return { reviewDiff: ev.diff }
     case "result":
       return { result: ev.result, finishedAt: Date.now(), stage: null }
     case "error":
@@ -50,6 +52,24 @@ export interface DebugActions {
   pickFiles: (list: FileList) => void
   dropFiles: (dt: DataTransfer) => Promise<void>
   downloadReport: (run: Run) => void
+  /** Save the run's next review file, to drop with the next revision. */
+  saveReviewFile: (run: Run) => void
+}
+
+/** Hand the browser a file to save. */
+function saveBlob(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = name
+  // Firefox ignores clicks on a detached anchor, and Safari cancels the
+  // download if the blob URL is revoked before it has started reading it.
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 1000)
 }
 
 function setProject(files: ReturnType<typeof fromFileList>): void {
@@ -79,7 +99,10 @@ export function useDebugActions(): DebugActions {
     const update = useDebugStore.getState().updateRun
     try {
       for await (const ev of streamAnalysis(
-        store.files,
+        // The review file is a review's baseline; a debug run doesn't send it.
+        store.mode === "review"
+          ? store.files
+          : store.files.filter((f) => !f.path.endsWith(REVIEW_SUFFIX)),
         store.symptoms,
         useDebugStore.getState().measurements,
         store.mode,
@@ -150,22 +173,30 @@ export function useDebugActions(): DebugActions {
     if (!run.summary || !run.result) return
     // index.html's <title> carries PROJECT_NAME, so the name stays config.
     const md = toMarkdown(run, run.summary, run.result, currentMessages(), document.title)
-    const blob = new Blob([md], { type: "text/markdown" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${run.summary.project}-run${String(run.number)}.md`
-    // Firefox ignores clicks on a detached anchor, and Safari cancels the
-    // download if the blob URL is revoked before it has started reading it.
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => {
-      URL.revokeObjectURL(url)
-    }, 1000)
+    saveBlob(
+      new Blob([md], { type: "text/markdown" }),
+      `${run.summary.project}-run${String(run.number)}.md`,
+    )
   }, [])
 
-  return { analyze, rerunWithMeasurement, cancel, pickFiles, dropFiles, downloadReport }
+  const saveReviewFile = useCallback((run: Run) => {
+    if (!run.reviewDiff) return
+    const next = run.reviewDiff.next
+    saveBlob(
+      new Blob([JSON.stringify(next, null, 2) + "\n"], { type: "application/json" }),
+      `${next.project}${REVIEW_SUFFIX}`,
+    )
+  }, [])
+
+  return {
+    analyze,
+    rerunWithMeasurement,
+    cancel,
+    pickFiles,
+    dropFiles,
+    downloadReport,
+    saveReviewFile,
+  }
 }
 
 /** A conversation with the model: answered turns, the question in flight

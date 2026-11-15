@@ -7,7 +7,7 @@ import { Card } from "@/shared/ui/card"
 import { Textarea } from "@/shared/ui/textarea"
 import { Title } from "@/shared/ui/title"
 
-import { projectName } from "../files"
+import { projectName, REVIEW_SUFFIX } from "../files"
 import { useMessages } from "../messages"
 import { SIM_ANALYSES, useDebugStore } from "../store"
 import { fragmentLines, symptomHints, symptomLines } from "../symptoms"
@@ -129,6 +129,7 @@ export function InputView({ actions }: { actions: DebugActions }) {
 
   const name = projectName(files)
   const sheets = files.filter((f) => f.path.endsWith(".kicad_sch")).length
+  const reviewFound = review && files.some((f) => f.path.endsWith(REVIEW_SUFFIX))
   const hints = symptomHints(symptoms, messages)
   const lines = symptomLines(symptoms)
   const fragments = fragmentLines(symptoms)
@@ -206,6 +207,7 @@ export function InputView({ actions }: { actions: DebugActions }) {
             <span>
               <span className="text-ok">✓</span> <span className="font-bold text-info">{name}</span>{" "}
               <span className="text-muted-foreground">· {t.sheets(sheets)}</span>
+              {reviewFound && <span className="text-muted-foreground"> · {t.reviewFound}</span>}
             </span>
             <button
               type="button"

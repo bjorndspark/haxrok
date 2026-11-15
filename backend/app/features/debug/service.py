@@ -31,6 +31,7 @@ from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, 
 from contextlib import aclosing
 from dataclasses import dataclass, field
 
+from app.core.clock import get_clock
 from app.core.errors import AppError, BadRequestError
 from app.core.logging import get_logger
 from app.features.debug import (
@@ -44,6 +45,7 @@ from app.features.debug import (
     prompt,
     record,
     reference,
+    review_file,
     spice,
     spice_circuits,
     spice_convert,
@@ -124,6 +126,7 @@ class Prepared:
     upload: dict[str, bytes] = field(default_factory=dict, repr=False)  # the model files
     analyses: tuple[SimAnalysis, ...] = ("startup",)  # the vendor-model simulations
     battery: power.Range | None = None  # the review form's battery range, if given
+    baseline: review_file.Baseline = field(default_factory=review_file.Baseline)
 
 
 async def prepare(
@@ -147,7 +150,9 @@ async def prepare(
     mode the symptoms are optional notes on what the board is for.
     ``language`` is the one the structured answer is written in;
     ``analyses`` the vendor-model simulations ``stream`` runs; ``battery``
-    the user's (min, max) for the board's battery, over the inferred one."""
+    the user's (min, max) for the board's battery, over the inferred one.
+    In review mode the project's review file, if sent, is the baseline the
+    result is compared with (``review_file``); a debug run ignores it."""
     symptoms = prompt.number_symptoms(symptoms_text)
     if mode == "debug" and not symptoms:
         raise BadRequestError("Describe what you see on the bench first.", field="symptoms")
@@ -210,6 +215,7 @@ async def prepare(
         upload=project.files,
         analyses=tuple(analyses),
         battery=battery,
+        baseline=review_file.read(project) if mode == "review" else review_file.Baseline(),
     )
 
 
@@ -432,7 +438,8 @@ async def _review(
     rec: record.Recorder,
 ) -> AsyncIterator[SseEvent]:
     """The model's part of the stream: progress, the datasheet facts (when a
-    datasheet was found), then result or error. ``reading_task`` is
+    datasheet was found), in review mode the diff against the baseline
+    (``review_diff``), then result or error. ``reading_task`` is
     ``_read``'s, shared with the vendor-model runs. The context, each
     model answer and the findings' keys go to ``rec``."""
     found_sheets = sum(1 for s in prepared.datasheets if s.status == "found")
@@ -529,6 +536,21 @@ async def _review(
         ctx.evidence.design, checked, ctx.table.findings, ctx.table.warnings, ctx.calculations
     )
     rec.append("keys", {"findings": found})
+    if review:
+        base = prepared.baseline.file
+        next_file = review_file.next_file(
+            prepared.summary.project,
+            rec.run_id,
+            get_clock().now(),
+            found,
+            checked,
+            ctx.table.findings,
+            ctx.table.warnings,
+            ctx.calculations,
+            waivers=base.waivers if base else [],
+        )
+        diff = review_file.diff(prepared.baseline, found, next_file)
+        yield _event("review_diff", diff.model_dump_json())
     yield _event("result", checked.model_dump_json())
 
 

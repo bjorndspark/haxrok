@@ -524,11 +524,53 @@ export interface ProgressEvent {
   message: string
 }
 
+/** One keyed finding as the review file keeps it (plan 011). */
+export interface ReviewFinding {
+  key: string
+  source: "calculation" | "wiring" | "pin_warning" | "issue"
+  /** Part ref → fingerprint of its connections. */
+  parts: Record<string, string>
+  title: string
+  severity: Severity | null
+}
+
+/** `<project>.review.json`: the last review's findings, the next baseline. */
+export interface ReviewFile {
+  version: 1
+  project: string
+  run_id: string
+  date: string
+  findings: ReviewFinding[]
+  waivers: Record<string, unknown>[]
+}
+
+/** A model issue against the baseline: new, or likely the same as `earlier`. */
+export interface IssueMark {
+  id: string
+  mark: "new" | "unchanged"
+  /** The earlier issue's title, when unchanged. */
+  earlier: string | null
+  /** Parts both cite whose connections changed since. */
+  changed_parts: string[]
+}
+
+/** The review against the uploaded review file, and the file to save next. */
+export interface ReviewDiff {
+  baseline_run_id: string
+  baseline_date: string | null
+  /** Why a review file was sent but not used. */
+  note: "unreadable" | "unknown_version" | null
+  marks: IssueMark[]
+  fixed: ReviewFinding[]
+  next: ReviewFile
+}
+
 export type AnalysisEvent =
   | { type: "design_summary"; summary: DesignSummary }
   | { type: "progress"; progress: ProgressEvent }
   | { type: "datasheet_facts"; facts: DatasheetFacts }
   | { type: "simulation"; simulation: Simulation }
+  | { type: "review_diff"; diff: ReviewDiff }
   | { type: "result"; result: CheckedAnalysis }
   | { type: "error"; message: string }
 
@@ -547,6 +589,8 @@ export interface Run {
   summary: DesignSummary | null
   stage: ProgressStage | null
   result: CheckedAnalysis | null
+  /** Review mode only: the diff against the review file, sent before the result. */
+  reviewDiff: ReviewDiff | null
   error: string | null
   /** The stream is open: until the result, and after it while the
    *  vendor-model simulations run. */

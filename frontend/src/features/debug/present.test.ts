@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { isSchematicFile, projectName } from "./files"
+import { isSchematicFile, projectName, sentFiles } from "./files"
 import { MESSAGES } from "./messages"
 import {
   findingTokens,
@@ -96,6 +96,24 @@ describe("project files", () => {
   it("keeps only schematics and the project file", () => {
     expect(isSchematicFile("b/b.kicad_pro")).toBe(true)
     expect(isSchematicFile("b/b.kicad_pcb")).toBe(false)
+  })
+
+  it("sends the project's review file and no other", () => {
+    const blob = new Blob([])
+    const paths = (files: string[]) =>
+      sentFiles(files.map((path) => ({ path, file: blob }))).map((f) => f.path)
+    expect(
+      paths([
+        "x/board.kicad_pro",
+        "x/board.kicad_sch",
+        "x/board.review.json",
+        "x/old.review.json",
+        "x/board.kicad_pcb",
+        "x/board-backups/board.review.json",
+      ]),
+    ).toEqual(["x/board.kicad_pro", "x/board.kicad_sch", "x/board.review.json"])
+    // Without a .kicad_pro there is no project name to match.
+    expect(paths(["board.kicad_sch", "board.review.json"])).toEqual(["board.kicad_sch"])
   })
 
   it("names the project after its .kicad_pro", () => {
@@ -499,6 +517,7 @@ describe("toMarkdown", () => {
       summary: null,
       stage: null,
       result: null,
+      reviewDiff: null,
       error: null,
       streaming: false,
       simulations: [sim],
@@ -707,6 +726,7 @@ describe("toMarkdown with datasheets and vendor models", () => {
     summary: null,
     stage: null,
     result: null,
+    reviewDiff: null,
     error: null,
     streaming: false,
     simulations: [vendor],

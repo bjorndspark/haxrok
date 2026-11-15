@@ -39,6 +39,7 @@ from app.features.debug.schemas import (
     Hypothesis,
     LimitFact,
     MeasurementInput,
+    Mode,
     PinFact,
     SpiceModelStatus,
 )
@@ -1840,6 +1841,61 @@ async def test_review_mode_needs_no_symptoms_and_uses_the_review_prompts():
     assert "## Symptoms" not in users[0]
     assert "what the board is for\n(none given)" in users[0]
     assert events[-1][0] == "result" and events[-1][1]["hypotheses"] == []
+
+
+async def _review_run(
+    files: list[tuple[str, bytes]], mode: Mode = "review"
+) -> tuple[list[str], dict | None]:
+    """A run on ``files`` with ``_analysis``'s one issue (``issue:U2``): its
+    event names, and the review_diff event's data if there is one."""
+    prepared = await service.prepare(
+        files, "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels(), mode
+    )
+    events = await _collect(prepared, service.Model(_diagnose, _structure))
+    diffs = [data for name, data in events if name == "review_diff"]
+    return [name for name, _ in events], diffs[0] if diffs else None
+
+
+async def test_a_review_with_no_review_file_sends_the_next_one_and_marks_nothing():
+    names, diff = await _review_run(_files())
+    assert diff is not None
+    assert names.index("review_diff") == names.index("result") - 1
+    assert (diff["marks"], diff["fixed"], diff["note"]) == ([], [], None)
+    found = {f["key"]: f for f in diff["next"]["findings"]}
+    assert found["issue:U2"]["title"] == "L2 is on the output rail"
+    assert found["wiring:U2.9"]["source"] == "wiring"
+    assert (diff["next"]["project"], diff["next"]["version"]) == ("board", 1)
+
+
+async def test_a_saved_review_file_is_the_next_reviews_baseline():
+    _, first = await _review_run(_files())
+    assert first is not None
+    saved = json.dumps(first["next"]).encode()
+    _, diff = await _review_run([*_files(), ("board/board.review.json", saved)])
+    assert diff is not None
+    assert [(m["id"], m["mark"], m["changed_parts"]) for m in diff["marks"]] == [
+        ("h1", "unchanged", [])
+    ]
+    assert diff["fixed"] == []
+
+    gone = {"key": "issue:J9", "source": "issue", "parts": {"J9": "x"}, "title": "J9 gone"}
+    older = {**first["next"], "findings": [*first["next"]["findings"], gone]}
+    _, diff = await _review_run(
+        [*_files(), ("board/board.review.json", json.dumps(older).encode())]
+    )
+    assert diff is not None
+    assert [f["title"] for f in diff["fixed"]] == ["J9 gone"]
+
+
+async def test_an_unreadable_review_file_is_a_note_not_an_error():
+    names, diff = await _review_run([*_files(), ("board/board.review.json", b"{oops")])
+    assert diff is not None
+    assert names[-1] == "result" and diff["note"] == "unreadable"
+
+
+async def test_a_debug_run_ignores_the_review_file():
+    names, diff = await _review_run([*_files(), ("board/board.review.json", b"{}")], mode="debug")
+    assert diff is None and names[-1] == "result"
 
 
 async def test_japanese_changes_only_the_write_up_and_ask_prompts():

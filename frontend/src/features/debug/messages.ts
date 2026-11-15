@@ -66,8 +66,9 @@ const en = {
     /** Around the two file types: "Only .kicad_pro and .kicad_sch are sent…" */
     sentBefore: "Only ",
     sentAnd: " and ",
-    sentAfter: " are sent; the PCB stays here.",
+    sentAfter: " are sent, and in review mode the last review file; the PCB stays here.",
     sheets: (n: number) => plural(n, "sheet", "sheets"),
+    reviewFound: "last review file found: issues are compared with it",
     showFiles: "▸ show files",
     hideFiles: "▾ hide files",
     remove: "remove",
@@ -169,8 +170,25 @@ Used outdoors, so it may see -10 °C.`,
     runs: (n: number) => (n === 1 ? "1 run" : `${String(n)} runs, newest first`),
     heading: { review: "Design review", debug: "Ranked hypotheses" },
     downloadReport: "Download report",
+    saveReviewFile: "Save review file",
+    diff: {
+      title: "Against the last review",
+      since: (date: string) => `Compared with the review of ${date}.`,
+      counts: (fresh: number, same: number, fixed: number) =>
+        `${String(fresh)} new · ${String(same)} likely the same · ${String(fixed)} fixed`,
+      fixedTitle: "Fixed since then",
+      none: "No review file was dropped. Save this one next to the .kicad_pro, and the next review shows what changed.",
+      note: {
+        unreadable: "The review file couldn't be read, so nothing is compared.",
+        unknown_version:
+          "The review file is from another version of the app, so nothing is compared.",
+      },
+    },
   },
   hypothesis: {
+    markNew: "new",
+    markSame: (title: string) => `likely the same as “${title}”`,
+    circuitChanged: (parts: string[]) => `circuit changed: ${parts.join(", ")}`,
     explains: "Explains",
     claimsBacked: "Claims backed",
     labelledBy: (label: string, reason: string) =>
@@ -485,8 +503,9 @@ const ja: Messages = {
     chooseFolder: "フォルダを選択",
     sentBefore: "送信するのは ",
     sentAnd: " と ",
-    sentAfter: " だけです。PCB はこの端末に残ります。",
+    sentAfter: " だけです (レビューモードでは前回のレビューファイルも)。PCB はこの端末に残ります。",
     sheets: (n: number) => `${String(n)} シート`,
+    reviewFound: "前回のレビューファイルあり: 指摘を前回と比べます",
     showFiles: "▸ ファイルを表示",
     hideFiles: "▾ ファイルを隠す",
     remove: "削除",
@@ -588,8 +607,24 @@ USB 5 V では動く: マイコンが起動する。
     runs: (n: number) => (n === 1 ? "1 回実行" : `${String(n)} 回実行、新しい順`),
     heading: { review: "設計レビュー", debug: "原因の候補 (順位順)" },
     downloadReport: "レポートをダウンロード",
+    saveReviewFile: "レビューファイルを保存",
+    diff: {
+      title: "前回のレビューとの比較",
+      since: (date: string) => `${date} のレビューと比べています。`,
+      counts: (fresh: number, same: number, fixed: number) =>
+        `新規 ${String(fresh)} · おそらく同じ ${String(same)} · 解消 ${String(fixed)}`,
+      fixedTitle: "前回から解消した指摘",
+      none: "レビューファイルはありません。これを .kicad_pro の隣に保存すると、次のレビューで変化がわかります。",
+      note: {
+        unreadable: "レビューファイルを読めなかったため、比較していません。",
+        unknown_version: "レビューファイルが別のバージョンのアプリのものなので、比較していません。",
+      },
+    },
   },
   hypothesis: {
+    markNew: "新規",
+    markSame: (title: string) => `前回の「${title}」とおそらく同じ`,
+    circuitChanged: (parts: string[]) => `回路が変わった部品: ${parts.join(", ")}`,
     explains: "説明できる症状",
     claimsBacked: "裏づけのある主張",
     labelledBy: (label: string, reason: string) =>

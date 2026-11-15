@@ -24,6 +24,7 @@ import type {
   Evidence,
   GlossaryEntry,
   Hypothesis,
+  IssueMark,
   Problem,
   Severity,
   Simulation,
@@ -297,6 +298,27 @@ interface HypothesisCardProps {
   latest: boolean
   busy: boolean
   onRerun: (step: ConfirmStep, value: string) => void
+  /** Against the last review's file; null without one. */
+  mark: IssueMark | null
+}
+
+/** "new", or "likely the same as …" with the parts whose circuit changed. */
+function MarkLine({ mark }: { mark: IssueMark }) {
+  const t = useMessages().hypothesis
+  if (mark.mark === "new")
+    return (
+      <Badge tone="warn" bracket className="mt-0.5 shrink-0 font-bold">
+        {t.markNew}
+      </Badge>
+    )
+  return (
+    <p className="pt-1 text-xs text-muted-foreground">
+      {t.markSame(mark.earlier ?? "")}
+      {mark.changed_parts.length > 0 && (
+        <span className="text-info"> · {t.circuitChanged(mark.changed_parts)}</span>
+      )}
+    </p>
+  )
 }
 
 export function HypothesisCard({
@@ -309,6 +331,7 @@ export function HypothesisCard({
   latest,
   busy,
   onRerun,
+  mark,
 }: HypothesisCardProps) {
   const primary = h.rank === 1
   const stepIds = new Set(h.confirm.map((s) => s.id))
@@ -330,8 +353,10 @@ export function HypothesisCard({
               {m.present.severity[h.severity]}
             </Badge>
           )}
+          {mark?.mark === "new" && <MarkLine mark={mark} />}
           <h3 className="text-sm font-bold">{h.title}</h3>
         </div>
+        {mark?.mark === "unchanged" && <MarkLine mark={mark} />}
         <p className="pt-2 text-sm leading-relaxed">
           <GlossaryText text={h.summary} glossary={glossary} />
         </p>

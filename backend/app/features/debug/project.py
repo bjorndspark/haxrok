@@ -15,6 +15,8 @@ from app.core.errors import BadRequestError
 # ``spice_models.py``, never kept on disk.
 MODEL_SUFFIXES = (".lib", ".cir", ".sub", ".mod", ".sp", ".spi", ".spice")
 ALLOWED_SUFFIXES = (".kicad_pro", ".kicad_sch", *MODEL_SUFFIXES)
+# The project's last review (``review_file``), the baseline of the next one.
+REVIEW_SUFFIX = ".review.json"
 # (property "Sheetfile" "power.kicad_sch" ...) — KiCad 6+ schematic format.
 _SHEETFILE = re.compile(r'\(property\s+"Sheetfile"\s+"((?:[^"\\]|\\.)*)"')
 
@@ -33,8 +35,9 @@ class Project:
 
 
 def normalize_paths(raw: list[tuple[str, bytes]]) -> dict[str, bytes]:
-    """Keep only ``.kicad_pro``/``.kicad_sch`` files and SPICE model files,
-    and make their paths relative to the folder that was dropped.
+    """Keep only ``.kicad_pro``/``.kicad_sch`` files, SPICE model files and
+    review files (``*.review.json``), and make their paths relative to the
+    folder that was dropped.
 
     A dropped folder arrives as ``board/power.kicad_sch``; a picked single
     file as ``power.kicad_sch``. The common leading folder is removed so
@@ -45,7 +48,7 @@ def normalize_paths(raw: list[tuple[str, bytes]]) -> dict[str, bytes]:
         path = PurePosixPath(name.replace("\\", "/"))
         if path.is_absolute() or ".." in path.parts:
             raise BadRequestError(f"Unsafe file path: {name}")
-        if path.suffix.lower() in ALLOWED_SUFFIXES:
+        if path.suffix.lower() in ALLOWED_SUFFIXES or path.name.endswith(REVIEW_SUFFIX):
             kept[str(path)] = data
     if not any(p.endswith((".kicad_pro", ".kicad_sch")) for p in kept):
         raise BadRequestError("No .kicad_sch file was sent. Drop the KiCad project folder.")

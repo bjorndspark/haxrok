@@ -3,8 +3,22 @@ import type { ProjectFile } from "./types"
 /** Only these leave the user's machine: the PCB, backups and 3D models stay. */
 const SENT_SUFFIXES = [".kicad_pro", ".kicad_sch"]
 
+/** The last review's findings, saved next to the `.kicad_pro` (plan 011). */
+export const REVIEW_SUFFIX = ".review.json"
+
 export function isSchematicFile(path: string): boolean {
   return SENT_SUFFIXES.some((s) => path.toLowerCase().endsWith(s))
+}
+
+/** Schematic files, plus any review file until `sentFiles` picks the project's. */
+function isWanted(path: string): boolean {
+  return isSchematicFile(path) || path.endsWith(REVIEW_SUFFIX)
+}
+
+/** The project's review file: `<name>.review.json` beside its `.kicad_pro`. */
+export function reviewFilePath(files: ProjectFile[]): string | null {
+  const pro = files.find((f) => f.path.endsWith(".kicad_pro"))
+  return pro ? pro.path.replace(/\.kicad_pro$/, REVIEW_SUFFIX) : null
 }
 
 /** Folders KiCad fills with copies of the schematic; never the live project. */
@@ -12,15 +26,19 @@ function isBackupPath(path: string): boolean {
   return path.split("/").some((part) => part.endsWith("-backups") || part === ".history")
 }
 
-function keep(files: ProjectFile[]): ProjectFile[] {
-  return files
-    .filter((f) => isSchematicFile(f.path) && !isBackupPath(f.path))
+/** The live project's schematic files and its review file; other review
+ *  files (another project's, a renamed copy) stay on the machine. */
+export function sentFiles(files: ProjectFile[]): ProjectFile[] {
+  const live = files.filter((f) => isWanted(f.path) && !isBackupPath(f.path))
+  const review = reviewFilePath(live)
+  return live
+    .filter((f) => !f.path.endsWith(REVIEW_SUFFIX) || f.path === review)
     .sort((a, b) => a.path.localeCompare(b.path))
 }
 
 /** Files from an `<input webkitdirectory>` or plain multi-file picker. */
 export function fromFileList(list: FileList): ProjectFile[] {
-  return keep(
+  return sentFiles(
     Array.from(list, (file) => ({
       path: file.webkitRelativePath || file.name,
       file,
@@ -43,8 +61,7 @@ function entryFile(entry: FileSystemFileEntry): Promise<File> {
 async function walk(entry: FileSystemEntry, out: ProjectFile[]): Promise<void> {
   const path = entry.fullPath.replace(/^\//, "")
   if (entry.isFile) {
-    if (isSchematicFile(path))
-      out.push({ path, file: await entryFile(entry as FileSystemFileEntry) })
+    if (isWanted(path)) out.push({ path, file: await entryFile(entry as FileSystemFileEntry) })
     return
   }
   if (!entry.isDirectory || isBackupPath(path)) return
@@ -65,7 +82,7 @@ export async function fromDataTransfer(dt: DataTransfer): Promise<ProjectFile[]>
   if (entries.length === 0) return fromFileList(dt.files)
   const out: ProjectFile[] = []
   for (const entry of entries) await walk(entry, out)
-  return keep(out)
+  return sentFiles(out)
 }
 
 /** The project's display name: the .kicad_pro's name, else the lone sheet's. */

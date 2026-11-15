@@ -89,6 +89,7 @@ export const useDebugStore = create<DebugState>((set, get) => ({
       summary: null,
       stage: null,
       result: null,
+      reviewDiff: null,
       error: null,
       streaming: true,
       simulations: [],

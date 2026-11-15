@@ -7,7 +7,7 @@ import { Title } from "@/shared/ui/title"
 import { useMessages } from "../messages"
 import { isReview } from "../present"
 import { useDebugStore } from "../store"
-import type { Run } from "../types"
+import type { ReviewDiff, Run } from "../types"
 import { formatElapsed, type DebugActions } from "../useDebug"
 import { AnalyzingPanel } from "./AnalyzingPanel"
 import { DesignSummaryCard } from "./DesignSummaryCard"
@@ -35,6 +35,42 @@ function RunHeader({ run, total }: { run: Run; total: number }) {
       <span className="min-w-[2ch] flex-1 border-t" aria-hidden />
       <span className="truncate text-xs text-muted-foreground">{run.trigger}</span>
     </div>
+  )
+}
+
+/** What changed since the last review's file, or why nothing is compared. */
+function ReviewDiffCard({ diff }: { diff: ReviewDiff }) {
+  const t = useMessages().session.diff
+  if (diff.baseline_date === null)
+    return (
+      <Card className="p-4 text-xs text-muted-foreground sm:p-5">
+        {diff.note ? t.note[diff.note] : t.none}
+      </Card>
+    )
+  const fresh = diff.marks.filter((m) => m.mark === "new").length
+  return (
+    <Card className="space-y-3 p-4 sm:p-5">
+      <Title as="h3">{t.title}</Title>
+      <p className="text-xs text-muted-foreground">
+        {t.since(new Date(diff.baseline_date).toLocaleString())}{" "}
+        <span className="text-foreground">
+          {t.counts(fresh, diff.marks.length - fresh, diff.fixed.length)}
+        </span>
+      </p>
+      {diff.fixed.length > 0 && (
+        <div className="space-y-1 text-xs">
+          <p className="font-bold">{t.fixedTitle}</p>
+          <ul className="space-y-0.5">
+            {diff.fixed.map((f) => (
+              <li key={f.key} className="flex gap-[1ch]" title={f.key}>
+                <span className="shrink-0 text-ok">✓</span>
+                <span className="text-muted-foreground line-through">{f.title}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
   )
 }
 
@@ -81,8 +117,10 @@ function RunBody({
   const result = run.result
   const placed = new Set(result.hypotheses.flatMap((h) => [h.id, ...h.confirm.map((s) => s.id)]))
   const loose = result.problems.filter((p) => !placed.has(p.where))
+  const marks = new Map(run.reviewDiff?.marks.map((m) => [m.id, m]))
   return (
     <div className="space-y-5">
+      {run.reviewDiff && <ReviewDiffCard diff={run.reviewDiff} />}
       {result.hypotheses.length === 0 &&
         (isReview(run.summary) ? (
           <Card className="space-y-2 border-ok p-4 sm:p-5">
@@ -104,6 +142,7 @@ function RunBody({
           latest={latest}
           busy={busy}
           onRerun={(step, value) => void actions.rerunWithMeasurement(step, value)}
+          mark={marks.get(h.id) ?? null}
         />
       ))}
 
@@ -208,6 +247,7 @@ export function SessionView({ actions }: { actions: DebugActions }) {
   const busy = latest.finishedAt === null
   const review = latest.summary ? isReview(latest.summary) : mode === "review"
   const reportable = runs.find((r) => r.result !== null && r.summary !== null)
+  const reviewed = runs.find((r) => r.result !== null && r.reviewDiff !== null)
 
   return (
     <div className="animate-fade-in space-y-8">
@@ -226,6 +266,11 @@ export function SessionView({ actions }: { actions: DebugActions }) {
           {reportable && (
             <Button variant="outline" size="sm" onClick={() => actions.downloadReport(reportable)}>
               {t.downloadReport}
+            </Button>
+          )}
+          {reviewed && (
+            <Button variant="outline" size="sm" onClick={() => actions.saveReviewFile(reviewed)}>
+              {t.saveReviewFile}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={editInput}>

@@ -11,6 +11,7 @@ import type {
   MeasurementInput,
   RerunRequest,
   ResultAskRequest,
+  ReviewDiff,
   Mode,
   ProgressEvent,
   ProjectFile,
@@ -95,6 +96,8 @@ export async function* streamAnalysis(
       yield { type: "datasheet_facts", facts: JSON.parse(data) as DatasheetFacts }
     else if (event === "simulation")
       yield { type: "simulation", simulation: JSON.parse(data) as Simulation }
+    else if (event === "review_diff")
+      yield { type: "review_diff", diff: JSON.parse(data) as ReviewDiff }
     else if (event === "result")
       yield { type: "result", result: JSON.parse(data) as CheckedAnalysis }
     else if (event === "error")

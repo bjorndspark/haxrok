@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-14 | 2026-11-14 | in progress | — | `010-ratings-sequencing-esd.md` (deferred the review workflow here), `012-benchmark-scorecard.md` (goes first; its scorecard measures this plan), `007-one-review-path-recorded.md` (run records), `DECISIONS.md` ("No database", "Runs are recorded as files", "Review mode reuses the debug pipeline") |
+| 2026-11-14 | 2026-11-15 | in progress | — | `010-ratings-sequencing-esd.md` (deferred the review workflow here), `012-benchmark-scorecard.md` (goes first; its scorecard measures this plan), `007-one-review-path-recorded.md` (run records), `DECISIONS.md` ("No database", "Runs are recorded as files", "Review mode reuses the debug pipeline") |
 
 A review today is a single shot: upload a schematic and get back a list of
 issues. Real boards go through several revisions, and on each one a
@@ -34,8 +34,9 @@ Two constraints shape it:
 | Step | What | |
 |---|---|---|
 | 1 | Every finding has a stable key, recorded in the run | done |
-| 2 | A review against an earlier run shows new, fixed and unchanged issues | proposed |
-| 3 | Waivers: an accepted finding stays quiet until its circuit changes | proposed |
+| 2 | A review against an earlier run shows new, fixed and unchanged issues | done |
+| 3 | Issues match and fingerprint on the pins they cite, not whole parts | proposed |
+| 4 | Waivers: an accepted finding stays quiet until its circuit changes | proposed |
 
 ## 1. Every finding has a stable key, recorded in the run: done
 
@@ -94,13 +95,13 @@ has no `--output-sync`). Bugs found: one recorded issue's verified
 cites name no part, so its key is `issue:` alone; step 2 must leave such
 an issue unmatched, never match two empty sets.
 
-## 2. A review against an earlier run shows new, fixed and unchanged issues: proposed
+## 2. A review against an earlier run shows new, fixed and unchanged issues: done
 
 - The upload names an earlier run; the result marks each issue new or
   unchanged, and lists the earlier run's issues that are gone.
 
 Decided (2026-11-14): the baseline is the same project file as the
-waivers (step 3). `<board>.review.json` holds the last review's findings
+waivers (step 4). `<board>.review.json` holds the last review's findings
 (key, fingerprint, title, severity, run id, date) as well as the
 waivers. Uploading it gives the diff its base, and saving it after a
 review moves the base on. It works on any machine, survives deleted run
@@ -110,7 +111,7 @@ travel to a teammate); uploading both revisions (two full reviews per
 diff, and the model's run-to-run variation shows up as fake changes).
 Decided (2026-11-14): only the model's issues are marked new or
 unchanged and listed as fixed. The review file still records every keyed
-finding (calculations, wiring findings, pin warnings), so step 3 can
+finding (calculations, wiring findings, pin warnings), so step 4 can
 waive those too. Rejected: marking wiring findings and pin warnings, or
 every calculation (most calculations are checks, not problems).
 Decided (2026-11-14): the baseline is a `<project>.review.json` in the
@@ -133,17 +134,63 @@ Decided (2026-11-14), default: only `<project>.review.json` (the
 `.kicad_pro` stem) is the baseline; other `*.review.json` files are
 ignored. It is a Pydantic `ReviewFile`: `version`, `project`, `run_id`,
 `date`, `findings` (key, source, parts, title, severity) and `waivers`
-(empty until step 3). The backend sends the next review file with the
+(empty until step 4). The backend sends the next review file with the
 result, and a "Save review file" button downloads it. A malformed file,
 or one with an unknown `version`, gives a review with no baseline and a
 note saying why, not an error. The logic goes in
 `backend/app/features/debug/review_file.py`.
 
-**Checks:** an eval case pair (rev A, rev B with one fault fixed and one
-added): the diff shows exactly one fixed and one new. Unit tests for the
-matching.
+**Checks:** `tests/test_debug_review_file.py` (11 tests): no file, or
+another project's file, is no baseline; a malformed file or another
+`version` is no baseline with a note; one fixed, one new and one
+unchanged; a match with a changed part names it; overlap below 0.5 is
+no match; each earlier issue matches once, best overlap first; issues
+naming no part are never matched; the next file keeps every keyed
+finding and the waivers. The service's review test reads the
+`review_diff` event and the record line. The eval pair failed: rev A =
+`orbit-boot0-high`, rev B = `orbit-uart-swapped` (the same board with
+BOOT0 fixed and the UART swapped), keyed from the 3 stored scorecard
+reviews of each (`20261114T065544Z`), so 9 A→B pairs. Exactly one fixed
+and one new: 1 of 9 pairs, and there the wrong ones. BOOT0 fixed and
+the UART swap new: 4 of 9, each with extra new and fixed issues. Why:
+an issue citing many parts matches a different one (B's "slide-switch
+common" cites BAT1, BOOT0, PWR1, R2, U16 and matches A's BOOT0 issue,
+BOOT0, R2, U16, at 0.6, so BOOT0 isn't fixed); two issues on the same
+two ICs match (A's "MCU drives unpowered CP2102", U16 and U22, matches
+B's UART swap at 1.0, so the swap is unchanged); one issue cites
+different parts run to run (ESD: J1, J2, U16, U22, USB1 vs U22, USB1,
+0.4), so it shows as new plus fixed. "Circuit changed" is too coarse:
+both planted edits touch U16's and U22's nets, so every match citing
+them, the HSE caps and ESD included, says "circuit changed: U16", and a
+step 4 waiver on any of them would lapse. Matching and fingerprints on
+cited pins, not whole parts, would separate these: step 3. `make lint` and
+`make test` passed (509 backend, 56 frontend), each sub-target run on
+its own. Bugs found: `lint-tsc` caught two `Run` literals in
+`present.test.ts` missing the new `reviewDiff`.
 
-## 3. Waivers: an accepted finding stays quiet until its circuit changes: proposed
+## 3. Issues match and fingerprint on the pins they cite, not whole parts: proposed
+
+- A model issue's key is the set of pins its verified cites name
+  (`U16.7`, `U22.25`), not their parts, so two issues on the same two
+  ICs but different pins don't match.
+- An issue's fingerprint covers only the circuit at those pins, so an
+  edit on another pin of the same IC doesn't say "circuit changed".
+- The review file's findings carry these keys and fingerprints
+  (`ReviewFile` `version` 2; a version 1 file gives the
+  `unknown_version` note).
+
+Added (2026-11-15) after step 2's eval pair failed: matching on whole
+parts matched different issues on the same ICs, and both planted edits
+changed U16's and U22's fingerprints, so a waiver on any issue citing
+them would lapse.
+
+**Checks:** step 2's eval pair (`orbit-boot0-high` → `orbit-uart-swapped`,
+the 9 pairs from the stored scorecard reviews): more pairs show exactly
+BOOT0 fixed and the UART swap new than step 2's 1 of 9, and no match
+outside the edited pins says "circuit changed". Unit tests for pin keys
+and pin fingerprints.
+
+## 4. Waivers: an accepted finding stays quiet until its circuit changes: proposed
 
 - The user marks an issue accepted, with a reason; later reviews show it
   folded away with that reason, and bring it back when its fingerprint
