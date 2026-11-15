@@ -58,6 +58,12 @@ Scope, the go/no-go result and the ideas weighed against this one are in
       limits. The page shows each IC's datasheet and model, and under each
       claim the facts it cites, linked to their page
       (`docs/plans/001-100/004-datasheets-and-simulation.md`)
+- [x] Revision diffs and waivers: a review compared with the last one
+      marks each issue new or unchanged and lists the fixed ones, and an
+      issue the team accepted stays folded until the circuit at its pins
+      changes. Both come from a review file kept in the project
+      (see "Reviewing a new revision";
+      `docs/plans/001-100/011-revision-diffs-and-waivers.md`)
 - [ ] Stretch: agent loop, what-if re-runs ("try C5 = 1 µF")
 
 The app started from a FastAPI, React and Postgres template. Its seed chat,
@@ -86,6 +92,24 @@ AI_CHAT_MODEL=muse-spark-1.3-contributor
 Any other OpenAI-compatible endpoint (a gateway such as LiteLLM or Bifrost,
 or another provider) works by changing these variables. No code changes are
 needed.
+
+### Reviewing a new revision
+
+The review file `<project>.review.json` holds the last review's findings
+and the accepted issues. The server keeps none of it.
+
+1. Run a pre-fab review. Click **Accept** on an issue the team has
+   decided is fine, and give a reason.
+2. Click **Save review file**. The browser downloads
+   `<project>.review.json`.
+3. Move the review file next to the `.kicad_pro`, with the same name
+   stem (`board.kicad_pro` → `board.review.json`), and commit it.
+   The app ignores a review file anywhere else or under another name.
+4. On the next revision, drop the project folder as usual. The review
+   marks each issue new or unchanged, lists the fixed ones, and folds the
+   accepted ones. An accepted issue comes back when the circuit at its
+   pins changes.
+5. Save the review file again to move the comparison on to this review.
 
 ### How the app uses the model
 
