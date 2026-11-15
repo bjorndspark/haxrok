@@ -184,6 +184,29 @@ parts matched different issues on the same ICs, and both planted edits
 changed U16's and U22's fingerprints, so a waiver on any issue citing
 them would lapse.
 
+Decided (2026-11-15): every finding fingerprints the pins it names, not
+only model issues: `wiring:U2.9` covers U2.9 alone, `pin_voltage:U3.7`
+covers U3.7. A finding about a whole part (`part_rating`,
+`connector_esd`, `pin_convention`) covers all that part's pins. One
+`pins` map (pin to fingerprint) replaces `parts` everywhere, so a step 4
+waiver on U2.9 doesn't lapse when another pin of U2 changes. Rejected:
+pins for model issues only (two kinds of fingerprint map in one file).
+Decided (2026-11-15): two model issues match on their cited pins alone,
+Jaccard ≥ 0.5, as step 2 did over parts. The eval pair measures it; if
+run-to-run pin drift loses more matches than pin keys gain, the Log says
+so and a later step deals with it. Rejected: a fallback to parts for the
+issues left over (it brings back step 2's wrong matches between issues
+on the same ICs).
+Decided (2026-11-15), default: a pin's fingerprint hashes its part's
+value and footprint, and that pin's net counted as step 1 counts it
+(ground and big nets by name, others by their other pins' refs and
+values). A model issue's pins are its verified pin cites, plus the pins
+of each calculation it cites; a cited calculation with no pins adds
+none. The issue key is `issue:` and the sorted pins
+(`issue:U16.7,U22.25`). The UI's note names pins:
+"circuit changed: U16.7". `IssueMark.changed_parts` becomes
+`changed_pins`.
+
 **Checks:** step 2's eval pair (`orbit-boot0-high` → `orbit-uart-swapped`,
 the 9 pairs from the stored scorecard reviews): more pairs show exactly
 BOOT0 fixed and the UART swap new than step 2's 1 of 9, and no match
