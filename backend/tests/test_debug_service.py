@@ -28,6 +28,7 @@ from app.features.debug.prompt import number_symptoms
 from app.features.debug.schemas import (
     Analysis,
     AppPart,
+    BoardStatus,
     Calculation,
     CheckedClaim,
     Cite,
@@ -106,12 +107,18 @@ ERC = json.dumps(
 
 
 class FakeKicad:
-    def __init__(self) -> None:
+    """Returns the fixed netlist and ERC, and ``drc`` (with ``skipped``) as
+    the DRC when the project has a board."""
+
+    def __init__(self, drc: str = "", skipped: str = "") -> None:
         self.projects: list[Project] = []
+        self.drc, self.skipped = drc, skipped
 
     async def export(self, project: Project) -> KicadOutput:
         self.projects.append(project)
-        return KicadOutput(netlist=NETLIST, erc=ERC)
+        if not project.board:
+            return KicadOutput(netlist=NETLIST, erc=ERC)
+        return KicadOutput(netlist=NETLIST, erc=ERC, drc=self.drc, drc_skipped=self.skipped)
 
 
 class FakeDatasheets:
@@ -153,7 +160,6 @@ def _files() -> list[tuple[str, bytes]]:
         ("board/board.kicad_pro", b"{}"),
         ("board/board.kicad_sch", ROOT_SCH),
         ("board/power.kicad_sch", SUB_SCH),
-        ("board/board.kicad_pcb", b"never sent, but dropped if it is"),
     ]
 
 
@@ -236,15 +242,24 @@ def test_paths_that_escape_the_folder_are_refused():
         normalize_paths([("../etc/x.kicad_sch", SUB_SCH)])
 
 
-def test_spice_model_files_are_kept_and_other_files_dropped():
+def test_spice_model_files_and_the_board_are_kept_and_other_files_dropped():
     files = normalize_paths(
         [
             ("b/board.kicad_sch", SUB_SCH),
             ("b/spice/U1.LIB", b".subckt U1 1 2\n.ends"),
             ("b/board.kicad_pcb", b"(kicad_pcb)"),
+            ("b/board.kicad_prl", b"{}"),
         ]
     )
-    assert set(files) == {"board.kicad_sch", "spice/U1.LIB"}
+    assert set(files) == {"board.kicad_sch", "spice/U1.LIB", "board.kicad_pcb"}
+
+
+def test_the_board_is_the_one_named_after_the_root_sheet():
+    assert load_project(_files()).board is None
+    with_board = load_project([*_files(), ("board/board.kicad_pcb", b"(kicad_pcb)")])
+    assert with_board.board == "board.kicad_pcb"
+    other = load_project([*_files(), ("board/old.kicad_pcb", b"(kicad_pcb)")])
+    assert other.board is None
 
 
 def test_model_files_without_a_sheet_are_refused():
@@ -1062,6 +1077,35 @@ def _tps63070_facts() -> tuple[DatasheetStatus, FactReader]:
 
     reader = FactReader(extract, Cache(), lambda path: [Page(4, "pins"), Page(5, "limits")])
     return found, reader
+
+
+async def test_a_project_without_a_board_has_no_board_or_drc():
+    prepared = await service.prepare(
+        _files(), "Dead", [], FakeKicad(drc="{}"), FakeDatasheets(), FakeSpiceModels()
+    )
+    assert prepared.summary.board is None
+    assert prepared.summary.drc == []
+
+
+async def test_a_sent_board_lists_its_drc_findings_in_the_summary():
+    report = (pathlib.Path(__file__).parent / "golden" / "drc_kicad9.json").read_text()
+    files = [*_files(), ("board/board.kicad_pcb", b"(kicad_pcb)")]
+    prepared = await service.prepare(
+        files, "Dead", [], FakeKicad(drc=report), FakeDatasheets(), FakeSpiceModels()
+    )
+    assert prepared.summary.board == BoardStatus(file="board.kicad_pcb", skipped="")
+    assert [e.id for e in prepared.summary.drc] == ["drc-1", "drc-2"]
+    assert "board.kicad_pcb" in [f["name"] for f in record.file_digests(prepared.upload)]
+
+
+async def test_a_board_drc_skipped_says_why_and_the_run_goes_on():
+    files = [*_files(), ("board/board.kicad_pcb", b"(kicad_pcb)")]
+    kicad = FakeKicad(skipped="The board was saved by KiCad 10.0, ...")
+    prepared = await service.prepare(files, "Dead", [], kicad, FakeDatasheets(), FakeSpiceModels())
+    assert prepared.summary.board is not None
+    assert prepared.summary.board.skipped.startswith("The board was saved by KiCad 10.0")
+    assert prepared.summary.drc == []
+    assert prepared.summary.erc
 
 
 async def test_stream_reads_found_datasheets_and_their_facts_back_claims():

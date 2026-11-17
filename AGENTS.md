@@ -177,4 +177,4 @@ Settings for the `/step` workflow (one plan step per session).
 
 ### Current work
 
-1. `docs/plans/001-100/013-pcb-checks.md` step 1
+1. `docs/plans/001-100/013-pcb-checks.md` step 2

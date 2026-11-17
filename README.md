@@ -64,6 +64,9 @@ Scope, the go/no-go result and the ideas weighed against this one are in
       changes. Both come from a review file kept in the project
       (see "Reviewing a new revision";
       `docs/plans/001-100/011-revision-diffs-and-waivers.md`)
+- [x] KiCad DRC: when the user ticks "Also send the PCB", the board's
+      electrical DRC findings and schematic-parity errors are listed next
+      to ERC's (`docs/plans/001-100/013-pcb-checks.md`)
 - [ ] Stretch: agent loop, what-if re-runs ("try C5 = 1 µF")
 
 The app started from a FastAPI, React and Postgres template. Its seed chat,

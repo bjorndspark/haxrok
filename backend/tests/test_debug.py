@@ -6,6 +6,7 @@ checker's rules are written for.
 """
 
 import json
+import pathlib
 
 import pytest
 
@@ -16,10 +17,12 @@ from app.features.debug.design import (
     compact,
     format_erc,
     normalize_pin,
+    parse_drc,
     parse_erc,
     parse_netlist,
 )
 from app.features.debug.evidence import EvidenceContext, check, check_claim
+from app.features.debug.kicad import skip_reason
 from app.features.debug.schemas import (
     Analysis,
     Cite,
@@ -435,6 +438,58 @@ def test_parse_erc_drops_library_noise_and_numbers_the_rest():
     ]
     assert entries[0].items == ["Label 'SW2'"]
     assert "erc-1 [multiple_net_names]" in format_erc(entries)
+
+
+def test_parse_drc_keeps_parity_unconnected_and_electrical_findings():
+    # Recorded: kicad-cli 9.0.2 `pcb drc --schematic-parity --severity-all` on
+    # KiCad's ecc83-pp demo board with footprint R1 deleted.
+    report = (pathlib.Path(__file__).parent / "golden" / "drc_kicad9.json").read_text()
+    entries = parse_drc(report)
+    # Dropped: 13 lib_footprint_issues, 2 silk_edge_clearance, and 5
+    # footprint_symbol_mismatch that differ only in the library nickname.
+    assert [(e.id, e.rule) for e in entries] == [
+        ("drc-1", "missing_footprint"),
+        ("drc-2", "track_dangling"),
+    ]
+    assert entries[0].message == "Missing footprint R1 (1.5K)"
+    assert entries[1].items == ["Track [Net-(U1A-K)] on bottom_cu, length 0.8890 mm"]
+
+
+def test_parse_drc_keeps_a_footprint_mismatch_that_names_another_footprint():
+    def mismatch(board: str, symbol: str) -> dict[str, object]:
+        return {
+            "type": "footprint_symbol_mismatch",
+            "severity": "warning",
+            "description": f"{board} doesn't match footprint given by symbol ({symbol}).",
+            "items": [{"description": "Footprint U1"}],
+        }
+
+    report = {
+        "schematic_parity": [
+            mismatch("Package_TO_SOT_SMD:SOT-23", "Package_TO_SOT_SMD:SOT-23-5"),
+            mismatch("Lib:SOT-23-5", "Package_TO_SOT_SMD:SOT-23-5"),
+        ],
+        "unconnected_items": [],
+        "violations": [_violation("shorting_items", "Items shorting two nets")],
+    }
+    entries = parse_drc(json.dumps(report))
+    assert [(e.id, e.rule) for e in entries] == [
+        ("drc-1", "footprint_symbol_mismatch"),
+        ("drc-2", "shorting_items"),
+    ]
+    assert "SOT-23 doesn't match" in entries[0].message
+
+
+def test_a_board_kicad_cant_load_names_the_kicad_that_saved_it():
+    board = (
+        b'(kicad_pcb\n\t(version 20260206)\n\t(generator "pcbnew")\n\t(generator_version "10.0")'
+    )
+    error = "kicad-cli couldn't read the board. If it was saved by a newer KiCad ..."
+    assert skip_reason(board, error).startswith("The board was saved by KiCad 10.0, which")
+    timeout = "kicad-cli took longer than 60 s on this project."
+    assert (
+        skip_reason(board, timeout) == f"DRC was skipped and the run is schematic-only: {timeout}"
+    )
 
 
 def test_format_erc_says_when_clean():

@@ -1,5 +1,7 @@
 import { create } from "zustand"
 
+import { savedSendBoard, saveSendBoard } from "./files"
+
 import type {
   AskTurn,
   MeasurementInput,
@@ -27,6 +29,9 @@ interface DebugState {
   /** The battery's voltage, "3.7" or "3.0-4.2"; empty to infer it. */
   battery: string
   files: ProjectFile[]
+  /** Also send the project's `.kicad_pcb` for KiCad's DRC; remembered in
+   *  this browser, off until the user ticks it. */
+  sendBoard: boolean
   symptoms: string
   /** Every measurement entered so far; each re-run sends all of them. */
   measurements: MeasurementInput[]
@@ -40,6 +45,7 @@ interface DebugState {
   toggleAnalysis: (analysis: SimAnalysis) => void
   setBattery: (text: string) => void
   setFiles: (files: ProjectFile[]) => void
+  setSendBoard: (on: boolean) => void
   setSymptoms: (text: string) => void
   setInputError: (message: string | null) => void
   addMeasurement: (m: MeasurementInput) => void
@@ -64,6 +70,7 @@ export const useDebugStore = create<DebugState>((set, get) => ({
   analyses: ["startup"],
   battery: "",
   files: [],
+  sendBoard: savedSendBoard(),
   symptoms: "",
   measurements: [],
   runs: [],
@@ -76,6 +83,10 @@ export const useDebugStore = create<DebugState>((set, get) => ({
     })),
   setBattery: (battery) => set({ battery, inputError: null }),
   setFiles: (files) => set({ files, inputError: null }),
+  setSendBoard: (sendBoard) => {
+    saveSendBoard(sendBoard)
+    set({ sendBoard })
+  },
   setSymptoms: (symptoms) => set({ symptoms }),
   setInputError: (inputError) => set({ inputError }),
   addMeasurement: (m) => set((s) => ({ measurements: [...s.measurements, m] })),

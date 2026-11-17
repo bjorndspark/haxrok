@@ -775,3 +775,32 @@ localStorage (one browser only, not shared with the team).
 it against; the git history of the file is the real record. A review
 uploaded without the file shows no diff and no waivers. Two people
 saving the file from different runs merge it in git like any other file.
+
+## The PCB is opt-in
+
+**Decision:** the browser sends the project's `.kicad_pcb` only when the
+user ticks "Also send the PCB" on the upload screen (plan 013). The box
+starts off, and the browser remembers the choice in `localStorage`. With a
+board, `kicad.py` runs `kicad-cli pcb drc --schematic-parity` and the
+summary lists the electrical findings as `drc-N`. A board the server's
+`kicad-cli` (9.0.2) can't load, such as one saved by KiCad 10, doesn't fail
+the run: DRC is skipped, the summary says why, and the run is
+schematic-only. The run record keeps the board by name and SHA-256 only, as
+it keeps the schematics.
+
+**Why:** "the PCB stays here" (plan 001) is a promise to everyone who
+uploads a schematic: a layout is the part of a design a company guards
+most. DRC with schematic parity finds faults the schematic can't show (a
+deleted footprint, an unrouted net, a short), so a team that wants it can
+send the board, and nobody else's board leaves their machine.
+
+**Alternatives rejected:** sending the board whenever the folder has one
+(breaks plan 001's privacy default without the user asking); asking on
+every upload (tedious for a team that always sends it); failing the run on
+a board `kicad-cli` can't load (punishes a user for having the current
+KiCad).
+
+**Consequence:** a board from KiCad 10 gets no DRC until the container
+moves to KiCad 10, which changes the netlist format and every committed
+eval case, so it is a plan of its own. A review run without the box ticked
+works exactly as before.

@@ -10,7 +10,7 @@ import { useLanguage, type Language } from "@/shared/lib/language"
 import { errorMessage } from "@/shared/lib/utils"
 
 import { askResult, askSimulation, rerunSimulation, streamAnalysis } from "./api"
-import { fromDataTransfer, fromFileList, REVIEW_SUFFIX } from "./files"
+import { fromDataTransfer, fromFileList, REVIEW_SUFFIX, runFiles } from "./files"
 import { currentMessages, useMessages } from "./messages"
 import { formatSi, parseSi, toMarkdown, whatIfLabels } from "./present"
 import { useDebugStore } from "./store"
@@ -104,10 +104,7 @@ export function useDebugActions(): DebugActions {
     const update = useDebugStore.getState().updateRun
     try {
       for await (const ev of streamAnalysis(
-        // The review file is a review's baseline; a debug run doesn't send it.
-        store.mode === "review"
-          ? store.files
-          : store.files.filter((f) => !f.path.endsWith(REVIEW_SUFFIX)),
+        runFiles(store.files, { review: store.mode === "review", sendBoard: store.sendBoard }),
         store.symptoms,
         useDebugStore.getState().measurements,
         store.mode,

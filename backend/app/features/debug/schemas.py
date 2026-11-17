@@ -518,6 +518,27 @@ class ErcEntry(BaseModel):
     uuids: list[str] = Field(default_factory=list, exclude=True)
 
 
+class DrcEntry(BaseModel):
+    """One KiCad DRC finding on the board: schematic parity, an unconnected
+    item, or an electrical violation (``design.parse_drc``). The model
+    doesn't read these yet (plan 013 step 2)."""
+
+    id: str
+    rule: str
+    severity: str
+    message: str
+    items: list[str]
+
+
+class BoardStatus(BaseModel):
+    """The board the user sent (opt-in), and whether DRC ran on it."""
+
+    file: str = Field(description="The .kicad_pcb, relative to the project folder.")
+    skipped: str = Field(
+        "", description="Why DRC didn't run (a board saved by a newer KiCad); empty when it ran."
+    )
+
+
 class WiringFix(BaseModel):
     """The rewiring a wiring rule finds unambiguous (plan 006 step 3):
     ``pins`` leave ``leaves`` and join ``joins``, a net of their own when
@@ -1009,6 +1030,10 @@ class DesignSummary(BaseModel):
         default_factory=list, description="One per IC, in the order of ``ics``."
     )
     erc: list[ErcEntry]
+    # None when no board was sent; defaults so /ask-result takes summaries
+    # from before the board could be sent.
+    board: BoardStatus | None = None
+    drc: list[DrcEntry] = Field(default_factory=list)
     wiring: list[WiringFinding]
     pin_warnings: list[PinWarning]
     references: list[ReferenceNote]

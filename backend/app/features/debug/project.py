@@ -14,7 +14,10 @@ from app.core.errors import BadRequestError
 # SPICE model files a symbol's ``Sim.Library`` can name; read by
 # ``spice_models.py``, never kept on disk.
 MODEL_SUFFIXES = (".lib", ".cir", ".sub", ".mod", ".sp", ".spi", ".spice")
-ALLOWED_SUFFIXES = (".kicad_pro", ".kicad_sch", *MODEL_SUFFIXES)
+# The board, sent only when the user turns on "also send the PCB"; ``kicad.py``
+# runs DRC on it and nothing else reads it (plan 013).
+BOARD_SUFFIX = ".kicad_pcb"
+ALLOWED_SUFFIXES = (".kicad_pro", ".kicad_sch", BOARD_SUFFIX, *MODEL_SUFFIXES)
 # The project's last review (``review_file``), the baseline of the next one.
 REVIEW_SUFFIX = ".review.json"
 # (property "Sheetfile" "power.kicad_sch" ...) — KiCad 6+ schematic format.
@@ -33,10 +36,18 @@ class Project:
     def name(self) -> str:
         return PurePosixPath(self.root).stem
 
+    @property
+    def board(self) -> str | None:
+        """The board named after the root sheet (``board.kicad_pcb`` next to
+        ``board.kicad_sch``), if it was sent; the one KiCad pairs with the
+        schematic for DRC's schematic parity."""
+        path = str(PurePosixPath(self.root).with_suffix(BOARD_SUFFIX))
+        return path if path in self.files else None
+
 
 def normalize_paths(raw: list[tuple[str, bytes]]) -> dict[str, bytes]:
-    """Keep only ``.kicad_pro``/``.kicad_sch`` files, SPICE model files and
-    review files (``*.review.json``), and make their paths relative to the
+    """Keep only ``.kicad_pro``/``.kicad_sch``/``.kicad_pcb`` files, SPICE model
+    files and review files (``*.review.json``), and make their paths relative to the
     folder that was dropped.
 
     A dropped folder arrives as ``board/power.kicad_sch``; a picked single

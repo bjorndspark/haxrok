@@ -47,10 +47,55 @@ function StatusText({ badge }: { badge: StatusBadge }) {
   )
 }
 
+/** One KiCad check's findings (ERC or DRC), folded until "inspect";
+ *  `note` says why the check didn't run, when it didn't. */
+function KicadFindings({
+  title,
+  entries,
+  note,
+}: {
+  title: string
+  entries: { id: string; rule: string; message: string; where?: string }[]
+  note?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const t = useMessages().summary
+  return (
+    <div className="border-l-2 border-warn pl-[1ch] text-xs">
+      <div className="flex items-center justify-between gap-[1ch]">
+        <span className="font-bold text-warn">{title}</span>
+        {entries.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            className="text-warn hover:underline"
+          >
+            {open ? t.hide : t.inspect}
+          </button>
+        )}
+      </div>
+      {note && <p className="mt-1 text-muted-foreground">{note}</p>}
+      {open && (
+        <ul className="mt-2 max-h-72 space-y-1.5 overflow-y-auto border-t pt-2">
+          {entries.map((e) => (
+            <li key={e.id} className="flex items-start gap-[1ch]">
+              <span className="shrink-0 font-bold text-info">{e.id}</span>
+              <span>
+                <span className="text-muted-foreground">{e.rule}</span> {e.message}
+                {e.where && <span className="text-muted-foreground"> ({e.where})</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 /** What the backend parsed, shown before the model answers so the user
  *  can check the parse and see which ICs have pin data. */
 export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
-  const [showErc, setShowErc] = useState(false)
   const [showSymptoms, setShowSymptoms] = useState(true)
   const [showRefs, setShowRefs] = useState(false)
   const [showFacts, setShowFacts] = useState(false)
@@ -73,6 +118,12 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           <span className={summary.erc.length > 0 ? "text-warn" : "text-ok"}>
             {t.erc(summary.erc.length)}
           </span>
+          {summary.board && !summary.board.skipped && (
+            <span className={summary.drc.length > 0 ? "text-warn" : "text-ok"}>
+              {" · "}
+              {t.drc(summary.drc.length)}
+            </span>
+          )}
         </p>
       </div>
 
@@ -308,34 +359,17 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
         </div>
       )}
 
-      <div className="border-l-2 border-warn pl-[1ch] text-xs">
-        <div className="flex items-center justify-between gap-[1ch]">
-          <span className="font-bold text-warn">{t.ercFindings(summary.erc.length)}</span>
-          {summary.erc.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowErc(!showErc)}
-              aria-expanded={showErc}
-              className="text-warn hover:underline"
-            >
-              {showErc ? t.hide : t.inspect}
-            </button>
-          )}
-        </div>
-        {showErc && (
-          <ul className="mt-2 max-h-72 space-y-1.5 overflow-y-auto border-t pt-2">
-            {summary.erc.map((e) => (
-              <li key={e.id} className="flex items-start gap-[1ch]">
-                <span className="shrink-0 font-bold text-info">{e.id}</span>
-                <span>
-                  <span className="text-muted-foreground">{e.rule}</span> {e.message}{" "}
-                  <span className="text-muted-foreground">({e.sheet})</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <KicadFindings
+        title={t.ercFindings(summary.erc.length)}
+        entries={summary.erc.map((e) => ({ ...e, where: e.sheet }))}
+      />
+      {summary.board && (
+        <KicadFindings
+          title={summary.board.skipped ? t.drcSkipped : t.drcFindings(summary.drc.length)}
+          entries={summary.drc}
+          note={summary.board.skipped}
+        />
+      )}
 
       {(summary.symptoms.length > 0 || summary.measurements.length > 0) && (
         <div className="border">

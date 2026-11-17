@@ -54,6 +54,7 @@ from app.features.debug.datasheet import DatasheetFinder
 from app.features.debug.design import (
     Design,
     Label,
+    parse_drc,
     parse_erc,
     parse_labels,
     parse_netlist,
@@ -64,6 +65,7 @@ from app.features.debug.project import load_project
 from app.features.debug.schemas import (
     Analysis,
     AskRequest,
+    BoardStatus,
     Calculation,
     Claim,
     DatasheetStatus,
@@ -161,6 +163,7 @@ async def prepare(
     try:
         design = parse_netlist(output.netlist)
         erc = parse_erc(output.erc)
+        drc = parse_drc(output.drc) if output.drc else []
     except ValueError as e:
         raise BadRequestError(f"Couldn't parse kicad-cli's output: {e}") from e
     labels = parse_labels(project.files)
@@ -191,6 +194,10 @@ async def prepare(
         datasheets=sheets,
         spice_models=models,
         erc=erc,
+        board=BoardStatus(file=project.board, skipped=output.drc_skipped)
+        if project.board
+        else None,
+        drc=drc,
         wiring=lookup.findings,
         pin_warnings=lookup.warnings,
         references=notes,

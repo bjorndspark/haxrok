@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { isSchematicFile, projectName, sentFiles } from "./files"
+import { isSchematicFile, projectName, runFiles, sentFiles } from "./files"
 import { MESSAGES } from "./messages"
 import {
   findingTokens,
@@ -98,7 +98,7 @@ describe("project files", () => {
     expect(isSchematicFile("b/b.kicad_pcb")).toBe(false)
   })
 
-  it("sends the project's review file and no other", () => {
+  it("keeps the project's review file and board and no others", () => {
     const blob = new Blob([])
     const paths = (files: string[]) =>
       sentFiles(files.map((path) => ({ path, file: blob }))).map((f) => f.path)
@@ -109,11 +109,33 @@ describe("project files", () => {
         "x/board.review.json",
         "x/old.review.json",
         "x/board.kicad_pcb",
+        "x/old.kicad_pcb",
         "x/board-backups/board.review.json",
       ]),
-    ).toEqual(["x/board.kicad_pro", "x/board.kicad_sch", "x/board.review.json"])
-    // Without a .kicad_pro there is no project name to match.
-    expect(paths(["board.kicad_sch", "board.review.json"])).toEqual(["board.kicad_sch"])
+    ).toEqual([
+      "x/board.kicad_pcb",
+      "x/board.kicad_pro",
+      "x/board.kicad_sch",
+      "x/board.review.json",
+    ])
+    // Without a .kicad_pro there is no project name to match a review file;
+    // a board named after a sheet is kept, and the backend picks the root's.
+    expect(
+      paths(["board.kicad_sch", "board.review.json", "board.kicad_pcb", "x.kicad_pcb"]),
+    ).toEqual(["board.kicad_pcb", "board.kicad_sch"])
+  })
+
+  it("sends the board only when ticked and the review file only in review mode", () => {
+    const blob = new Blob([])
+    const files = ["b.kicad_pcb", "b.kicad_pro", "b.kicad_sch", "b.review.json"].map((path) => ({
+      path,
+      file: blob,
+    }))
+    const sent = (review: boolean, sendBoard: boolean) =>
+      runFiles(files, { review, sendBoard }).map((f) => f.path)
+    expect(sent(true, false)).toEqual(["b.kicad_pro", "b.kicad_sch", "b.review.json"])
+    expect(sent(false, true)).toEqual(["b.kicad_pcb", "b.kicad_pro", "b.kicad_sch"])
+    expect(sent(false, false)).toEqual(["b.kicad_pro", "b.kicad_sch"])
   })
 
   it("names the project after its .kicad_pro", () => {
@@ -122,6 +144,13 @@ describe("project files", () => {
       projectName([
         { path: "x/a.kicad_sch", file: blob },
         { path: "x/board.kicad_pro", file: blob },
+      ]),
+    ).toBe("board")
+    // The board sorts first; the name still comes from a sheet.
+    expect(
+      projectName([
+        { path: "x/board.kicad_pcb", file: blob },
+        { path: "x/board.kicad_sch", file: blob },
       ]),
     ).toBe("board")
   })

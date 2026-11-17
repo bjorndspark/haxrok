@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-17 | 2026-11-17 | proposed | — | `001-mvp-scope.md` (sends only `.kicad_pro` and `*.kicad_sch`; "the PCB stays here"), `012-benchmark-scorecard.md` (checked a board's pad nets against its `.kicad_pcb` by hand), `DECISIONS.md` ("No auth": runs are recorded on disk) |
+| 2026-11-17 | 2026-11-17 | in progress | — | `001-mvp-scope.md` (sends only `.kicad_pro` and `*.kicad_sch`; "the PCB stays here"), `012-benchmark-scorecard.md` (checked a board's pad nets against its `.kicad_pcb` by hand), `DECISIONS.md` ("No auth": runs are recorded on disk) |
 
 The app reviews and debugs from the schematic alone. Since plan 001 the
 frontend has sent only the `.kicad_pro` and `*.kicad_sch` files, so the
@@ -39,11 +39,11 @@ Three constraints shape it:
 
 | Step | What | |
 |---|---|---|
-| 1 | An opt-in PCB upload runs KiCad's DRC with schematic parity, and its findings are listed next to ERC's | proposed |
+| 1 | An opt-in PCB upload runs KiCad's DRC with schematic parity, and its findings are listed next to ERC's | done |
 | 2 | The model reads the DRC findings and computed layout facts, and cites them | proposed |
 | 3 | Rework can name tracks and vias | proposed |
 
-## 1. An opt-in PCB upload runs KiCad's DRC with schematic parity, and its findings are listed next to ERC's: proposed
+## 1. An opt-in PCB upload runs KiCad's DRC with schematic parity, and its findings are listed next to ERC's: done
 
 - First, try a KiCad 10 board in the container's `kicad-cli` 9.0.2
   (`pcb drc`). What it does decides how a newer board is handled.
@@ -83,10 +83,36 @@ DRC entries in the events; the board's bytes live only in the temp dir
 `erc-N`. `DECISIONS.md` gets a "The PCB is opt-in" entry in this step's
 commit.
 
-**Checks:** a test for the DRC report parser on a recorded KiCad 9
-report; a test that a project without a board runs as today; a board with
-a deliberate parity error (a footprint deleted) shows that finding in the
-UI.
+Decided (2026-11-17), in the build: a `footprint_symbol_mismatch` whose
+two footprints differ only in the library nickname (`Footprints:X` on the
+board, `Valve:X` on the symbol) counts as a footprint-library finding and
+is dropped; one that names another footprint is kept. On KiCad's
+`ecc83-pp` demo, 5 of its 6 mismatches were nickname-only.
+
+**Checks:** a KiCad 10 board (KiCad's `ecc83-pp` demo, upgraded with the
+host's `kicad-cli` 10.0.8) in the container's `kicad-cli` 9.0.2: `pcb drc`
+exits 3 with "Failed to load board", so the decided skip-and-continue
+holds; `kicad.py` reads the board's `generator_version` to say which KiCad
+saved it. `backend/tests/golden/drc_kicad9.json` is the 9.0.2 report on
+the demo board with R1 deleted. In `tests/test_debug.py`, the parser keeps
+`drc-1` `missing_footprint` and `drc-2` `track_dangling` from it and drops
+the rest; a mismatch naming another footprint is kept; the skip reason
+names KiCad 10.0. `tests/test_debug_service.py` gains 4 tests: the board
+is the one named after the root sheet; a project without a board has no
+board and no DRC, as before; a sent board's findings are in the summary
+and the board in `record.file_digests`; a board DRC skipped says why and
+the run goes on. `present.test.ts`: the project's board is kept and
+another board dropped; `runFiles` sends the board only when ticked and the
+review file only in review mode. In headless Chrome on the dev server, the
+R1-less board with the box ticked shows "KiCad DRC findings (2)" with
+drc-1 "Missing footprint R1 (1.5K)", and `0 ERC · 2 DRC` in the counts;
+the KiCad 9 schematic with the KiCad 10 board shows "KiCad DRC skipped"
+and the reason. `make lint` and `make test` passed (526 backend, 61
+frontend), each sub-target run on its own; ESLint's one warning is in
+`shared/ui/button.tsx`, untouched. Bugs found: `projectName` took the
+first file's name, which with the board sorted first was
+`board.kicad_pcb`; it takes the first sheet's now. `mypy` caught an
+unnarrowed regex match in the parser.
 
 ## 2. The model reads the DRC findings and computed layout facts, and cites them: proposed
 

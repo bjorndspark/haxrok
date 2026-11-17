@@ -142,6 +142,22 @@ export interface ErcEntry {
   items: string[]
 }
 
+/** A KiCad DRC finding on the board the user opted to send (plan 013):
+ *  schematic parity, an unconnected item or an electrical rule. */
+export interface DrcEntry {
+  id: string
+  rule: string
+  severity: string
+  message: string
+  items: string[]
+}
+
+/** The board that was sent; `skipped` says why DRC didn't run on it. */
+export interface BoardStatus {
+  file: string
+  skipped: string
+}
+
 /** A pin wired against its role (datasheet, pin table or pin name), found by
  *  the backend before the model runs (roles.check, pins.check_pinout).
  *  Verified, not the model's reasoning. */
@@ -496,6 +512,9 @@ export interface DesignSummary {
   nets: number
   ics: IcSummary[]
   erc: ErcEntry[]
+  /** Null when no board was sent. */
+  board: BoardStatus | null
+  drc: DrcEntry[]
   wiring: WiringFinding[]
   pin_warnings: PinWarning[]
   references: ReferenceNote[]

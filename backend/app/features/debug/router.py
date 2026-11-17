@@ -93,7 +93,10 @@ async def _answer(system: str, user: str) -> str:
 async def analyze(
     files: Annotated[
         list[UploadFile],
-        File(description="The project's .kicad_pro and .kicad_sch files, and SPICE model files"),
+        File(
+            description="The project's .kicad_pro and .kicad_sch files, SPICE model files, "
+            "and the .kicad_pcb when the user opts in (DRC)"
+        ),
     ],
     symptoms: Annotated[
         str, Form(max_length=8000, description="Bench symptoms; review: optional board notes")

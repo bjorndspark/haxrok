@@ -7,7 +7,7 @@ import { Card } from "@/shared/ui/card"
 import { Textarea } from "@/shared/ui/textarea"
 import { Title } from "@/shared/ui/title"
 
-import { projectName, REVIEW_SUFFIX } from "../files"
+import { BOARD_SUFFIX, projectName, REVIEW_SUFFIX, runFiles } from "../files"
 import { useMessages } from "../messages"
 import { SIM_ANALYSES, useDebugStore } from "../store"
 import { fragmentLines, symptomHints, symptomLines } from "../symptoms"
@@ -109,6 +109,26 @@ function AnalysisPicker() {
   )
 }
 
+/** The file types a run sends, by the "also send the PCB" toggle. */
+function SentTypes({ sendBoard }: { sendBoard: boolean }) {
+  const t = useMessages().input
+  const types = sendBoard
+    ? [".kicad_pro", ".kicad_sch", BOARD_SUFFIX]
+    : [".kicad_pro", ".kicad_sch"]
+  return (
+    <p className="mt-2 text-xs text-muted-foreground">
+      {t.sentBefore}
+      {types.map((type, i) => (
+        <span key={type}>
+          {i > 0 && (i === types.length - 1 ? t.sentAnd : t.sentComma)}
+          <span className="text-foreground">{type}</span>
+        </span>
+      ))}
+      {sendBoard ? t.sentAfter.board : t.sentAfter.local}
+    </p>
+  )
+}
+
 export function InputView({ actions }: { actions: DebugActions }) {
   const mode = useDebugStore((s) => s.mode)
   const setMode = useDebugStore((s) => s.setMode)
@@ -117,6 +137,8 @@ export function InputView({ actions }: { actions: DebugActions }) {
   const symptoms = useDebugStore((s) => s.symptoms)
   const setSymptoms = useDebugStore((s) => s.setSymptoms)
   const setFiles = useDebugStore((s) => s.setFiles)
+  const sendBoard = useDebugStore((s) => s.sendBoard)
+  const setSendBoard = useDebugStore((s) => s.setSendBoard)
   const inputError = useDebugStore((s) => s.inputError)
   const hasRuns = useDebugStore((s) => s.runs.length > 0)
   const showSession = useDebugStore((s) => s.showSession)
@@ -130,6 +152,8 @@ export function InputView({ actions }: { actions: DebugActions }) {
   const name = projectName(files)
   const sheets = files.filter((f) => f.path.endsWith(".kicad_sch")).length
   const reviewFound = review && files.some((f) => f.path.endsWith(REVIEW_SUFFIX))
+  const boardFound = files.some((f) => f.path.endsWith(BOARD_SUFFIX))
+  const sent = runFiles(files, { review, sendBoard })
   const hints = symptomHints(symptoms, messages)
   const lines = symptomLines(symptoms)
   const fragments = fragmentLines(symptoms)
@@ -194,13 +218,16 @@ export function InputView({ actions }: { actions: DebugActions }) {
             />
           </label>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {t.sentBefore}
-          <span className="text-foreground">.kicad_pro</span>
-          {t.sentAnd}
-          <span className="text-foreground">.kicad_sch</span>
-          {t.sentAfter}
-        </p>
+        <SentTypes sendBoard={sendBoard} />
+        <label className="mt-2 flex w-fit cursor-pointer items-center gap-[1ch] text-xs">
+          <input
+            type="checkbox"
+            checked={sendBoard}
+            onChange={(e) => setSendBoard(e.target.checked)}
+            className="accent-foreground"
+          />
+          {t.sendBoard}
+        </label>
 
         {name && (
           <div className="mt-2.5 flex flex-wrap items-center gap-[2ch] text-xs">
@@ -208,6 +235,10 @@ export function InputView({ actions }: { actions: DebugActions }) {
               <span className="text-ok">✓</span> <span className="font-bold text-info">{name}</span>{" "}
               <span className="text-muted-foreground">· {t.sheets(sheets)}</span>
               {reviewFound && <span className="text-muted-foreground"> · {t.reviewFound}</span>}
+              {sendBoard && boardFound && (
+                <span className="text-muted-foreground"> · {t.boardFound}</span>
+              )}
+              {sendBoard && !boardFound && <span className="text-warn"> · {t.noBoard(name)}</span>}
             </span>
             <button
               type="button"
@@ -227,9 +258,9 @@ export function InputView({ actions }: { actions: DebugActions }) {
           </div>
         )}
 
-        {showFiles && files.length > 0 && (
+        {showFiles && sent.length > 0 && (
           <ul className="mt-3 space-y-0.5 border-t pt-3 text-xs">
-            {files.map((f) => (
+            {sent.map((f) => (
               <li key={f.path} className="truncate">
                 {f.path}
               </li>

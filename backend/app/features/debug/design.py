@@ -1,5 +1,6 @@
 """The parsed schematic: parts and nets from KiCad's netlist, violations from
-its ERC, and the compact text form the model reads.
+its ERC and, when the board was sent, its DRC, and the compact text form the
+model reads.
 
 Pure functions over text, no I/O: running ``kicad-cli`` happens elsewhere.
 This is the single KiCad import step, so another EDA tool would be another
@@ -10,12 +11,44 @@ import json
 import re
 from dataclasses import dataclass, field
 
-from app.features.debug.schemas import ErcEntry
+from app.features.debug.schemas import DrcEntry, ErcEntry
 
 # ERC rules that only report library state. The server has no symbol
 # libraries, so these fire on every board and say nothing about the design.
 LIBRARY_ONLY_RULES = frozenset(
     {"lib_symbol_issues", "lib_symbol_mismatch", "footprint_link_issues"}
+)
+# "Footprints:R_0603 doesn't match footprint given by symbol (Resistor_SMD:R_0603)."
+_FOOTPRINT_MISMATCH = re.compile(r"^(\S+) doesn't match footprint given by symbol \((\S+)\)")
+# DRC's report has three lists: "schematic_parity" and "unconnected_items" are
+# kept whole; of "violations" only these electrical rules are (shorts,
+# clearance, copper, track, via and hole rules). Silkscreen, courtyard, text
+# and footprint-library rules say nothing a bench symptom comes from.
+DRC_ELECTRICAL_RULES = frozenset(
+    {
+        "shorting_items",
+        "clearance",
+        "creepage",
+        "tracks_crossing",
+        "copper_edge_clearance",
+        "zones_intersect",
+        "isolated_copper",
+        "starved_thermal",
+        "copper_sliver",
+        "solder_mask_bridge",
+        "net_conflict",
+        "via_dangling",
+        "track_dangling",
+        "connection_width",
+        "track_width",
+        "via_diameter",
+        "annular_width",
+        "drill_out_of_range",
+        "microvia_drill_out_of_range",
+        "hole_clearance",
+        "hole_to_hole",
+        "holes_co_located",
+    }
 )
 
 _TOKEN = re.compile(r'\(|\)|"(?:[^"\\]|\\.)*"|[^\s()]+')
@@ -365,6 +398,42 @@ def parse_erc(text: str) -> list[ErcEntry]:
                 )
             )
     return entries
+
+
+# --- KiCad DRC -------------------------------------------------------------------
+
+
+def parse_drc(text: str) -> list[DrcEntry]:
+    """Parse ``kicad-cli pcb drc --format json --schematic-parity`` output.
+    Parity findings come first, then unconnected items, then the electrical
+    violations (``DRC_ELECTRICAL_RULES``); numbered drc-1, drc-2, … in that
+    order."""
+    report = json.loads(text)
+    found = [
+        *(v for v in report.get("schematic_parity", []) if not _library_only(v)),
+        *report.get("unconnected_items", []),
+        *(v for v in report.get("violations", []) if v.get("type") in DRC_ELECTRICAL_RULES),
+    ]
+    return [
+        DrcEntry(
+            id=f"drc-{n}",
+            rule=v.get("type", ""),
+            severity=v.get("severity", ""),
+            message=v.get("description", ""),
+            items=[i.get("description", "") for i in v.get("items", [])],
+        )
+        for n, v in enumerate(found, start=1)
+    ]
+
+
+def _library_only(v: dict[str, object]) -> bool:
+    """A footprint mismatch where only the library nickname differs
+    (``Footprints:X`` on the board, ``Capacitor_THT:X`` on the symbol): the
+    same footprint, so library state, not a swapped part."""
+    if v.get("type") != "footprint_symbol_mismatch":
+        return False
+    m = _FOOTPRINT_MISMATCH.match(str(v.get("description", "")))
+    return m is not None and m.group(1).split(":")[-1] == m.group(2).split(":")[-1]
 
 
 def format_erc(entries: list[ErcEntry]) -> str:
