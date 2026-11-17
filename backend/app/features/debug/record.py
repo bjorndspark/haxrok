@@ -45,7 +45,7 @@ from app.core.logging import get_logger
 from app.features.debug.context import ReviewContext
 from app.features.debug.design import Design, Node, Part
 from app.features.debug.evidence import EvidenceContext
-from app.features.debug.schemas import Calculation, ErcEntry, WiringFinding
+from app.features.debug.schemas import Calculation, DrcEntry, ErcEntry, LayoutFact, WiringFinding
 
 logger = get_logger(__name__)
 
@@ -167,6 +167,8 @@ def context_data(ctx: ReviewContext) -> dict[str, object]:
         "measurement_ids": ev.measurement_ids,
         "reference_ids": ev.reference_ids,
         "datasheet_ids": ev.datasheet_ids,
+        "drc": list(ev.drc.values()),
+        "layout": list(ev.layout.values()),
         "wiring": ctx.table.findings,
         "calculations": ctx.calculations,
     }
@@ -193,6 +195,9 @@ class Recorded:
 def evidence_context(data: Mapping[str, Any]) -> Recorded:
     """The ``context`` line read back (``context_data`` wrote it)."""
     erc = [ErcEntry.model_validate(e) for e in data["erc"]]
+    # Runs recorded before the board's DRC and layout facts have neither.
+    drc = [DrcEntry.model_validate(e) for e in data.get("drc", [])]
+    facts = [LayoutFact.model_validate(f) for f in data.get("layout", [])]
     return Recorded(
         evidence=EvidenceContext(
             design=design_from(data["design"]),
@@ -202,6 +207,8 @@ def evidence_context(data: Mapping[str, Any]) -> Recorded:
             measurement_ids=frozenset(data["measurement_ids"]),
             reference_ids=frozenset(data["reference_ids"]),
             datasheet_ids=frozenset(data["datasheet_ids"]),
+            drc={e.id: e for e in drc},
+            layout={f.id: f for f in facts},
         ),
         findings=[WiringFinding.model_validate(w) for w in data["wiring"]],
         calculations=[Calculation.model_validate(c) for c in data["calculations"]],

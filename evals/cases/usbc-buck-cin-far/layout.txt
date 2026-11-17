@@ -1,0 +1,90 @@
+KiCad DRC:
+drc-1 [unconnected_items] (error): Missing connection between items
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+drc-2 [unconnected_items] (error): Missing connection between items
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+drc-3 [unconnected_items] (error): Missing connection between items
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+drc-4 [track_dangling] (warning): Track has unconnected end
+    Track [USB-OK] on F.Cu, length 0.4318 mm
+drc-5 [track_dangling] (warning): Track has unconnected end
+    Track [USB-OK] on F.Cu, length 0.5080 mm
+drc-6 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1852 mm)
+    Track [GND] on F.Cu, length 0.3800 mm
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+drc-7 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1433 mm)
+    Pad B5 [CC2] of J1 on F.Cu
+    Track [+5V] on F.Cu, length 0.5633 mm
+drc-8 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1237 mm)
+    Track [GND] on F.Cu, length 0.5572 mm
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+drc-9 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1922 mm)
+    Pad B4 [+5V] of J1 on F.Cu
+    Track [CC2] on F.Cu, length 1.4300 mm
+drc-10 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1922 mm)
+    Track [CC1] on F.Cu, length 1.5000 mm
+    Pad B7 [unconnected-(J1-D--PadB7)] of J1 on F.Cu
+drc-11 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1323 mm)
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+    Track [GND] on F.Cu, length 0.4000 mm
+drc-12 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1719 mm)
+    Pad B8 [unconnected-(J1-SBU2-PadB8)] of J1 on F.Cu
+    Track [+5V] on F.Cu, length 1.0317 mm
+drc-13 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1323 mm)
+    PTH pad S1 [unconnected-(J1-SHIELD-PadS1)] of J1
+    Track [GND] on F.Cu, length 0.3451 mm
+drc-14 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.1433 mm)
+    Pad B5 [CC2] of J1 on F.Cu
+    Track [+5V] on F.Cu, length 0.3584 mm
+drc-15 [hole_clearance] (error): Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.2005 mm)
+    NPTH pad of J1
+    Pad A4 [+5V] of J1 on F.Cu
+drc-16 [hole_clearance] (error): Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.1651 mm)
+    NPTH pad of J1
+    Pad B12 [GND] of J1 on F.Cu
+drc-17 [hole_clearance] (error): Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.2005 mm)
+    NPTH pad of J1
+    Pad A9 [+5V] of J1 on F.Cu
+drc-18 [hole_clearance] (error): Hole clearance violation (board setup constraints hole clearance 0.2500 mm; actual 0.1651 mm)
+    NPTH pad of J1
+    Pad B1 [GND] of J1 on F.Cu
+drc-19 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A4 [+5V] of J1 on F.Cu
+    Pad B12 [GND] of J1 on F.Cu
+drc-20 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A5 [CC1] of J1 on F.Cu
+    Pad B7 [unconnected-(J1-D--PadB7)] of J1 on F.Cu
+drc-21 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A5 [CC1] of J1 on F.Cu
+    Pad B8 [unconnected-(J1-SBU2-PadB8)] of J1 on F.Cu
+drc-22 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A6 [unconnected-(J1-D+-PadA6)] of J1 on F.Cu
+    Pad A7 [unconnected-(J1-D--PadA7)] of J1 on F.Cu
+drc-23 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A6 [unconnected-(J1-D+-PadA6)] of J1 on F.Cu
+    Pad B7 [unconnected-(J1-D--PadB7)] of J1 on F.Cu
+drc-24 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A7 [unconnected-(J1-D--PadA7)] of J1 on F.Cu
+    Pad B6 [unconnected-(J1-D+-PadB6)] of J1 on F.Cu
+drc-25 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A8 [unconnected-(J1-SBU1-PadA8)] of J1 on F.Cu
+    Pad B5 [CC2] of J1 on F.Cu
+drc-26 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A8 [unconnected-(J1-SBU1-PadA8)] of J1 on F.Cu
+    Pad B6 [unconnected-(J1-D+-PadB6)] of J1 on F.Cu
+drc-27 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad A9 [+5V] of J1 on F.Cu
+    Pad B1 [GND] of J1 on F.Cu
+drc-28 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad B4 [+5V] of J1 on F.Cu
+    Pad B5 [CC2] of J1 on F.Cu
+drc-29 [clearance] (error): Clearance violation (board minimum clearance 0.2032 mm; actual 0.2000 mm)
+    Pad B8 [unconnected-(J1-SBU2-PadB8)] of J1 on F.Cu
+    Pad B9 [+5V] of J1 on F.Cu
+Layout facts:
+pl1 FLAGGED: U1.2 (VIN, +5V): nearest decoupling capacitor C2, 44.8 mm of copper from pad to pad. Over 5 mm. May fail, not verified.
+pl2 FLAGGED: U2.8 (V+, +5V): nearest decoupling capacitor C2, 30.5 mm of copper from pad to pad. Over 5 mm. May fail, not verified.
+

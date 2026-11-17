@@ -41,8 +41,9 @@ manufacturers' reference designs and datasheets, values the backend \
 calculated from the netlist with datasheet formulas (cf1, ...), the power \
 tree the backend built from the netlist (each rail, its voltage, the part \
 that makes it and what it supplies; a voltage marked inferred is a guess to \
-check, not a fact), and sometimes bench measurements the user entered \
-(m1, ...)."""
+check, not a fact), the board's KiCad DRC entries (drc-1, ...) and layout \
+facts (pl1, ...) when the user sent the .kicad_pcb, and sometimes bench \
+measurements the user entered (m1, ...)."""
 
 # The unverified-facts rule: the model recalls part specs from memory, and in
 # the no-fault eval it called a correct part an error and told the user to
@@ -117,7 +118,21 @@ lines only when its names or labels say it leaves the box.
 Pin warnings (pw...) are not verified: they compare a transistor's symbol \
 with the pinout most parts in its package share, not with its own \
 datasheet. Report each as a likely error whose first confirm step is \
-reading the part's pin diagram; never call one verified."""
+reading the part's pin diagram; never call one verified.
+
+KiCad's DRC entries (drc-1, ...) are KiCad's own check of the board: the \
+board against the schematic, unrouted connections, and copper that breaks \
+the board's rules. They are verified facts about the board. The layout \
+facts (pl1, ...) are measured from the board's copper by the backend: a \
+supply pin's copper path to its nearest decoupling capacitor, the ground \
+fill under a switching regulator, a rail's narrowest track against \
+IPC-2221 for its known load. Their numbers are verified; the limit each is \
+judged against is a rule of thumb, so one marked FLAGGED is may fail, not \
+verified, never will fail. Report a flagged fact only with what it \
+plausibly does to this circuit (a buck's input capacitor far from its VIN \
+pin: ringing and noise on the switch edges), and rank it on that. Other \
+layout advice, with no DRC entry or layout fact behind it, is not an \
+issue."""
 
 DIAGNOSE = f"""\
 You are an expert hardware engineer debugging a PCB from its KiCad schematic \
@@ -131,7 +146,7 @@ pins involved, the mechanism that produces the observed symptoms (which \
 symptoms it explains and which it can't), how to confirm it on the bench \
 (say power off or on and where to put the probes), and the fix. Mark each \
 claim as CONFIRMED (follows directly from the netlist, ERC, pin table, \
-datasheet facts or a measurement) or INFERRED.
+datasheet facts, DRC entries, layout facts or a measurement) or INFERRED.
 
 {_UNVERIFIED}
 """
@@ -146,6 +161,9 @@ claim if any fails, so cite exactly.
 and its net, exactly as written) or pin_name (the pin's name as the netlist \
 gives it, and use that same name in the text).
 - erc: a fact from an ERC entry. Cite its id.
+- board: a fact from a KiCad DRC entry (cited as kind drc with its id, \
+drc-...) or a layout fact (cited as kind layout with its id, pl...). A \
+layout fact vouches for the pins and the net it names.
 - datasheet: a pin function from the pin table, cited as pin_function with \
 the pin; or a datasheet fact (a limit or typical application part), cited \
 as kind datasheet with its id (ds...); a deviation is cited the same way \
@@ -253,7 +271,9 @@ BUDGET is a risk to weigh, may fail, not verified; then its operating \
 states: which rails are up from each combination of sources, which parts \
 their enables hold off, and where a rail that's down may be back-powered \
 through a pull-up or an unpowered IC's pin, a risk to weigh, may fail, not \
-verified; a rail that's down in some state is by itself no fault)."""
+verified; a rail that's down in some state is by itself no fault), and, \
+when the designer sent the .kicad_pcb, the board's KiCad DRC entries \
+(drc-1, ...) and layout facts (pl1, ...)."""
 
 REVIEW_DIAGNOSE = f"""\
 You are an expert hardware engineer reviewing a hobbyist's KiCad schematic \
@@ -274,12 +294,12 @@ a severity (WILL FAIL: won't work as drawn; MAY FAIL: fails under some \
 supply, load or tolerance; IMPROVE: works, but a cheap change makes it more \
 robust), how to settle it before ordering (which datasheet section to read, \
 or what to check on the first assembled board), and the schematic fix. Mark \
-each claim as CONFIRMED (follows directly from the netlist, ERC, pin table \
-or datasheet facts) or INFERRED.
+each claim as CONFIRMED (follows directly from the netlist, ERC, pin table, \
+datasheet facts, DRC entries or layout facts) or INFERRED.
 
 A design that looks correct is a valid and useful answer: say which blocks \
-you checked and that you found no issues. Never pad the list. Style, part \
-choice and layout advice are not issues. An ERC warning that is harmless in \
+you checked and that you found no issues. Never pad the list. Style and \
+part choice are not issues. An ERC warning that is harmless in \
 this circuit (e.g. a power pin fed through a connector) is not an issue; say \
 why it is harmless.
 
@@ -371,11 +391,13 @@ def build_user_message(
     datasheet_facts: str = "",
     deviations: str = "",
     power: str = "",
+    board: str = "",
 ) -> str:
     """The user turn: symptoms (review: the designer's notes), measurements,
     netlist, ERC, pin table, datasheet facts, deviations from their typical
     applications, verified findings, unverified pin warnings, reference
-    notes, calculated values, the power tree."""
+    notes, calculated values, the power tree, and the board's DRC entries
+    and layout facts when a board was sent."""
     parts = []
     if mode == "debug":
         parts.append("## Symptoms\n" + "\n".join(f"{s.id}: {s.text}" for s in symptoms))
@@ -417,6 +439,11 @@ def build_user_message(
         parts.append("## Calculated from the netlist (verified arithmetic)\n" + calculations)
     if power:
         parts.append("## Power tree (built from the netlist; inferred voltages marked)\n" + power)
+    if board:
+        parts.append(
+            "## Board (the .kicad_pcb: KiCad's DRC, and layout facts measured from its "
+            "copper)\n" + board
+        )
     return "\n\n".join(parts)
 
 
@@ -518,10 +545,11 @@ def _with_question(parts: list[str], history: list[AskTurn], question: str) -> s
 ASK_RESULT = """\
 You answer a hardware engineer's follow-up question about an analysis of \
 their KiCad schematic that has already run. You get what the backend parsed \
-and checked (verified: ERC, wiring findings, calculations, reference notes; \
-unverified: pin warnings), the facts read from the board's datasheets (ds1, \
-...) with the page each came from, the board's deviations from a datasheet's \
-typical application (dv1, ...), and the findings the analysis reported, each \
+and checked (verified: ERC, wiring findings, calculations, reference notes, \
+the board's DRC entries and layout facts; unverified: pin warnings), the \
+facts read from the board's datasheets (ds1, ...) with the page each came \
+from, the board's deviations from a datasheet's typical application (dv1, \
+...), and the findings the analysis reported, each \
 with its claims, tests and fixes.
 
 - Answer from that input. Name the finding (h1, ...), part, pin, net, fact or \
@@ -560,6 +588,8 @@ def build_result_ask_message(
         *(f"- {w.id} (unverified): {w.text}" for w in summary.pin_warnings),
         *(f"- {c.id}{' FLAGGED' if c.flagged else ''}: {c.text}" for c in summary.calculations),
         *(f"- {r.id} {r.part} ({r.source}): {r.text}" for r in summary.references),
+        *(f"- {e.id} DRC {e.severity} {e.rule}: {e.message}" for e in summary.drc),
+        *(f"- {f.id}{' FLAGGED' if f.flagged else ''} layout: {f.text}" for f in summary.layout),
     ]
     parts.append("## Checked by the backend\n" + ("\n".join(checked) or "(nothing)"))
     if summary.datasheet_facts or summary.deviations:

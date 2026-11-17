@@ -23,8 +23,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # --- shared vocabulary ---------------------------------------------------------
 
-Evidence = Literal["schematic", "erc", "datasheet", "reference", "measurement", "none"]
-"""schematic: the netlist. erc: a KiCad ERC entry. datasheet: a fact read from
+Evidence = Literal["schematic", "erc", "board", "datasheet", "reference", "measurement", "none"]
+"""schematic: the netlist. erc: a KiCad ERC entry. board: a KiCad DRC entry or
+a layout fact the backend computed from the ``.kicad_pcb`` (``layout.py``),
+when the user sent the board. datasheet: a fact read from
 the part's datasheet (a pin, a limit, its typical application), or the
 hand-written pin table where there's none. reference: a manufacturer
 reference note or a value the backend calculated with a datasheet formula
@@ -46,16 +48,26 @@ fails under some conditions (a supply, a load, a tolerance). improve: works,
 but a cheap change makes it more robust."""
 
 CiteKind = Literal[
-    "pin_on_net", "pin_name", "erc", "pin_function", "datasheet", "reference", "measurement"
+    "pin_on_net",
+    "pin_name",
+    "erc",
+    "drc",
+    "layout",
+    "pin_function",
+    "datasheet",
+    "reference",
+    "measurement",
 ]
 
 # Which citation kinds back which evidence label. pin_name is the pin's name
 # as the netlist gives it (U2.9 is "L2"); pin_function is what the pin does,
 # from the datasheet or the hand-written pin table; datasheet is a limit or
-# typical-application fact read from a datasheet ("ds3").
+# typical-application fact read from a datasheet ("ds3"); drc is a KiCad DRC
+# entry ("drc-2") and layout a layout fact ("pl1").
 EVIDENCE_CITE_KINDS: dict[Evidence, frozenset[CiteKind]] = {
     "schematic": frozenset({"pin_on_net", "pin_name"}),
     "erc": frozenset({"erc"}),
+    "board": frozenset({"drc", "layout"}),
     "datasheet": frozenset({"pin_function", "datasheet"}),
     "reference": frozenset({"reference"}),
     "measurement": frozenset({"measurement"}),
@@ -79,7 +91,8 @@ class Cite(_Strict):
 
     kind: CiteKind = Field(
         description="pin_on_net: the pin is on that net in the netlist. pin_name: the pin's "
-        "name as the netlist gives it, e.g. U2.9(L2). erc: an ERC entry. pin_function: what "
+        "name as the netlist gives it, e.g. U2.9(L2). erc: an ERC entry. drc: a KiCad DRC "
+        "entry (drc-1). layout: a layout fact (pl1). pin_function: what "
         "the pin does, from the pin table. datasheet: a datasheet fact (ds1) or a deviation "
         "from a typical application (dv1). reference: a "
         "reference note (rd1) or calculated value (cf1). measurement: a value the user entered."
@@ -90,7 +103,8 @@ class Cite(_Strict):
     )
     net: str | None = Field(description="Net name exactly as in the netlist. For pin_on_net.")
     id: str | None = Field(
-        description='ERC entry id ("erc-3"), datasheet fact or deviation id ("ds4", "dv2"), '
+        description='ERC entry id ("erc-3"), DRC entry id ("drc-1"), layout fact id ("pl2"), '
+        'datasheet fact or deviation id ("ds4", "dv2"), '
         'reference id ("rd2", "cf1") or measurement id ("m1").'
     )
 
@@ -100,7 +114,9 @@ class Claim(_Strict):
 
     text: str = Field(description="One fact, in plain words a hobbyist understands.")
     evidence: Evidence
-    cites: list[Cite] = Field(description="Every pin, net, ERC entry or measurement the text uses.")
+    cites: list[Cite] = Field(
+        description="Every pin, net, ERC or DRC entry, layout fact or measurement the text uses."
+    )
 
 
 class SetupChange(_Strict):
@@ -520,8 +536,8 @@ class ErcEntry(BaseModel):
 
 class DrcEntry(BaseModel):
     """One KiCad DRC finding on the board: schematic parity, an unconnected
-    item, or an electrical violation (``design.parse_drc``). The model
-    doesn't read these yet (plan 013 step 2)."""
+    item, or an electrical violation (``design.parse_drc``). Claims cite it
+    by id (``drc-3``)."""
 
     id: str
     rule: str
@@ -537,6 +553,27 @@ class BoardStatus(BaseModel):
     skipped: str = Field(
         "", description="Why DRC didn't run (a board saved by a newer KiCad); empty when it ran."
     )
+
+
+class LayoutFact(BaseModel):
+    """A fact the backend computed from the ``.kicad_pcb`` (``layout.py``),
+    judged against a fixed limit: a supply pin's copper path to its nearest
+    decoupling capacitor (over 5 mm), a rail's narrowest track against
+    IPC-2221's width for its known load at 10 °C rise, or the ground fill
+    under a switching regulator and its inductor on the adjacent layer.
+    Verified, not the model's; ``flagged`` means past the limit, which
+    reads "may fail, not verified": the limit is a rule of thumb."""
+
+    id: str = Field(description='"pl1", "pl2", …')
+    kind: Literal["decoupling", "track_width", "ground_zone"]
+    refs: list[str] = Field(description="The parts it is about.")
+    pins: list[str] = Field(description="The pins it is about, as REF.PIN.")
+    net: str
+    value: float | None = Field(description="The number it found; None when unknown.")
+    limit: float | None = Field(description="What ``value`` is judged against.")
+    unit: str = Field(description='"mm" or "%".')
+    flagged: bool
+    text: str
 
 
 class WiringFix(BaseModel):
@@ -1034,6 +1071,10 @@ class DesignSummary(BaseModel):
     # from before the board could be sent.
     board: BoardStatus | None = None
     drc: list[DrcEntry] = Field(default_factory=list)
+    layout: list[LayoutFact] = Field(
+        default_factory=list,
+        description="Layout facts from the board, before the datasheets' current budgets.",
+    )
     wiring: list[WiringFinding]
     pin_warnings: list[PinWarning]
     references: list[ReferenceNote]
@@ -1118,6 +1159,11 @@ class DatasheetFactsEvent(BaseModel):
         "ratings (kind part_rating), supplies' power-up order against the datasheet's "
         "(kind rail_order) and connector lines with no ESD part (kind connector_esd); they "
         "replace the summary's."
+    )
+    layout: list[LayoutFact] = Field(
+        default_factory=list,
+        description="The layout facts again, with track widths judged against the rails' "
+        "current budgets; they replace the summary's.",
     )
 
 

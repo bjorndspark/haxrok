@@ -10,6 +10,7 @@ import {
   datasheetBadge,
   datasheetLines,
   findingTokens,
+  layoutFacts,
   modelBadge,
   powerRows,
   stateRows,
@@ -47,8 +48,8 @@ function StatusText({ badge }: { badge: StatusBadge }) {
   )
 }
 
-/** One KiCad check's findings (ERC or DRC), folded until "inspect";
- *  `note` says why the check didn't run, when it didn't. */
+/** One KiCad check's findings (ERC or DRC) or the layout facts, folded
+ *  until "inspect"; `note` says why the check didn't run, when it didn't. */
 function KicadFindings({
   title,
   entries,
@@ -368,6 +369,16 @@ export function DesignSummaryCard({ summary }: { summary: DesignSummary }) {
           title={summary.board.skipped ? t.drcSkipped : t.drcFindings(summary.drc.length)}
           entries={summary.drc}
           note={summary.board.skipped}
+        />
+      )}
+      {(summary.layout ?? []).length > 0 && (
+        <KicadFindings
+          title={t.layoutFacts(layoutFacts(summary).length)}
+          entries={layoutFacts(summary).map((f) => ({
+            id: f.id,
+            rule: f.flagged ? t.mayFail : t.withinLimit,
+            message: f.text,
+          }))}
         />
       )}
 

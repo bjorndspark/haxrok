@@ -1,0 +1,94 @@
+# Components
+C1  4.7 uF  (Device:C_Small)
+C2  4.7 uF  (Device:C_Small)
+C3  0.1uF  (Device:C_Small)
+C4  0.1uF  (Device:C_Small)
+C5  1.5nF  (Device:C_Small)
+C6  27pF  (Device:C_Small)
+C7  0.1uF  (Device:C_Small)
+C8  47uF  (Device:C_Small)
+C9  47uF  (Device:C_Small)
+D1  SS34  (Device:D_Schottky_Small)
+D2  RED  (Device:LED)
+D3  GREEN  (Device:LED)
+J1  USB port  (Connector:USB_C_Receptacle_USB2.0)
+J2  Selector  (Connector:Conn_01x03_Male)
+J3  Selector  (Connector:Conn_01x03_Male)
+J4  3.3V conn.  (Connector:Conn_01x02_Male)
+J5  5V conn.  (Connector:Conn_01x02_Male)
+L1  3.3uH  (Device:L)
+Q1  SS8050  (Device:Q_NPN_BEC)
+Q2  AO3401A  (Transistor_FET:AO3401A)
+Q4  2N7002  (Transistor_FET:AO3400A)
+Q5  2N7002  (Transistor_FET:AO3400A)
+Q6  2N7002  (Transistor_FET:AO3400A)
+R1  47k  (Device:R_Small)
+R2  5.1k  (Device:R_Small)
+R3  5.1k  (Device:R_Small)
+R4  1.2k  (Device:R_Small)
+R5  820  (Device:R_Small)
+R6  180  (Device:R_Small)
+R7  330  (Device:R_Small)
+R8  10k  (Device:R_Small)
+R9  3.3K  (Device:R_Small)
+R10  6.8k  (Device:R_Small)
+R11  6.8k  (Device:R_Small)
+R12  5.1k  (Device:R_Small)
+R13  5.1k  (Device:R_Small)
+R14  100  (Device:R_Small)
+R16  100  (Device:R_Small)
+R17  100  (Device:R_Small)
+R18  100  (Device:R_Small)
+R19  5.1k  (Device:R_Small)
+R20  2k  (Device:R_Small)
+R21  1.1k  (Device:R_Small)
+R22  10k  (Device:R_Small)
+TP1  CC2  (Connector:TestPoint)
+TP2  CC1  (Connector:TestPoint)
+TP3  GND  (Connector:TestPoint)
+TP4  T1  (Connector:TestPoint)
+TP5  T2  (Connector:TestPoint)
+TP6  T3  (Connector:TestPoint)
+TP7  T4  (Connector:TestPoint)
+U1  TPS54331  (000_Libreria_personale:TPS54331)
+U2  LM358  (Amplifier_Operational:LM358)
+
+# Nets
++3V3: C8.2 C9.2 J4.2(Pin_2) L1.2(2) R7.2
++5V: C1.1 C2.1 C3.2 D2.2(A) D3.2(A) J1.A4(VBUS) J1.A9(VBUS) J1.B4(VBUS) J1.B9(VBUS) Q2.2(S) R10.2 R11.2 R13.2 R21.1 U1.2(VIN) U2.8(V+)
+/0.65V: J2.2(Pin_2) R4.1 R5.2
+/1.2V: J2.1(Pin_1) R4.2
+BUCK-EN: J5.2(Pin_2) Q2.3(D) R22.2 U1.3(EN)
+CC REF: J3.1(Pin_1) J3.2(Pin_2) R10.1 U2.3(+) U2.5(+)
+CC1: J1.A5(CC1) R3.1 TP2.1(1) U2.2(-)
+CC2: J1.B5(CC2) R2.2 TP1.1(1) U2.6(-)
+ENABLE-500mA: J3.3(Pin_3) R11.1 R18.1 TP6.1(1)
+GND: C1.2 C2.2 C3.1 C4.1 C6.1 C8.1 C9.1 D1.2(A) J1.A1(GND) J1.A12(GND) J1.B1(GND) J1.B12(GND) J2.3(Pin_3) J4.1(Pin_1) J5.1(Pin_1) Q1.2(E) Q6.2(S) R1.1 R2.1 R22.1 R3.2 R6.1 R9.1 TP3.1(1) U1.7(GND) U1.9(GPAD) U2.4(V-)
+Net-(C5-Pad2): C5.2 R1.2
+Net-(D1-K): C7.2 D1.1(K) L1.1(1) U1.8(PH)
+Net-(D2-K): D2.1(K) R19.2
+Net-(D3-K): D3.1(K) R20.2
+Net-(Q1-B): Q1.1(B) R12.2
+Net-(Q1-C): Q1.3(C) R14.1 R20.1
+Net-(Q2-G): Q2.1(G) R13.1 R14.2
+Net-(Q4-G): Q4.1(G) R16.1
+Net-(Q4-S): Q4.2(S) Q5.3(D)
+Net-(Q5-G): Q5.1(G) R17.2
+Net-(Q5-S): Q5.2(S) Q6.3(D)
+Net-(Q6-G): Q6.1(G) R18.2
+Net-(R5-Pad1): R5.1 R6.2
+Net-(R7-Pad1): R7.1 R8.2
+Net-(U1-BOOT): C7.1 U1.1(BOOT)
+Net-(U1-COMP): C5.1 C6.2 U1.6(COMP)
+Net-(U1-SS): C4.2 U1.4(SS)
+Net-(U1-VSNS): R8.1 R9.2 U1.5(VSNS)
+T1: R16.2 TP4.1(1) U2.1
+T2: R17.1 TP5.1(1) U2.7
+USB-OK: Q4.3(D) R12.1 R19.1 R21.2 TP7.1(1)
+unconnected-(J1-D+-PadA6): J1.A6(D+)
+unconnected-(J1-D+-PadB6): J1.B6(D+)
+unconnected-(J1-D--PadA7): J1.A7(D-)
+unconnected-(J1-D--PadB7): J1.B7(D-)
+unconnected-(J1-SBU1-PadA8): J1.A8(SBU1)
+unconnected-(J1-SBU2-PadB8): J1.B8(SBU2)
+unconnected-(J1-SHIELD-PadS1): J1.S1(SHIELD)

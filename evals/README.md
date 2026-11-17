@@ -12,6 +12,8 @@ cases/<name>/
                 cases have none
   netlist.txt   compact netlist (compact_netlist.py output)
   erc.txt       KiCad ERC report, optional
+  layout.txt    KiCad DRC findings and layout facts, as the prompt gets
+                them from the board (`layout.format_board`), optional
   expected.md   confirmed root cause, fix, and the pass rule
   parts.txt     datasheet URLs the compact netlist drops, optional
   judged.md     each review issue judged real or wrong (`judged.py`)
@@ -32,6 +34,7 @@ cases/<name>/
 | `rp-micro-no-fault` | None; the cause is a charge-only USB cable. Pass = no schematic fault claimed at any rank | Unmodified board (siderakb/rp-micro) |
 | `samd21-breakout-no-fault` | None; review only, for false alarms | Unmodified board (atoomnetmarc/SAMD21-breakout) |
 | `usbc-buck-no-fault` | None; review only, for false alarms | Unmodified board (maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C) |
+| `usbc-buck-cin-far` | The buck's input capacitors C1-C3 moved from U1 to the USB-C connector on the PCB, 44.8 mm of copper from U1's VIN; review only | Planted (maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C) |
 | `moist-sensor-no-fault` | None; review only, for false alarms | Unmodified board (Miceuz/rs485-moist-sensor) |
 | `furby-boot-cap` | ESP32-S3 GPIO0 has 100 nF to GND and only the internal pull-up, so it's still low when sampled and every cold boot enters download mode | Real bug (maintainer's board, built) |
 | `artemia-fet-pinout` | BSS123 FETs Q1/Q2 drawn with a D-G-S symbol (BSS123 is G-S-D), so the MCU can't set or clear the boost-enable flip-flop; also 10 kΩ pull-downs on two open-drain lines with pull-ups | Real bug (patlab-ucsd/artemia_hardware, fix a05f688) |
@@ -67,6 +70,20 @@ python3 -I evals/compact_netlist.py board.net > evals/cases/<name>/netlist.txt
 ```
 
 Then write `symptom.md` from bench notes only, and `expected.md`.
+
+A case with a board gets `layout.txt` from the board's DRC report and the
+case's netlist (`layout_text.py`, in the backend container; the board
+and report go under `data/`, which the container sees as `/app/data`):
+
+```sh
+kicad-cli pcb drc --format json --schematic-parity --severity-all -o data/drc.json board.kicad_pcb
+docker compose exec -T -e PYTHONPATH=/app backend uv run --no-sync \
+  python /evals/layout_text.py <name> /app/data/board.kicad_pcb /app/data/drc.json \
+  > evals/cases/<name>/layout.txt
+```
+
+A planted PCB edit is checked like a schematic one: DRC before and after
+gives the same entries.
 
 Export with KiCad 9, as the backend container has (`docker compose exec
 backend kicad-cli …`): KiCad 10.0.8 wrote orbit's pin functions with the
@@ -452,3 +469,50 @@ real counts drafts in brackets):
 `rust-board-part-ratings` has two planted edits, so its bug counts 2 per
 run. On the 4 unmodified boards (12 runs) the reviews raised 31 issues,
 8 of them will-fail; 20 of the 31 are wrong.
+
+### With the board's DRC and layout facts, 2026-11-17
+
+The same sweep after plan 013 step 2 gave the model the KiCad DRC
+findings and layout facts (`layout.txt`) on the two `usbc-buck` boards
+(`results/scorecard/meta_muse-spark-1.3-contributor/20261117T141005Z/`):
+55 runs, 2 failed (`orbit-l2-shorted` runs 2 and 3), 199 issues, 15
+unjudged.
+
+Misses, by case kind:
+
+| Cases | Runs | Bug ranked #1 | Bug ranked at all | Missed |
+|---|---|---|---|---|
+| Planted (11) | 33 | 22 | 30 | 1 |
+| Real bug (4) | 12 | 7 | 8 | 4 |
+
+`usbc-buck-cin-far` ranked its bug #4, #2 and #2: below the wrong
+will-fail "CC REF" issue the unmodified board also gets, at the top of
+the may-fail issues. The 1 planted miss is `rust-board-fb-swapped` run
+2, an Auto-check miss: its #1 issue names U5's 0.73 V output but none of
+"divider", "ratio", "resistor" or "swap". The real-bug misses are
+`artemia-fet-pinout` in all 3 runs and `lpddr5-fb-no-divider` in 1, as
+in the baseline.
+
+Issues judged wrong, per board:
+
+| Board | Runs | Issues | Bug | Real | Wrong |
+|---|---|---|---|---|---|
+| rust-board (4 planted) | 12 | 39 | 14 | 24 | 0 |
+| orbit (4 planted) | 12 | 38 | 10 | 13 (+1) | 14 |
+| rp-micro (2 planted, 1 unmodified) | 9 | 13 | 6 | 6 | 1 |
+| `samd21-breakout-no-fault` | 3 | 12 | – | 0 | 12 |
+| `usbc-buck-no-fault` | 3 | 12 | – | 9 | 3 |
+| `usbc-buck-cin-far` | 3 | 13 | 3 | 6 | 4 |
+| `moist-sensor-no-fault` | 3 | 14 | – | 5 | 3 |
+| `furby-boot-cap` | 3 | 13 | 3 | 3 | 5 |
+| `artemia-fet-pinout` | 3 | 15 | 0 | 7 (+2) | 3 |
+| `enviro-node-usb-backfeed` | 3 | 15 | 3 | 9 | 2 |
+| `lpddr5-fb-no-divider` | 3 | 15 | 2 | 5 | 6 |
+| All | 55 | 199 | 41 | 87 (+3) | 53 |
+
+On the 4 unmodified boards (12 runs) the reviews raised 38 issues, 8 of
+them will-fail; 18 of the 38 are wrong and 6 unjudged.
+`usbc-buck-no-fault` gains one may-fail issue per run (#3, #4, #3): its
+decoupling distances, which the layout facts flag (U1.2 at 5.5 mm, U2.8
+at 18 mm). They are true, so `judged.md` counts them real (the table
+above is re-judged with that entry).

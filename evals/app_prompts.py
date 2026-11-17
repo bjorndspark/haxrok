@@ -4,7 +4,8 @@ The app analyzes in two calls (see DECISIONS.md, "Debug analysis is two
 model calls"): prompt.DIAGNOSE writes a free-text diagnosis, then
 prompt.STRUCTURE turns it into the checked schema. gonogo.py tests neither,
 so a green go/no-go says nothing about the app. This sends each case's
-symptoms, netlist and ERC through both calls with the app's own gateway
+symptoms, netlist, ERC and (when it has a ``layout.txt``) KiCad DRC findings
+and layout facts through both calls with the app's own gateway
 client and AI_CHAT_MODEL, with what the app adds once the datasheets are
 read: each IC's datasheet found from its value and the case's
 ``parts.txt`` (the datasheet URLs a compact netlist drops) and read
@@ -107,8 +108,10 @@ def build_input(
 ) -> context.ReviewContext:
     """The review's input for the case, built by ``context.build`` as the
     app builds it from the datasheets' ``reading``. Review mode drops the
-    symptoms; the ERC goes in as the case's text report."""
+    symptoms; the ERC goes in as the case's text report, and the board as
+    its ``layout.txt`` (the DRC and layout facts text the prompt gets)."""
     erc = case_dir / "erc.txt"
+    layout = case_dir / "layout.txt"
     design = parse_compact((case_dir / "netlist.txt").read_text())
     return context.build(
         mode="review" if mode == "review" else "debug",
@@ -121,6 +124,7 @@ def build_input(
         references=reference.lookup(design),
         calculations=calc.lookup(design),
         erc_report=erc.read_text() if erc.exists() else "(none)",
+        board_report=layout.read_text() if layout.exists() else None,
     )
 
 

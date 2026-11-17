@@ -40,7 +40,7 @@ Three constraints shape it:
 | Step | What | |
 |---|---|---|
 | 1 | An opt-in PCB upload runs KiCad's DRC with schematic parity, and its findings are listed next to ERC's | done |
-| 2 | The model reads the DRC findings and computed layout facts, and cites them | proposed |
+| 2 | The model reads the DRC findings and computed layout facts, and cites them | done |
 | 3 | Rework can name tracks and vias | proposed |
 
 ## 1. An opt-in PCB upload runs KiCad's DRC with schematic parity, and its findings are listed next to ERC's: done
@@ -114,7 +114,7 @@ first file's name, which with the board sorted first was
 `board.kicad_pcb`; it takes the first sheet's now. `mypy` caught an
 unnarrowed regex match in the parser.
 
-## 2. The model reads the DRC findings and computed layout facts, and cites them: proposed
+## 2. The model reads the DRC findings and computed layout facts, and cites them: done
 
 - DRC entries become citable evidence (`drc-3`), as ERC entries are.
 - A parser for the `.kicad_pcb` (pads, tracks, vias, zones) turns the
@@ -169,6 +169,85 @@ is an IC with an `SW`/`LX` pin (`power.py`'s `_SW_PIN`); its limit is no
 GND zone fill on an adjacent layer covering the IC's and its inductor's
 pads. On a board saved with unfilled zones, the ground zone fact says
 the coverage isn't known and doesn't flag.
+
+Decided (2026-11-17), in the build: a supply pin is every IC pin on a
+rail that `is_supply_pin` accepts (`VIN`, `V+`, `VDD`, …), not only the
+power tree's load pins: a regulator the tree doesn't recognise as a load
+still needs its input capacitor, and `usbc-buck`'s U1 was missing from
+the tree's loads.
+Decided (2026-11-17), in the build: the copper path runs over a graph of
+pads, track ends and vias (`layout._paths`), where a filled zone joins
+everything it touches in a straight line. A fill counts as touching a
+pad within 0.6 mm of the pad's edge (`_RELIEF_MM`), past KiCad's default
+0.5 mm thermal-relief gap.
+Decided (2026-11-17), in the build: the ground zone limit is 75% of the
+area under the IC's and its inductor's pads (`GROUND_FILL_PCT`),
+measured on a 0.1 mm grid (`_GRID_MM`). Rejected: any fill at all (a
+pour that clips one pad corner would pass).
+Decided (2026-11-17), in the build: the facts are numbered decoupling,
+then ground zone, then track width. Track widths need the datasheets'
+budgets, so the summary has none; the `datasheet_facts` event carries
+the full `layout` list and goes out whenever it differs from the
+summary's.
+Decided (2026-11-17), in the build: a board that `board.parse` can't
+read costs only its layout facts: the run goes on, DRC stands, and the
+log says why (`service._parse_board`).
+Decided (2026-11-17), in the build: the planted case is
+`usbc-buck-cin-far`. Its edit moves all three input capacitors C1-C3
+beside J1, not one capacitor 20 mm away: with C3 left in place the
+nearest one stays 5.5 mm from U1's `VIN`. U1.2 is now 44.8 mm of copper
+from C2 (about 24 mm in a straight line), and KiCad 9 DRC gives the same
+29 entries before and after.
+Decided (2026-11-17), in the build: an eval case's `layout.txt` comes
+from `evals/layout_text.py`, which runs the app's `layout.check` and
+`layout.format_board` on the case's netlist. Its power tree has no
+budgets, so eval cases get no track width facts.
+Decided (2026-11-17), in the build: under a claim, the UI lists the ERC,
+DRC and layout entries it cites (`citedEntries` in `present.ts`), so a
+cite chip shows its text without scrolling to the list.
+Decided (2026-11-17), in the build: a gap left for later: the TPS54331's
+switch pin is `PH`, which `power.py`'s `_SW_PIN` (`LX\d*|SW\d*`) doesn't
+match, so `usbc-buck` gets no ground zone fact.
+Decided (2026-11-18): the 5 mm decoupling limit stays, and
+`usbc-buck-no-fault`'s decoupling issue (5.5 mm and 18 mm, flagged) is
+judged real in its `judged.md`: the facts are true and the issue is
+may-fail. Rejected: judging it wrong and raising the limit, or not
+flagging capacitors of non-switching parts (an 18 mm op-amp supply path
+is a real weakness).
+
+**Checks:** `backend/tests/golden/ecc83_kicad9.kicad_pcb` and
+`ecc83_kicad10.kicad_pcb` are KiCad's `ecc83-pp` demo saved by each
+version; in `tests/test_debug_board.py` (4 tests) both parse to the same
+33 pads, 59 tracks and one filled GND zone on B.Cu.
+`tests/test_debug_layout.py` (17 tests, hand-built boards) covers a
+decoupling path through a T-junction (13.0 mm, flagged), across a zone,
+past a thermal-relief gap, with no copper and with an unfilled zone;
+ground fill at 100%, partial and none; IPC-2221 at 1 A (0.30 mm outside,
+0.78 mm inside) and a narrow budgeted track numbered after the
+decoupling fact; and `format_board`. `tests/test_debug.py` gains 4
+evidence tests: a `pl` cite vouches for its pins and net, a `drc` cite
+keeps the label, an unknown `pl9` or `drc-9` is downgraded, and a board
+claim citing only `erc` is downgraded. `tests/test_debug_service.py`
+gains 2: a sent board reaches the prompt and the record (an older record
+without `drc` and `layout` still loads), and a board that doesn't parse
+costs only its layout facts. `make lint` and `make test` passed (553
+backend, 65 frontend), each sub-target run on its own. `make eval-score`
+(`evals/README.md`, "With the board's DRC and layout facts") against
+the 2026-11-14 baseline: planted cases ranked the bug #1 in 22 of 33
+runs (21 of 30 before), `usbc-buck-cin-far` at #4, #2 and #2 citing
+`pl1`/`pl2`; the 1 planted miss is an Auto-check miss in
+`rust-board-fb-swapped`; real bugs 7 #1 and 4 missed (6 and 5 before);
+53 issues judged wrong (60 before), 18 of 38 on the no-fault boards (20
+of 31 before); 33 claims rest on `board` evidence. The new false-alarm
+risk is `usbc-buck-no-fault`'s decoupling issue, raised as may-fail in
+all 3 runs from the flagged 5.5 mm and 18 mm facts; the facts are true,
+so its `judged.md` counts it real.
+Bugs found: `usbc-buck`'s U1 wasn't a load in the power tree, so it had
+no decoupling fact (hence every supply pin, above); `plant.py` looked a
+reference up wrongly; mypy caught two loop variables reused with another
+type (`board.py`, `layout.py`) and `_parse_board`'s `str | None` path;
+ruff B023 caught `amps` bound late in a closure; the exact-event test of
+`datasheet_facts` lacked the new `layout` key.
 
 ## 3. Rework can name tracks and vias: proposed
 

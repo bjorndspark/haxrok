@@ -590,6 +590,17 @@ def _is_in(function: str) -> bool:
     return not re.search(r"[+\-]", function) and _IN_PIN.fullmatch(_norm(function)) is not None
 
 
+def is_supply_pin(function: str) -> bool:
+    """A pin an IC takes power on: a load pin (VDD, VCC…) or a regulator's
+    input (VIN, PVIN…)."""
+    return _LOAD_PIN.match(function) is not None or _is_in(function)
+
+
+def is_switch_pin(function: str) -> bool:
+    """A switching regulator's switch node (SW, LX)."""
+    return _SW_PIN.fullmatch(_norm(function)) is not None
+
+
 def _pin_index(design: Design) -> _Pins:
     """(pin name, net) for each connected pin, by ref."""
     index: dict[str, list[tuple[str, str]]] = {}

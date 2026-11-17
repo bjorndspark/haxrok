@@ -8,9 +8,9 @@ claim's conclusion follows from them. That is still the model's reasoning.
 Rules for a claim with evidence other than ``none``:
 
 1. Every citation resolves (pin on that net; pin has that name in the
-   netlist, and the text uses it; ERC id exists; pin in the pin table;
-   datasheet fact id exists; reference note or calculation id exists;
-   measurement id exists).
+   netlist, and the text uses it; ERC id exists; DRC id exists; layout
+   fact id exists; pin in the pin table; datasheet fact id exists;
+   reference note or calculation id exists; measurement id exists).
 2. At least one citation is of the kind its label needs (schematic needs a
    pin_on_net or pin_name, and so on).
 3. Every pin and net the text names is cited. This catches a claim that
@@ -22,7 +22,8 @@ removed or reported as ``Problem``s.
 """
 
 import re
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from app.features.debug.design import PIN_MENTION, Design, normalize_pin
 from app.features.debug.schemas import (
@@ -32,8 +33,10 @@ from app.features.debug.schemas import (
     CheckedClaim,
     Cite,
     Claim,
+    DrcEntry,
     ErcEntry,
     Hypothesis,
+    LayoutFact,
     Problem,
     SetupChange,
 )
@@ -54,6 +57,8 @@ class EvidenceContext:
     measurement_ids: frozenset[str]
     reference_ids: frozenset[str] = frozenset()  # rd1…, cf1… from reference.lookup
     datasheet_ids: frozenset[str] = frozenset()  # ds1… facts.FactReader, dv1… application
+    drc: dict[str, DrcEntry] = field(default_factory=dict)  # drc-1… from the board's DRC
+    layout: dict[str, LayoutFact] = field(default_factory=dict)  # pl1… from layout.check
 
 
 def check(analysis: Analysis[Claim], ctx: EvidenceContext) -> CheckedAnalysis:
@@ -139,15 +144,21 @@ def _claim_failure(claim: Claim, ctx: EvidenceContext) -> str | None:
         kinds = " or ".join(sorted(needed))
         return f"It is labelled {claim.evidence} but cites no {kinds} reference."
 
+    # A layout fact vouches for the pins and the net it is about.
+    facts = [f for c in claim.cites if c.kind == "layout" and c.id and (f := ctx.layout.get(c.id))]
     cited_pins = {normalize_pin(c.pin) for c in claim.cites if c.pin}
+    cited_pins |= {normalize_pin(p) for f in facts for p in f.pins}
     cited_nets = {
         ctx.design.resolve_net(c.net) for c in claim.cites if c.kind == "pin_on_net" and c.net
     }
-    # An ERC entry vouches for the nets and parts its message and items name.
+    cited_nets |= {ctx.design.resolve_net(f.net) for f in facts if f.net}
+    # An ERC or DRC entry vouches for the nets and parts its message and
+    # items name.
+    entries: dict[str, Mapping[str, ErcEntry | DrcEntry]] = {"erc": ctx.erc, "drc": ctx.drc}
     erc_text = " ".join(
         f"{e.message} {' '.join(e.items)}"
         for c in claim.cites
-        if c.kind == "erc" and c.id and (e := ctx.erc.get(c.id))
+        if c.kind in entries and c.id and (e := entries[c.kind].get(c.id))
     )
     for pin in mentioned_pins(claim.text):
         if pin not in cited_pins:
@@ -182,6 +193,12 @@ def _cite_failure(cite: Cite, ctx: EvidenceContext) -> str | None:
         case "erc":
             if not cite.id or cite.id not in ctx.erc:
                 return f"KiCad's checker has no entry {cite.id}."
+        case "drc":
+            if not cite.id or cite.id not in ctx.drc:
+                return f"KiCad's DRC has no entry {cite.id}."
+        case "layout":
+            if not cite.id or cite.id not in ctx.layout:
+                return f"There is no layout fact {cite.id}."
         case "pin_function":
             if not cite.pin:
                 return "A datasheet reference is missing its pin."

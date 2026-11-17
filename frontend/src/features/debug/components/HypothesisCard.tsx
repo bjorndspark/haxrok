@@ -8,6 +8,7 @@ import { Prompt } from "@/shared/ui/prompt"
 import { useMessages } from "../messages"
 import {
   assess,
+  citedEntries,
   citedLines,
   confidenceLabel,
   findingTokens,
@@ -39,6 +40,7 @@ import { WiringDiagram } from "./WiringDiagram"
 const EVIDENCE_TONE: Record<Evidence, BadgeProps["tone"]> = {
   schematic: "info",
   erc: "warn",
+  board: "warn",
   datasheet: "ok",
   reference: "ok",
   measurement: "ok",
@@ -145,6 +147,7 @@ function ClaimRow({ claim, summary }: { claim: CheckedClaim; summary: DesignSumm
   const m = useMessages()
   const label = m.present.evidence
   const cited = citedLines(claim, summary)
+  const entries = citedEntries(claim, summary)
   return (
     <div className="flex flex-col gap-1 border-l-2 pl-[1ch] sm:flex-row sm:items-start sm:gap-[1ch]">
       <Badge tone={EVIDENCE_TONE[claim.evidence]} bracket className="self-start">
@@ -157,6 +160,16 @@ function ClaimRow({ claim, summary }: { claim: CheckedClaim; summary: DesignSumm
             {cited.map((line) => (
               <li key={line.id} className="leading-relaxed">
                 <DatasheetLineText line={line} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {entries.length > 0 && (
+          <ul className="space-y-0.5 text-xs">
+            {entries.map((e) => (
+              <li key={e.id} className="leading-relaxed">
+                <span className="mr-[1ch] font-bold text-info">{e.id}</span>
+                {e.text}
               </li>
             ))}
           </ul>

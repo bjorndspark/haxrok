@@ -5,6 +5,7 @@ switch node shorted onto the +3V3 output rail, the classic wiring fault the
 checker's rules are written for.
 """
 
+import dataclasses
 import json
 import pathlib
 
@@ -28,9 +29,11 @@ from app.features.debug.schemas import (
     Cite,
     Claim,
     ConfirmStep,
+    DrcEntry,
     ErcEntry,
     Fix,
     Hypothesis,
+    LayoutFact,
     Reading,
     SetupChange,
 )
@@ -215,6 +218,66 @@ def test_erc_claim_may_name_nets_from_its_entry(ctx):
 def test_unknown_erc_entry_is_downgraded(ctx):
     c = check_claim(claim("KiCad flagged a merge.", "erc", ref("erc", "erc-9")), ctx)
     assert c.downgraded
+
+
+@pytest.fixture(scope="module")
+def board_ctx(ctx) -> EvidenceContext:
+    """The ``ctx`` design with a board: one DRC entry and one layout fact
+    about U2.12 (VIN) and C1."""
+    return dataclasses.replace(
+        ctx,
+        drc={
+            "drc-1": DrcEntry(
+                id="drc-1",
+                rule="unconnected_items",
+                severity="error",
+                message="Missing connection between items",
+                items=["Pad 12 [VDD] of U2 on F.Cu", "Pad 1 [VDD] of C1 on F.Cu"],
+            )
+        },
+        layout={
+            "pl1": LayoutFact(
+                id="pl1",
+                kind="decoupling",
+                refs=["U2", "C1"],
+                pins=["U2.12", "C1.1"],
+                net="VDD",
+                value=12.0,
+                limit=5.0,
+                unit="mm",
+                flagged=True,
+                text="U2.12 (VIN, VDD): nearest decoupling capacitor C1, 12.0 mm.",
+            )
+        },
+    )
+
+
+def test_board_claim_citing_a_layout_fact_may_name_its_pins_and_net(board_ctx):
+    c = check_claim(
+        claim("C1.1 is 12 mm of copper from U2.12 on VDD.", "board", ref("layout", "pl1")),
+        board_ctx,
+    )
+    assert c.evidence == "board"
+    assert not c.downgraded
+
+
+def test_board_claim_citing_a_drc_entry_keeps_its_label(board_ctx):
+    c = check_claim(
+        claim("KiCad's DRC finds VDD unrouted.", "board", ref("drc", "drc-1")), board_ctx
+    )
+    assert not c.downgraded
+
+
+@pytest.mark.parametrize("cite", [ref("layout", "pl9"), ref("drc", "drc-9")])
+def test_unknown_board_cite_is_downgraded(board_ctx, cite):
+    c = check_claim(claim("The board has a problem.", "board", cite), board_ctx)
+    assert c.downgraded
+
+
+def test_board_claim_needs_a_board_cite(board_ctx):
+    c = check_claim(claim("The layout is poor.", "board", ref("erc", "erc-1")), board_ctx)
+    assert c.downgraded
+    assert "cites no drc or layout" in (c.reason or "")
 
 
 def test_datasheet_claim_needs_pin_table_entry(ctx):

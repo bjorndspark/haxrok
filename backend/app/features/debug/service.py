@@ -39,6 +39,7 @@ from app.features.debug import (
     context,
     diagram,
     keys,
+    layout,
     mcu,
     pins,
     power,
@@ -50,6 +51,8 @@ from app.features.debug import (
     spice_circuits,
     spice_convert,
 )
+from app.features.debug.board import Board
+from app.features.debug.board import parse as parse_board
 from app.features.debug.datasheet import DatasheetFinder
 from app.features.debug.design import (
     Design,
@@ -70,6 +73,7 @@ from app.features.debug.schemas import (
     Claim,
     DatasheetStatus,
     DesignSummary,
+    DrcEntry,
     ErcEntry,
     ErrorEvent,
     Language,
@@ -129,6 +133,9 @@ class Prepared:
     analyses: tuple[SimAnalysis, ...] = ("startup",)  # the vendor-model simulations
     battery: power.Range | None = None  # the review form's battery range, if given
     baseline: review_file.Baseline = field(default_factory=review_file.Baseline)
+    board: Board | None = None  # the parsed .kicad_pcb, when one was sent and parsed
+    drc: list[DrcEntry] = field(default_factory=list)
+    drc_skipped: str = ""  # why DRC didn't run on a board that was sent
 
 
 async def prepare(
@@ -166,6 +173,7 @@ async def prepare(
         drc = parse_drc(output.drc) if output.drc else []
     except ValueError as e:
         raise BadRequestError(f"Couldn't parse kicad-cli's output: {e}") from e
+    board = _parse_board(project.name, project.board, project.files)
     labels = parse_labels(project.files)
     lookup = pins.lookup(design, erc, labels)
     notes = reference.lookup(design)
@@ -184,6 +192,9 @@ async def prepare(
     # read; kept out of Prepared.calculations, which the power tree and the
     # simulations read.
     pin_rules = mcu.check(design, tree, mcu.rules(design), first_id=len(calcs) + 1)
+    # Without the datasheets' budgets the tree gives no track widths; the
+    # datasheet_facts event's layout facts add them.
+    facts = layout.check(design, board, tree) if board is not None else []
     summary = DesignSummary(
         mode=mode,
         project=project.name,
@@ -198,6 +209,7 @@ async def prepare(
         if project.board
         else None,
         drc=drc,
+        layout=facts,
         wiring=lookup.findings,
         pin_warnings=lookup.warnings,
         references=notes,
@@ -223,7 +235,23 @@ async def prepare(
         analyses=tuple(analyses),
         battery=battery,
         baseline=review_file.read(project) if mode == "review" else review_file.Baseline(),
+        board=board,
+        drc=drc,
+        drc_skipped=output.drc_skipped,
     )
+
+
+def _parse_board(project: str, path: str | None, files: dict[str, bytes]) -> Board | None:
+    """The sent ``.kicad_pcb``, parsed, or None when none was sent. A board
+    that doesn't parse costs only its layout facts, never the run: DRC has
+    already read it with kicad-cli."""
+    if not path or path not in files:
+        return None
+    try:
+        return parse_board(files[path].decode("utf-8", errors="replace"))
+    except (ValueError, IndexError) as e:
+        logger.warning("%s: couldn't read %s for layout facts: %s", project, path, e)
+        return None
 
 
 async def stream(
@@ -468,9 +496,14 @@ async def _review(
         erc=prepared.erc,
         labels=prepared.labels,
         battery=prepared.battery,
+        board=prepared.board,
+        drc=prepared.drc,
+        drc_skipped=prepared.drc_skipped,
     )
     rec.append("context", record.context_data(ctx))
-    if facts is not None and found_sheets:
+    # The budgeted tree can add track widths the summary's layout facts
+    # lack, so the event also goes out when only those changed.
+    if (facts is not None and found_sheets) or ctx.layout != prepared.summary.layout:
         yield _event("datasheet_facts", context.facts_event(ctx).model_dump_json())
     yield _progress("pin_lookup", context.progress_note(ctx))
     review = prepared.mode == "review"

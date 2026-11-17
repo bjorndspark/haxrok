@@ -12,6 +12,7 @@ import type {
   Diagram,
   GlossaryEntry,
   Hypothesis,
+  LayoutFact,
   Run,
   PinWarning,
   PowerTree,
@@ -303,6 +304,33 @@ export function citedLines(claim: CheckedClaim, summary: DesignSummary | null): 
     const line = lines.find((l) => l.id === id)
     return line ? [linkPage(line, summary)] : []
   })
+}
+
+/** A KiCad entry or layout fact a claim cites, as its row reads. */
+export interface CitedEntry {
+  id: string
+  text: string
+}
+
+/** The KiCad ERC and DRC entries (erc-N, drc-N) and layout facts (plN)
+ *  `claim` cites, in the order cited, so the claim shows what it rests on. */
+export function citedEntries(claim: CheckedClaim, summary: DesignSummary | null): CitedEntry[] {
+  if (!summary) return []
+  const entries: CitedEntry[] = [
+    ...summary.erc.map((e) => ({ id: e.id, text: `${e.rule}: ${e.message}` })),
+    ...summary.drc.map((e) => ({ id: e.id, text: `${e.rule}: ${e.message}` })),
+    ...(summary.layout ?? []).map((f) => ({ id: f.id, text: f.text })),
+  ]
+  const kinds = new Set(["erc", "drc", "layout"])
+  const ids = [...new Set(claim.cites.flatMap((c) => (c.id && kinds.has(c.kind) ? [c.id] : [])))]
+  return ids.flatMap((id) => entries.filter((e) => e.id === id))
+}
+
+/** The board's layout facts for the summary card, the may-fail ones first
+ *  (each group keeps the backend's order). */
+export function layoutFacts(summary: DesignSummary): LayoutFact[] {
+  const facts = summary.layout ?? []
+  return [...facts.filter((f) => f.flagged), ...facts.filter((f) => !f.flagged)]
 }
 
 /** A rail of the power tree, worded for the summary card. */

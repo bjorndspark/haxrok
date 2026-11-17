@@ -1108,6 +1108,50 @@ async def test_a_board_drc_skipped_says_why_and_the_run_goes_on():
     assert prepared.summary.erc
 
 
+async def test_a_sent_board_reaches_the_prompt_and_the_record_with_its_drc(tmp_path):
+    report = (pathlib.Path(__file__).parent / "golden" / "drc_kicad9.json").read_text()
+    files = [*_files(), ("board/board.kicad_pcb", b"(kicad_pcb)")]
+    prepared = await service.prepare(
+        files, "Dead", [], FakeKicad(drc=report), FakeDatasheets(), FakeSpiceModels()
+    )
+    assert prepared.board is not None
+    # No supply pin with a capacitor, no SW pin, no budget: no facts.
+    assert prepared.summary.layout == []
+    seen: list[str] = []
+
+    async def diagnose(system: str, user: str) -> str:
+        seen.append(user)
+        return "1. L2 tied to VOUT."
+
+    recorder = record.FileRecorder(tmp_path, record.new_run_id())
+    model = service.Model(diagnose, _structure)
+    events = [e["event"] async for e in service.stream(prepared, model, recorder=recorder)]
+    assert "## Board (the .kicad_pcb" in seen[0]
+    assert "KiCad DRC:\ndrc-1 [" in seen[0]
+    assert "Layout facts:\n(none: " in seen[0]
+    # The layout didn't change from the summary's, so no facts event for it.
+    assert "datasheet_facts" not in events
+
+    ctx = next(line["data"] for line in _record(recorder.path) if line["kind"] == "context")
+    back = record.evidence_context(ctx).evidence
+    assert sorted(back.drc) == ["drc-1", "drc-2"]
+    assert back.layout == {}
+    # A run recorded before boards had neither key.
+    old = {k: v for k, v in ctx.items() if k not in ("drc", "layout")}
+    assert record.evidence_context(old).evidence.drc == {}
+
+
+async def test_a_board_that_doesnt_parse_costs_only_its_layout_facts(caplog):
+    files = [*_files(), ("board/board.kicad_pcb", b"not a board")]
+    prepared = await service.prepare(
+        files, "Dead", [], FakeKicad(drc="{}"), FakeDatasheets(), FakeSpiceModels()
+    )
+    assert prepared.board is None
+    assert prepared.summary.board == BoardStatus(file="board.kicad_pcb", skipped="")
+    assert prepared.summary.layout == []
+    assert "couldn't read board.kicad_pcb for layout facts" in caplog.text
+
+
 async def test_stream_reads_found_datasheets_and_their_facts_back_claims():
     prepared = await service.prepare(
         _files(), "Dead", [], FakeKicad(), FakeDatasheets(), FakeSpiceModels()
@@ -1257,6 +1301,7 @@ async def test_datasheet_facts_names_a_datasheet_that_couldnt_be_read():
         "power": {"rails": [], "parts": [], "battery_override": False, "states": []},
         "wiring": [f.model_dump() for f in prepared.pin_lookup.findings],
         "calculations": [c.model_dump() for c in prepared.calculations],
+        "layout": [],
     }
 
 

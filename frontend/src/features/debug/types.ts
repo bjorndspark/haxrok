@@ -8,9 +8,19 @@ export type Mode = "debug" | "review"
 /** Review mode only: how badly an issue hurts the board. */
 export type Severity = "will_fail" | "may_fail" | "improve"
 
-export type Evidence = "schematic" | "erc" | "datasheet" | "reference" | "measurement" | "none"
+/** board: a KiCad DRC entry or a layout fact computed from the board. */
+export type Evidence =
+  "schematic" | "erc" | "board" | "datasheet" | "reference" | "measurement" | "none"
 export type CiteKind =
-  "pin_on_net" | "pin_name" | "erc" | "pin_function" | "datasheet" | "reference" | "measurement"
+  | "pin_on_net"
+  | "pin_name"
+  | "erc"
+  | "drc"
+  | "layout"
+  | "pin_function"
+  | "datasheet"
+  | "reference"
+  | "measurement"
 
 export interface Cite {
   kind: CiteKind
@@ -150,6 +160,22 @@ export interface DrcEntry {
   severity: string
   message: string
   items: string[]
+}
+
+/** A fact the backend computed from the board (layout.py) and judged
+ *  against a fixed limit; `flagged` is past it: may fail, not verified.
+ *  Claims cite it by id (`pl1`). */
+export interface LayoutFact {
+  id: string
+  kind: "decoupling" | "track_width" | "ground_zone"
+  refs: string[]
+  pins: string[]
+  net: string
+  value: number | null
+  limit: number | null
+  unit: string
+  flagged: boolean
+  text: string
 }
 
 /** The board that was sent; `skipped` says why DRC didn't run on it. */
@@ -502,6 +528,9 @@ export interface DatasheetFacts {
   /** With each IC pin's rail checked against its datasheet limits;
    *  replaces the summary's. Absent in older runs. */
   calculations?: Calculation[]
+  /** With track widths judged against the rails' budgets; replaces the
+   *  summary's. Absent in older runs. */
+  layout?: LayoutFact[]
 }
 
 export interface DesignSummary {
@@ -515,6 +544,8 @@ export interface DesignSummary {
   /** Null when no board was sent. */
   board: BoardStatus | null
   drc: DrcEntry[]
+  /** Absent in runs recorded before layout facts existed. */
+  layout?: LayoutFact[]
   wiring: WiringFinding[]
   pin_warnings: PinWarning[]
   references: ReferenceNote[]

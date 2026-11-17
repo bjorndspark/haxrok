@@ -7,6 +7,7 @@ import {
   markTokens,
   assess,
   calculationBadge,
+  citedEntries,
   citedLines,
   datasheetBadge,
   datasheetLines,
@@ -14,6 +15,7 @@ import {
   formatSi,
   hoverReadout,
   isVendorModel,
+  layoutFacts,
   modelBadge,
   nearestPoint,
   pairVendorSims,
@@ -34,6 +36,7 @@ import type {
   CheckedClaim,
   DesignSummary,
   Hypothesis,
+  LayoutFact,
   PowerTree,
   Run,
   SimCircuit,
@@ -719,6 +722,81 @@ describe("citedLines", () => {
 
   it("is empty without a summary", () => {
     expect(citedLines(datasheetClaim, null)).toEqual([])
+  })
+})
+
+function fact(id: string, flagged: boolean): LayoutFact {
+  return {
+    id,
+    kind: "decoupling",
+    refs: ["U1", "C2"],
+    pins: ["U1.2"],
+    net: "+5V",
+    value: flagged ? 44.8 : 2.1,
+    limit: 5,
+    unit: "mm",
+    flagged,
+    text: `${id} text`,
+  }
+}
+
+const boardSummary = {
+  ...sheetSummary,
+  erc: [
+    {
+      id: "erc-1",
+      sheet: "/",
+      rule: "pin_not_driven",
+      severity: "error",
+      message: "Input pin not driven",
+      items: [],
+    },
+  ],
+  drc: [
+    {
+      id: "drc-1",
+      rule: "clearance",
+      severity: "error",
+      message: "Clearance violation",
+      items: [],
+    },
+  ],
+  layout: [fact("pl1", false), fact("pl2", true), fact("pl3", false), fact("pl4", true)],
+} as DesignSummary
+
+describe("citedEntries", () => {
+  it("lists the cited ERC and DRC entries and layout facts in order, once each", () => {
+    const claim: CheckedClaim = {
+      ...datasheetClaim,
+      evidence: "board",
+      cites: [
+        { kind: "layout", pin: null, net: null, id: "pl2" },
+        { kind: "drc", pin: null, net: null, id: "drc-1" },
+        { kind: "erc", pin: null, net: null, id: "erc-1" },
+        { kind: "layout", pin: null, net: null, id: "pl2" },
+        { kind: "layout", pin: null, net: null, id: "pl9" },
+        { kind: "datasheet", pin: null, net: null, id: "dv1" },
+      ],
+    }
+    expect(citedEntries(claim, boardSummary)).toEqual([
+      { id: "pl2", text: "pl2 text" },
+      { id: "drc-1", text: "clearance: Clearance violation" },
+      { id: "erc-1", text: "pin_not_driven: Input pin not driven" },
+    ])
+  })
+
+  it("is empty without a summary", () => {
+    expect(citedEntries(datasheetClaim, null)).toEqual([])
+  })
+})
+
+describe("layoutFacts", () => {
+  it("puts the may-fail facts first, each group in the backend's order", () => {
+    expect(layoutFacts(boardSummary).map((f) => f.id)).toEqual(["pl2", "pl4", "pl1", "pl3"])
+  })
+
+  it("is empty for a run from before layout facts", () => {
+    expect(layoutFacts(sheetSummary)).toEqual([])
   })
 })
 

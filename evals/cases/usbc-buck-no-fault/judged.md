@@ -1,8 +1,9 @@
 # Judged issues: usbc-buck-no-fault
 
 Agent judgements from the 2026-11-14 sweep, confirmed by the user in
-plan 012 step 5; `make eval-score` matches each review issue against
-these (format in `evals/judged.py`).
+plan 012 step 5, and from the 2026-11-17 sweep with the board's layout
+facts, confirmed in plan 013 step 2; `make eval-score` matches each
+review issue against these (format in `evals/judged.py`).
 
 ## CC REF stuck at 5 V, buck never enables
 Verdict: wrong
@@ -26,3 +27,9 @@ Verdict: real
 Cites: j1.s1|unconnected-(j1-shield-pads1)
 Match: shield|shell
 Why: The board works with the shell open, but tying it to GND (directly or through an RC) gives ESD and cable noise a path. Fair as an improvement, not as an error.
+
+## Decoupling capacitors far from U1 VIN and U2 V+
+Verdict: real
+Cites: u1.2|u2.8
+Match: decoupl|capacitor|cap
+Why: The layout facts are true: `C3` is 5.5 mm of copper from `U1` VIN and `C1` 18 mm from the LM358's V+ (`pl1`, `pl2`). The board works, so it is a may-fail layout weakness, fair to raise, not a fault.

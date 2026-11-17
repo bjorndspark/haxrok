@@ -5,8 +5,8 @@ is checked against.
 and returns a ``ReviewContext``: the pin table and wiring findings, the
 budgeted power tree, the calculations with the datasheet-limit,
 microcontroller, part-rating, rail-order and connector-ESD checks added,
-the deviations from each typical application, the first call's user
-message and the ``EvidenceContext``.
+the deviations from each typical application, the layout facts when a
+board was sent, the first call's user message and the ``EvidenceContext``.
 The app's review (``service._review``) and the evals
 (``evals/app_prompts.py``) both call it, so the prompt an eval measures is
 the one the app sends. The progress text and the ``datasheet_facts``
@@ -21,6 +21,7 @@ from app.features.debug import (
     budget,
     calc,
     esd,
+    layout,
     mcu,
     pins,
     power,
@@ -32,6 +33,7 @@ from app.features.debug import (
     spice_circuits,
     voltage,
 )
+from app.features.debug.board import Board
 from app.features.debug.design import Design, Label, compact, format_erc
 from app.features.debug.evidence import EvidenceContext
 from app.features.debug.facts import DatasheetReading
@@ -40,7 +42,9 @@ from app.features.debug.schemas import (
     DatasheetFactsEvent,
     DatasheetLine,
     DatasheetReadFailure,
+    DrcEntry,
     ErcEntry,
+    LayoutFact,
     Measurement,
     Mode,
     PowerTree,
@@ -59,6 +63,7 @@ class ReviewContext:
     calculations: list[Calculation]  # the netlist's, then the limit and MCU checks
     deviations: list[application.Deviation]
     references: list[ReferenceNote]
+    layout: list[LayoutFact]  # computed from the board, with the budgeted tree
     user: str  # the first call's user message
     evidence: EvidenceContext
 
@@ -136,6 +141,10 @@ def build(
     labels: Sequence[Label] = (),
     battery: power.Range | None = None,
     erc_report: str | None = None,
+    board: Board | None = None,
+    drc: Sequence[DrcEntry] = (),
+    drc_skipped: str = "",
+    board_report: str | None = None,
 ) -> ReviewContext:
     """The review's input for one board. ``calculations`` are the
     netlist's (``calc.lookup``); the datasheet-limit, microcontroller,
@@ -143,7 +152,12 @@ def build(
     numbered after them.
     ``erc_report`` is the ERC as the model reads it when it came as
     kicad-cli's text report (an eval case) rather than as parsed ``erc``
-    entries."""
+    entries.
+    ``board`` is the parsed ``.kicad_pcb`` when one was sent, with its DRC
+    entries (``drc``) or why DRC didn't run (``drc_skipped``); the layout
+    facts are computed from it here. ``board_report`` is the board section
+    as the model reads it when it came as text (an eval case's
+    ``layout.txt``) rather than as a parsed board."""
     table = wiring(design, reading, erc, labels)
     tree = budgeted_tree(design, calculations, reading, battery)
     calcs = calculations + voltage.check(
@@ -154,6 +168,13 @@ def build(
     calcs += sequencing.check(design, tree, reading.sequencing, first_id=len(calcs) + 1)
     calcs += esd.check(design, tree, reading.facts, first_id=len(calcs) + 1)
     deviations = application.check(design, reading.application)
+    facts = layout.check(design, board, tree) if board is not None else []
+    if board_report is not None:
+        board_text = board_report
+    elif board is not None or drc or drc_skipped:
+        board_text = layout.format_board(drc, facts, drc_skipped)
+    else:
+        board_text = ""
     user = prompt.build_user_message(
         mode=mode,
         symptoms=symptoms,
@@ -168,6 +189,7 @@ def build(
         datasheet_facts=reading.text,
         deviations=application.format_deviations(deviations) if reading.application else "",
         power=power.format_power(tree),
+        board=board_text,
     )
     evidence = EvidenceContext(
         design=design,
@@ -177,6 +199,8 @@ def build(
         measurement_ids=frozenset(m.id for m in measurements),
         reference_ids=frozenset([n.id for n in references] + [c.id for c in calcs]),
         datasheet_ids=reading.ids | {d.id for d in deviations},
+        drc={e.id: e for e in drc},
+        layout={f.id: f for f in facts},
     )
     return ReviewContext(
         reading=reading,
@@ -185,6 +209,7 @@ def build(
         calculations=calcs,
         deviations=deviations,
         references=references,
+        layout=facts,
         user=user,
         evidence=evidence,
     )
@@ -242,4 +267,5 @@ def facts_event(ctx: ReviewContext) -> DatasheetFactsEvent:
         datasheet_failures=[
             DatasheetReadFailure(ref=ref, reason=why) for ref, why in ctx.reading.failed.items()
         ],
+        layout=ctx.layout,
     )
