@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-17 | 2026-11-17 | in progress | — | `001-mvp-scope.md` (sends only `.kicad_pro` and `*.kicad_sch`; "the PCB stays here"), `012-benchmark-scorecard.md` (checked a board's pad nets against its `.kicad_pcb` by hand), `DECISIONS.md` ("No auth": runs are recorded on disk) |
+| 2026-11-17 | 2026-11-18 | in progress | — | `001-mvp-scope.md` (sends only `.kicad_pro` and `*.kicad_sch`; "the PCB stays here"), `012-benchmark-scorecard.md` (checked a board's pad nets against its `.kicad_pcb` by hand), `DECISIONS.md` ("No auth": runs are recorded on disk) |
 
 The app reviews and debugs from the schematic alone. Since plan 001 the
 frontend has sent only the `.kicad_pro` and `*.kicad_sch` files, so the
@@ -257,3 +257,29 @@ ruff B023 caught `amps` bound late in a closure; the exact-event test of
 
 **Checks:** schema and evidence tests; `make eval-score` against the
 baseline.
+
+Decided (2026-11-18): pads anchor a board rework. `ReworkStep` gains an
+optional `board` field: `action` (`cut`, `jumper` or `drill_via`), `net`,
+`from_pad` and `to_pad` (`U1.2`). The evidence check accepts a `cut` or
+`drill_via` when a track or via on that net lies on the copper path
+between the two pads (`layout._paths`), and a `jumper` when both pads are
+on the board. Rejected: listed track ids (`t12`, `v3`; a real board's
+hundreds of segments cost prompt on every run); free text only (a cut
+can't be checked against the copper).
+Decided (2026-11-18): a rework the evidence check rejects stays in the
+fix without its `board` link; the UI marks it "not on the board" with
+the reason, and the run's problems record it, the way a downgraded
+claim is kept. Rejected: dropping the step (one wrong pad loses a good
+idea); `practical: false` (mixes "can't do by hand" with "not on the
+board").
+Decided (2026-11-18): `make eval-score` runs review mode only, where
+rework is empty, so `usbc-buck-cin-far` gains a `symptom.md` and
+`make eval-app case=usbc-buck-cin-far` runs 3 times in debug mode,
+counting the board reworks and how many pass the evidence check.
+`make eval-score` still runs as a regression against the baseline.
+Rejected: `make eval-score` only (nothing measures whether the model
+names a track); a debug mode in `scorecard.py` (a new check script, a
+step of its own).
+Decided (2026-11-18), defaults: a run without a board keeps today's
+prompt line ("never name traces or vias"), and a `board` link in it is
+rejected as above. Review mode keeps rework empty, board or not.
