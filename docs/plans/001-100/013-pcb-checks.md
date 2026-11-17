@@ -129,6 +129,47 @@ unnarrowed regex match in the parser.
 **Checks:** parser tests on a committed board; `make eval-score` misses
 and wrong issues against the baseline.
 
+Decided (2026-11-17): the code judges each layout fact against a fixed
+limit, and a fact past it reads "may fail, not verified", the way the
+power budget does. Every fact gives its number, so the model can cite a
+good layout to rule a cause out. Rejected: numbers only (the model's
+judgement varies run to run and can't be unit-tested); only the facts
+past a limit (the model can't rule a cause out).
+Decided (2026-11-17): a board the container's `kicad-cli` 9.0.2 can't
+load still gets layout facts: the app's own parser reads only pads,
+tracks, vias and zones, whose form is the same in KiCad 9 and 10. DRC
+stays skipped for it, as step 1 decided. Tests cover the `ecc83-pp` demo
+saved in each version. Rejected: no layout facts when DRC is skipped
+(this machine's KiCad 10.0.8 boards would get nothing).
+Decided (2026-11-17): two board-backed eval cases. An eval case gains a
+`layout.txt` (the DRC and layout facts text the prompt gets). A planted
+case moves `usbc-buck`'s input capacitor 20 mm from the buck's VIN in
+the source repo's `.kicad_pcb`; `usbc-buck-no-fault` gets its board, to
+catch false layout alarms. The baseline in `evals/README.md` gains both.
+Rejected: a regression run only (nothing measures whether the model uses
+layout facts); the no-fault board only (nothing the model should find).
+Decided (2026-11-17): the SSE summary carries the layout facts, and the
+UI lists them as "Layout facts (N)" under the KiCad DRC findings, the
+may-fail ones first. A cite chip (`pl3`) links to its row, the way
+`erc-N` does. Rejected: cite chips only (a may-fail fact the model
+didn't cite never reaches the user).
+Decided (2026-11-17), defaults: cite kinds `drc` (`drc-3`) and `layout`
+(`pl1`, `pl2`, …), and a claim resting on either has evidence `board`;
+the frontend's `types.ts` gains the same values. `board.py` parses the
+`.kicad_pcb` (pads, tracks, vias, zone fills, the stackup's copper
+thickness) and `layout.py` computes the facts, both pure functions like
+`power.py`. Decoupling: per IC supply pin (`power.py`'s load pins), the
+nearest capacitor between that pin's net and GND, and the copper path
+from its pad to the pin's pad along tracks and vias; when a zone is the
+only link, the straight-line distance, said so. Its limit is a path over
+5 mm. Track width: only on a rail whose budget has a known load; its
+limit is IPC-2221 at a 10 °C rise (k = 0.048 external, 0.024 internal)
+with the stackup's copper thickness, else 35 µm. Ground zone: a switcher
+is an IC with an `SW`/`LX` pin (`power.py`'s `_SW_PIN`); its limit is no
+GND zone fill on an adjacent layer covering the IC's and its inductor's
+pads. On a board saved with unfilled zones, the ground zone fact says
+the coverage isn't known and doesn't flag.
+
 ## 3. Rework can name tracks and vias: proposed
 
 - `Rework` allows a track cut, a jumper wire between two pads, and a via
