@@ -154,13 +154,38 @@ class ConfirmStep(_Strict):
     readings: list[Reading]
 
 
+class BoardRework(_Strict):
+    """A rework step's link to the board's copper, anchored by two pads.
+    ``evidence.check`` accepts a cut or drill_via when a track (cut) or via
+    (drill_via) of ``net`` lies on the copper path between the pads, and a
+    jumper when both pads are on the board."""
+
+    action: Literal["cut", "jumper", "drill_via"] = Field(
+        description="cut: cut a track. jumper: a wire between two pads. drill_via: drill out a via."
+    )
+    net: str | None = Field(
+        description="cut and drill_via: the net the track or via is on, as in the netlist. "
+        "jumper: null."
+    )
+    from_pad: str = Field(description='A pad as REF.PIN, e.g. "U1.2".')
+    to_pad: str = Field(
+        description="cut and drill_via: the pad at the other end of the copper path the "
+        "track or via is on. jumper: the pad the wire goes to."
+    )
+
+
 class ReworkStep(_Strict):
-    """Physical rework, at pin and part level only. The input has no PCB, so
-    never traces or vias. Always unverified."""
+    """Physical rework on the bench. Always unverified. ``board`` ties it to
+    the board's copper, when the user sent the board."""
 
     text: str
     practical: bool
     practical_note: str | None
+    board: BoardRework | None = Field(
+        description="The track, via or jumper on the board, when the step cuts a track, "
+        "drills a via or adds a wire between pads. Null otherwise, and always null when no "
+        "board was sent."
+    )
 
 
 class Fix(_Strict):
@@ -414,10 +439,12 @@ class CheckedClaim(Claim):
 class Problem(BaseModel):
     """A reference the checker removed or couldn't resolve outside a claim,
     e.g. an unknown symptom id in ``explains``. ``where`` is a hypothesis or
-    confirm-step id, so the UI can show it in place."""
+    confirm-step id, so the UI can show it in place. ``rework`` is the index
+    of a rework step in the hypothesis's fix whose board link was removed."""
 
     where: str
     message: str
+    rework: int | None = None
 
 
 class DiagramPin(BaseModel):

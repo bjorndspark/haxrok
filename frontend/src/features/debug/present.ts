@@ -13,6 +13,8 @@ import type {
   GlossaryEntry,
   Hypothesis,
   LayoutFact,
+  Problem,
+  ReworkStep,
   Run,
   PinWarning,
   PowerTree,
@@ -449,6 +451,24 @@ export function datasheetLines(summary: DesignSummary): {
   return { facts, deviations: (summary.deviations ?? []).map((d) => linkPage(d, summary)) }
 }
 
+/** A rework step's board line: the copper change the board confirmed, or
+ *  why the step's link was dropped (the problem the evidence check raised
+ *  for this step), or null when the step names no board change. */
+export function reworkBoardLine(
+  h: Hypothesis,
+  index: number,
+  step: ReworkStep,
+  problems: Problem[],
+  m: Messages,
+): { ok: boolean; text: string } | null {
+  const t = m.hypothesis
+  const rejected = problems.find((p) => p.where === h.id && p.rework === index)
+  if (rejected) return { ok: false, text: t.boardRejected(rejected.message) }
+  const b = step.board
+  if (!b) return null
+  return { ok: true, text: t.boardChecked(t.boardAction[b.action], b.from_pad, b.to_pad, b.net) }
+}
+
 /** The latest finished run as a Markdown bench report, headed with `app`
  *  (the project name, which is config). */
 export function toMarkdown(
@@ -526,7 +546,11 @@ export function toMarkdown(
       for (const r of s.readings) lines.push(`  - ${r.reading} → ${r.establishes}`)
     }
     lines.push("", t.fix)
-    for (const r of h.fix.rework) lines.push(`- ${t.rework} ${r.text}`)
+    h.fix.rework.forEach((r, i) => {
+      lines.push(`- ${t.rework} ${r.text}`)
+      const board = reworkBoardLine(h, i, r, result.problems, m)
+      if (board) lines.push(`  - ${board.text}`)
+    })
     for (const s of h.fix.schematic) lines.push(`- ${t.nextRevision} ${s}`)
   }
   const rc = run.simulations.filter((sim) => !isVendorModel(sim))

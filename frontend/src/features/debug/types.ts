@@ -64,10 +64,21 @@ export interface ConfirmStep {
   readings: Reading[]
 }
 
+/** A rework step's change to the board's copper, checked against the
+ *  uploaded board: a step whose link failed the check has none. */
+export interface BoardRework {
+  action: "cut" | "jumper" | "drill_via"
+  /** Null for a jumper. */
+  net: string | null
+  from_pad: string
+  to_pad: string
+}
+
 export interface ReworkStep {
   text: string
   practical: boolean
   practical_note: string | null
+  board: BoardRework | null
 }
 
 export interface Hypothesis {
@@ -97,6 +108,9 @@ export interface GlossaryEntry {
 export interface Problem {
   where: string
   message: string
+  /** Index into the hypothesis's `fix.rework` when the problem is a board
+   *  link that failed the check. */
+  rework: number | null
 }
 
 export interface DiagramPin {

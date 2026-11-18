@@ -2,7 +2,7 @@
 
 | Date | Updated | Status | Tracking | Related |
 |---|---|---|---|---|
-| 2026-11-17 | 2026-11-18 | in progress | — | `001-mvp-scope.md` (sends only `.kicad_pro` and `*.kicad_sch`; "the PCB stays here"), `012-benchmark-scorecard.md` (checked a board's pad nets against its `.kicad_pcb` by hand), `DECISIONS.md` ("No auth": runs are recorded on disk) |
+| 2026-11-17 | 2026-11-18 | done | — | `001-mvp-scope.md` (sends only `.kicad_pro` and `*.kicad_sch`; "the PCB stays here"), `012-benchmark-scorecard.md` (checked a board's pad nets against its `.kicad_pcb` by hand), `DECISIONS.md` ("No auth": runs are recorded on disk) |
 
 The app reviews and debugs from the schematic alone. Since plan 001 the
 frontend has sent only the `.kicad_pro` and `*.kicad_sch` files, so the
@@ -41,7 +41,7 @@ Three constraints shape it:
 |---|---|---|
 | 1 | An opt-in PCB upload runs KiCad's DRC with schematic parity, and its findings are listed next to ERC's | done |
 | 2 | The model reads the DRC findings and computed layout facts, and cites them | done |
-| 3 | Rework can name tracks and vias | proposed |
+| 3 | Rework can name tracks and vias | done |
 
 ## 1. An opt-in PCB upload runs KiCad's DRC with schematic parity, and its findings are listed next to ERC's: done
 
@@ -249,7 +249,7 @@ type (`board.py`, `layout.py`) and `_parse_board`'s `str | None` path;
 ruff B023 caught `amps` bound late in a closure; the exact-event test of
 `datasheet_facts` lacked the new `layout` key.
 
-## 3. Rework can name tracks and vias: proposed
+## 3. Rework can name tracks and vias: done
 
 - `Rework` allows a track cut, a jumper wire between two pads, and a via
   to drill out, each tied to a track or pad the board has.
@@ -283,3 +283,56 @@ step of its own).
 Decided (2026-11-18), defaults: a run without a board keeps today's
 prompt line ("never name traces or vias"), and a `board` link in it is
 rejected as above. Review mode keeps rework empty, board or not.
+Decided (2026-11-18), in the build: `Problem` gains `rework`, the index
+of the rework step whose board link the evidence check removed; the UI
+shows its reason under that step (`reworkBoardLine` in `present.ts`),
+not in the hypothesis's problem list, and a confirmed link as "Checked on
+the board". The bench report (`toMarkdown`) writes the same line.
+Decided (2026-11-18), in the build: the structure prompt is
+`STRUCTURE_BOARD` when a board was sent and `STRUCTURE` otherwise
+(`prompt.structure_prompt`), and the run records which by name.
+`EvidenceContext` gains `board_sent` and the parsed `board`; the record
+keeps only `board_sent`, so `make replay` rejects a board link as "the
+board's copper isn't available".
+Decided (2026-11-18), in the build: `layout.copper_path` gives the
+shortest copper path between two pads with the tracks and vias it runs
+through, on the copper graph `_paths` already built (now `_graph`).
+Decided (2026-11-18), in the build: `usbc-buck-cin-far` keeps the
+planted `board.kicad_pcb` (351 KB, the source's MIT licence), so
+`app_prompts.py` parses it for the evidence check. Its layout facts are
+the ones in `layout.txt`; one dangling track stub the planting script
+had pruned from `layout.txt`'s board was pruned here too. Its DRC needs
+the source's `.kicad_pro`, which the case doesn't keep.
+
+**Checks:** `tests/test_debug_layout.py` gains 4 `copper_path` tests
+(20 in all): a T-junction path of 13.0 mm over 3 tracks, a via to the
+back layer (2 tracks, 1 via), a path across a zone (no tracks), and none
+across nets or with no copper. `tests/test_debug.py` gains the board
+rework tests: a cut, a drilled via and a jumper pass; a cut with no
+track, a drilled via with no via, a missing pad, a net not in the
+schematic, a pad on another net, no copper between the pads, no board
+sent and copper not available are each rejected, the step kept without
+its link and the problem carrying its index. `tests/test_debug_service.py`'s
+sent-board test checks the `STRUCTURE_BOARD` prompt, the recorded prompt
+name and `board_sent` round-tripping without the copper.
+`present.test.ts` gains 3 `reworkBoardLine` tests. `make lint` and
+`make test` passed (566 backend, 68 frontend), each sub-target run on its
+own. `make eval-app case=usbc-buck-cin-far` in debug mode, 3 runs with
+the answer cache off: the bug ranked #1 in all 3; 5 rework steps (a
+10 µF capacitor tacked at U1, reflowed joints, a higher-current L1,
+separate wires from J4 to the loads), none of them a cut, jumper or
+drilled via, so none linked to the board and no link was rejected. The
+model never had cause to name a track or via on this fault, so only the
+tests cover the check. `make eval-score` (`evals/README.md`, "With board reworks") against
+the sweep above, review mode, whose prompts didn't change: 57 runs, 0
+failed; planted cases ranked the bug #1 in 22 of 33 runs (22 before),
+1 miss (`usbc-buck-cin-far` run 2, an Auto-check miss: its #3 issue cites
+`pl1`); real bugs 5 #1 and 7 missed (7 and 4 before, run-to-run
+variation in `enviro-node-usb-backfeed` and `lpddr5-fb-no-divider`); 53
+issues judged wrong (53 before), 19 of 37 on the unmodified boards.
+Bugs found: `copper_path` counted two touching track ends (joined at
+0 mm) as a track; ruff caught an import out of order in `evidence.py`;
+the 2nd and 3rd `make eval-app` runs came back from the AI answer cache
+in 0 s, so they were rerun with `AI_CACHE_TTL_S=0` as `scorecard.py`
+does; the review found `toMarkdown`'s doc comment left above
+`reworkBoardLine`.

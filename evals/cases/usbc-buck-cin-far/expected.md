@@ -2,8 +2,15 @@ Root cause: U1's input capacitors are far from its VIN pin. The planted
 edit moves C1, C2 and C3 (the +5V input caps of the TPS54331 buck U1)
 from beside U1 to beside the USB-C connector J1 and reroutes them, so
 the switching current loop runs through about 45 mm of +5V copper. The
-schematic is unchanged: only the PCB shows it. Review only: it has no
-`symptom.md`.
+schematic is unchanged: only the PCB shows it. Its `symptom.md` (written
+for plan 013 step 3, not from a bench) is what this layout would show:
+input ripple at U1's VIN and output ringing once the load passes about
+1.5 A.
+
+`board.kicad_pcb` is the planted board, kept so that the debug mode's
+evidence check can hold a board-linked rework to its copper. Its layout
+facts are the ones in `layout.txt`; its DRC needs the source's
+`USB power port.kicad_pro` beside it for the same entries.
 
 The layout facts the prompt gets name it: `pl1` (U1.2 VIN's nearest
 decoupling capacitor, C2, 44.8 mm of copper from pad to pad; about

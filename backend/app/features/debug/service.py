@@ -545,17 +545,16 @@ async def _review(
         # Only the write-up switches language: the diagnosis is reasoning the
         # user never sees, and the prompts that find bugs were tuned in English.
         structuring = time.monotonic()
+        system, system_name = prompt.structure_prompt(review=review, board=ctx.evidence.board_sent)
         analysis = await model.structure(
-            prompt.in_language(
-                prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE, prepared.language
-            ),
+            prompt.in_language(system, prepared.language),
             prompt.build_structure_message(diagnosis=diagnosis, user=ctx.user),
         )
         rec.append(
             "model",
             {
                 "name": "debug_analysis",
-                "prompt": "REVIEW_STRUCTURE" if review else "STRUCTURE",
+                "prompt": system_name,
                 "language": prepared.language,
                 "answer": analysis,
                 "seconds": round(time.monotonic() - structuring, 1),

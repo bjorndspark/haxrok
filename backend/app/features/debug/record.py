@@ -169,6 +169,8 @@ def context_data(ctx: ReviewContext) -> dict[str, object]:
         "datasheet_ids": ev.datasheet_ids,
         "drc": list(ev.drc.values()),
         "layout": list(ev.layout.values()),
+        # Only whether a board was sent: the run never records its copper.
+        "board_sent": ev.board_sent,
         "wiring": ctx.table.findings,
         "calculations": ctx.calculations,
     }
@@ -209,6 +211,9 @@ def evidence_context(data: Mapping[str, Any]) -> Recorded:
             datasheet_ids=frozenset(data["datasheet_ids"]),
             drc={e.id: e for e in drc},
             layout={f.id: f for f in facts},
+            # The copper isn't recorded, so a replay rejects a board-linked
+            # rework as "the board's copper isn't available".
+            board_sent=data.get("board_sent", False),
         ),
         findings=[WiringFinding.model_validate(w) for w in data["wiring"]],
         calculations=[Calculation.model_validate(c) for c in data["calculations"]],

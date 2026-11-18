@@ -20,8 +20,9 @@ Writes evals/results/<case>/<model>/app-diagnosis.md and app-analysis.json.
 ``--mode review`` sends the case with no symptoms through the review prompts
 (pre-fab review) and writes app-review-diagnosis.md / app-review-analysis.json.
 Prints where the Auto-check keywords (gonogo.py's rule) first match in the
-structured hypotheses; read the answer to judge it. The gateway can't take
-much concurrency, so run at most ~3 at once.
+structured hypotheses, and each rework step linked to the board with the
+evidence check's verdict (ok or REJECTED); read the answer to judge it.
+The gateway can't take much concurrency, so run at most ~3 at once.
 
 ``--sim startup[,load_step,dropout]`` also runs the vendor-model
 simulations as the app streams them (plan 006 steps 1–2), alongside the
@@ -51,12 +52,14 @@ from app.core.config import settings  # noqa: E402
 from app.features.debug import (  # noqa: E402
     calc,
     context,
+    evidence,
     pins,
     prompt,
     reference,
     spice_circuits,
     spice_convert,
 )
+from app.features.debug.board import parse as parse_board  # noqa: E402
 from app.features.debug.datasheet import Datasheets, DatasheetStore, HttpFetcher  # noqa: E402
 from app.features.debug.design import Design, Node, Part  # noqa: E402
 from app.features.debug.facts import DatasheetReading, FactReader, RedisFactsCache  # noqa: E402
@@ -109,9 +112,12 @@ def build_input(
     """The review's input for the case, built by ``context.build`` as the
     app builds it from the datasheets' ``reading``. Review mode drops the
     symptoms; the ERC goes in as the case's text report, and the board as
-    its ``layout.txt`` (the DRC and layout facts text the prompt gets)."""
+    its ``layout.txt`` (the DRC and layout facts text the prompt gets).
+    A case that keeps its ``board.kicad_pcb`` also has the parsed board, so
+    the evidence check can hold a board-linked rework to its copper."""
     erc = case_dir / "erc.txt"
     layout = case_dir / "layout.txt"
+    pcb = case_dir / "board.kicad_pcb"
     design = parse_compact((case_dir / "netlist.txt").read_text())
     return context.build(
         mode="review" if mode == "review" else "debug",
@@ -124,6 +130,7 @@ def build_input(
         references=reference.lookup(design),
         calculations=calc.lookup(design),
         erc_report=erc.read_text() if erc.exists() else "(none)",
+        board=parse_board(pcb.read_text()) if pcb.exists() else None,
         board_report=layout.read_text() if layout.exists() else None,
     )
 
@@ -261,7 +268,7 @@ async def answer(
     ctx = build_input(case_dir, reading, mode)
     review = mode == "review"
     diagnose_prompt = prompt.REVIEW_DIAGNOSE if review else prompt.DIAGNOSE
-    structure_prompt = prompt.REVIEW_STRUCTURE if review else prompt.STRUCTURE
+    structure_prompt, _ = prompt.structure_prompt(review=review, board=ctx.evidence.board_sent)
     start = time.monotonic()
     diagnosis = await complete_text(
         [
@@ -327,6 +334,14 @@ async def run(
         f"{case:22} {mark}  datasheets {read}  findings {findings}  "
         f"diagnose {result.diagnose_s:4.0f}s  total {result.total_s:4.0f}s  {titles}"
     )
+    checked = evidence.check(analysis, ctx.evidence)
+    rejected = {(p.where, p.rework) for p in checked.problems if p.rework is not None}
+    for h in analysis.hypotheses:
+        for i, step in enumerate(h.fix.rework):
+            if step.board is not None:
+                b = step.board
+                verdict = "REJECTED" if (h.id, i) in rejected else "ok"
+                print(f"  {h.id} rework {b.action} {b.net} {b.from_pad}-{b.to_pad}: {verdict}")
     if sims is not None:
         done = await sims
         (out_dir / f"{stem}-simulations.json").write_text(

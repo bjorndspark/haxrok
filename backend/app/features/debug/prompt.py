@@ -192,7 +192,9 @@ Keep every caveat the diagnosis gives: a part fact it marks UNVERIFIED stays \
 unverified (evidence none, with the datasheet section to check), and a fix \
 it makes wait on a check still waits on it."""
 
-STRUCTURE = f"""\
+# The debug structure prompt, up to its rework rule: STRUCTURE and
+# STRUCTURE_BOARD differ only there.
+_STRUCTURE = f"""\
 You turn a hardware engineer's diagnosis of a board into a structured answer \
 for a hobbyist with a multimeter. The diagnosis comes first, then the input it \
 was made from.
@@ -237,12 +239,54 @@ under a QFN); say why in practical_note.
 
 Fix
 - schematic: the change for the next revision.
-- rework: bodges for the board on the bench, at pin and part level only \
-(cut at a pin, lift a pin, bodge-wire pin to pin, swap a part). There is no \
-PCB data, so never name traces or vias.
+"""
 
+_STRUCTURE_IDS = """
 Ids: hypotheses h1, h2, h3; confirm steps h1-c1, h1-c2, ...
 """
+
+STRUCTURE = (
+    _STRUCTURE
+    + """\
+- rework: bodges for the board on the bench, at pin and part level only \
+(cut at a pin, lift a pin, bodge-wire pin to pin, swap a part). There is no \
+PCB data, so never name traces or vias. board: null.
+"""
+    + _STRUCTURE_IDS
+)
+
+# The same, when the user sent the .kicad_pcb: a rework step may name the
+# board's copper, and evidence.check holds it to that copper (plan 013
+# step 3).
+STRUCTURE_BOARD = (
+    _STRUCTURE
+    + """\
+- rework: bodges for the board on the bench: cut a track, drill out a via, \
+lift a pin, add a wire between two pads, swap a part. Write each step's text \
+for the bench as usual.
+- board: set it when a rework step cuts a track, drills out a via or adds a \
+wire between two pads, so it is checked against the board's copper; null \
+otherwise (lifting a pin, swapping a part). action: cut, drill_via or \
+jumper. from_pad and to_pad: pads as REF.PIN (U1.2, C2.1). For cut and \
+drill_via, the track or via lies on the copper between the two pads, both \
+on net (the net's name exactly as the input writes it), e.g. a cut on +5V \
+between J1.A4 and U1.2. For jumper, the wire runs from from_pad to to_pad \
+and net is null. Name only pads the input shows on that net: a layout \
+fact's pads, or the netlist's.
+"""
+    + _STRUCTURE_IDS
+)
+
+
+def structure_prompt(*, review: bool, board: bool) -> tuple[str, str]:
+    """The structure call's system prompt and its name for the run record:
+    review mode's, or debug mode's with or without the board's copper."""
+    if review:
+        return REVIEW_STRUCTURE, "REVIEW_STRUCTURE"
+    if board:
+        return STRUCTURE_BOARD, "STRUCTURE_BOARD"
+    return STRUCTURE, "STRUCTURE"
+
 
 # --- review mode -----------------------------------------------------------------
 #

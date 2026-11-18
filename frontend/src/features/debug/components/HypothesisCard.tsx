@@ -13,6 +13,7 @@ import {
   confidenceLabel,
   findingTokens,
   isReview,
+  reworkBoardLine,
   symptomText,
   type Assessment,
   type Confidence,
@@ -390,7 +391,10 @@ function HypothesisBody({
 }: HypothesisCardProps & { onFold: (() => void) | null }) {
   const primary = h.rank === 1
   const stepIds = new Set(h.confirm.map((s) => s.id))
-  const ownProblems = problems.filter((p) => p.where === h.id || stepIds.has(p.where))
+  // A rework step's board problem shows under that step, not in the list.
+  const ownProblems = problems.filter(
+    (p) => p.rework === null && (p.where === h.id || stepIds.has(p.where)),
+  )
   const m = useMessages()
   const t = m.hypothesis
   const assessment = assess(h, summary, m)
@@ -512,14 +516,26 @@ function HypothesisBody({
             <div className="space-y-1.5 border-l-2 border-warn pl-[1ch]">
               <span className="font-bold text-warn">{t.reworkOnBoard}</span>
               <ol className="list-decimal space-y-1 pl-4 leading-relaxed">
-                {h.fix.rework.map((r, i) => (
-                  <li key={i}>
-                    {r.text}
-                    {!r.practical && r.practical_note && (
-                      <span className="block text-warn">{t.hardByHandNote(r.practical_note)}</span>
-                    )}
-                  </li>
-                ))}
+                {h.fix.rework.map((r, i) => {
+                  const board = reworkBoardLine(h, i, r, problems, m)
+                  return (
+                    <li key={i}>
+                      {r.text}
+                      {board && (
+                        <span
+                          className={cn("block", board.ok ? "text-muted-foreground" : "text-warn")}
+                        >
+                          {board.text}
+                        </span>
+                      )}
+                      {!r.practical && r.practical_note && (
+                        <span className="block text-warn">
+                          {t.hardByHandNote(r.practical_note)}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
               </ol>
             </div>
           )}

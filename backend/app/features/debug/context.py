@@ -201,6 +201,10 @@ def build(
         datasheet_ids=reading.ids | {d.id for d in deviations},
         drc={e.id: e for e in drc},
         layout={f.id: f for f in facts},
+        # The prompt has a board section exactly when a board was sent; the
+        # structure prompt lets the model name its copper only then.
+        board_sent=bool(board_text),
+        board=board,
     )
     return ReviewContext(
         reading=reading,

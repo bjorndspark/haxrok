@@ -22,6 +22,7 @@ import {
   parseSi,
   peakRows,
   powerRows,
+  reworkBoardLine,
   stateRows,
   simulationLayout,
   spreadLabels,
@@ -38,6 +39,7 @@ import type {
   Hypothesis,
   LayoutFact,
   PowerTree,
+  ReworkStep,
   Run,
   SimCircuit,
   Simulation,
@@ -525,6 +527,50 @@ describe("calculationBadge", () => {
     expect(calculationBadge(calc({ kind: "i2c_pullup", value: null, expected: null }), en)).toBe(
       "missing",
     )
+  })
+})
+
+describe("reworkBoardLine", () => {
+  const cut: ReworkStep = {
+    text: "Cut the +5V track between C1 and U1.",
+    practical: true,
+    practical_note: null,
+    board: { action: "cut", net: "+5V", from_pad: "C1.1", to_pad: "U1.2" },
+  }
+  const wire: ReworkStep = {
+    text: "Add a wire from C1.1 to U1.9.",
+    practical: true,
+    practical_note: null,
+    board: null,
+  }
+  const swap: ReworkStep = {
+    text: "Swap C3 for 22 µF.",
+    practical: true,
+    practical_note: null,
+    board: null,
+  }
+  const h = { id: "h1", fix: { schematic: [], rework: [cut, wire, swap] } } as unknown as Hypothesis
+  const problems = [
+    { where: "h1", message: "No pad U1.9 on the board.", rework: 1 },
+    { where: "h2", message: "other hypothesis", rework: 2 },
+  ]
+
+  it("shows the link the board confirmed", () => {
+    expect(reworkBoardLine(h, 0, cut, problems, en)).toEqual({
+      ok: true,
+      text: "✓ Checked on the board: cut the track between C1.1 and U1.2 on +5V",
+    })
+  })
+
+  it("shows why this hypothesis's step lost its link", () => {
+    expect(reworkBoardLine(h, 1, wire, problems, en)).toEqual({
+      ok: false,
+      text: "! Not on the board: No pad U1.9 on the board.",
+    })
+  })
+
+  it("is null for a step with no board change, whatever other hypotheses raised", () => {
+    expect(reworkBoardLine(h, 2, swap, problems, en)).toBeNull()
   })
 })
 

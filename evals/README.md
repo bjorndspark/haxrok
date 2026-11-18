@@ -10,6 +10,8 @@ the real bug?
 cases/<name>/
   symptom.md    what was observed — never the root cause; review-only
                 cases have none
+  board.kicad_pcb  the board, optional: debug mode checks a rework's
+                tracks and vias against it (`app_prompts.py`)
   netlist.txt   compact netlist (compact_netlist.py output)
   erc.txt       KiCad ERC report, optional
   layout.txt    KiCad DRC findings and layout facts, as the prompt gets
@@ -34,7 +36,7 @@ cases/<name>/
 | `rp-micro-no-fault` | None; the cause is a charge-only USB cable. Pass = no schematic fault claimed at any rank | Unmodified board (siderakb/rp-micro) |
 | `samd21-breakout-no-fault` | None; review only, for false alarms | Unmodified board (atoomnetmarc/SAMD21-breakout) |
 | `usbc-buck-no-fault` | None; review only, for false alarms | Unmodified board (maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C) |
-| `usbc-buck-cin-far` | The buck's input capacitors C1-C3 moved from U1 to the USB-C connector on the PCB, 44.8 mm of copper from U1's VIN; review only | Planted (maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C) |
+| `usbc-buck-cin-far` | The buck's input capacitors C1-C3 moved from U1 to the USB-C connector on the PCB, 44.8 mm of copper from U1's VIN; its `symptom.md` is written, not from a bench, to check board reworks (plan 013 step 3) | Planted (maudeve-it/3.3V-3A-step-down-converter-powered-by-USB-C) |
 | `moist-sensor-no-fault` | None; review only, for false alarms | Unmodified board (Miceuz/rs485-moist-sensor) |
 | `furby-boot-cap` | ESP32-S3 GPIO0 has 100 nF to GND and only the internal pull-up, so it's still low when sampled and every cold boot enters download mode | Real bug (maintainer's board, built) |
 | `artemia-fet-pinout` | BSS123 FETs Q1/Q2 drawn with a D-G-S symbol (BSS123 is G-S-D), so the MCU can't set or clear the boost-enable flip-flop; also 10 kΩ pull-downs on two open-drain lines with pull-ups | Real bug (patlab-ucsd/artemia_hardware, fix a05f688) |
@@ -516,3 +518,54 @@ them will-fail; 18 of the 38 are wrong and 6 unjudged.
 decoupling distances, which the layout facts flag (U1.2 at 5.5 mm, U2.8
 at 18 mm). They are true, so `judged.md` counts them real (the table
 above is re-judged with that entry).
+
+### With board reworks, 2026-11-18
+
+The same sweep after plan 013 step 3 let a debug-mode rework step name
+the board's tracks and vias
+(`results/scorecard/meta_muse-spark-1.3-contributor/20261117T181127Z/`):
+57 runs, 0 failed, 195 issues, 13 unjudged. Review mode's prompts and
+code path didn't change (a review's rework is empty), so the
+differences from the sweep above are run-to-run variation.
+
+Misses, by case kind:
+
+| Cases | Runs | Bug ranked #1 | Bug ranked at all | Missed |
+|---|---|---|---|---|
+| Planted (11) | 33 | 22 | 32 | 1 |
+| Real bug (4) | 12 | 5 | 5 | 7 |
+
+`usbc-buck-cin-far` ranked its bug #2, missed and #2; the miss is an
+Auto-check miss: run 2's #3 issue, "Switching and op-amp supply caps far
+from pins", cites `pl1` and U1.2 but none of "decoupl", "input cap",
+"bypass" or "vin". The real-bug misses are `artemia-fet-pinout` in all 3
+runs, `enviro-node-usb-backfeed` in 2 (#1, #1, #4 above) and
+`lpddr5-fb-no-divider` in 2 (1 above).
+
+Issues judged wrong, per board:
+
+| Board | Runs | Issues | Bug | Real | Wrong |
+|---|---|---|---|---|---|
+| rust-board (4 planted) | 12 | 31 | 15 | 16 | 0 |
+| orbit (4 planted) | 12 | 46 | 12 | 16 | 16 |
+| rp-micro (2 planted, 1 unmodified) | 9 | 13 | 6 | 6 | 1 |
+| `samd21-breakout-no-fault` | 3 | 12 | – | 0 | 12 |
+| `usbc-buck-no-fault` | 3 | 15 | – | 8 | 3 |
+| `usbc-buck-cin-far` | 3 | 13 | 2 | 5 | 4 |
+| `moist-sensor-no-fault` | 3 | 10 | – | 5 | 4 |
+| `furby-boot-cap` | 3 | 10 | 3 | 2 | 4 |
+| `artemia-fet-pinout` | 3 | 15 | 0 | 11 (+3) | 0 |
+| `enviro-node-usb-backfeed` | 3 | 15 | 1 | 9 | 3 |
+| `lpddr5-fb-no-divider` | 3 | 15 | 1 | 8 | 6 |
+| All | 57 | 195 | 40 | 86 (+3) | 53 |
+
+On the 4 unmodified boards (12 runs) the reviews raised 37 issues, 9 of
+them will-fail; 19 of the 37 are wrong and 5 unjudged.
+
+Debug mode, where a rework can name the board's copper: `make eval-app
+case=usbc-buck-cin-far`, 3 runs with the AI answer cache off
+(`AI_CACHE_TTL_S=0`; with it on, the 2nd and 3rd runs return the 1st's
+answer). The bug ranked #1 in all 3. Their 5 rework steps tack a
+capacitor at U1, reflow joints, swap L1 and wire J4 to the loads apart:
+none is a cut, a jumper or a drilled via, so none is linked to the
+board and none rejected. The board check is covered by tests only.

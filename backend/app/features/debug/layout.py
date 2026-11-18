@@ -26,6 +26,7 @@ import heapq
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from typing import Literal
 
 from app.features.debug import calc
 from app.features.debug.board import Board, Fill, Pad, Point
@@ -169,13 +170,35 @@ class _Node:
     point: Point
     layers: frozenset[str]
     reach: float  # how far from ``point`` copper still touches it
+    kind: Literal["pad", "via", "track"]
 
 
-def _paths(board: Board, start: Pad, targets: list[Pad]) -> list[tuple[Pad, float, bool]]:
-    """Each target pad the start pad's copper reaches: (pad, mm, whether the
-    shortest path crosses a zone). Tracks count their length; a filled zone
-    of the net joins what lies on it in a straight line."""
-    net = start.net
+@dataclass(frozen=True)
+class CopperPath:
+    """The shortest copper path between two pads (``copper_path``)."""
+
+    mm: float
+    tracks: int  # track segments it runs along
+    vias: int  # vias it passes through
+    through_zone: bool
+
+
+@dataclass
+class _Graph:
+    """One net's copper as a graph of pads, vias and track ends."""
+
+    nodes: list[_Node]
+    edges: dict[int, list[tuple[int, float, bool]]]
+    pads: dict[tuple[str, str, float, float], int]
+
+    def pad(self, pad: Pad) -> int | None:
+        return self.pads.get((pad.ref, pad.number, pad.x, pad.y))
+
+
+def _graph(board: Board, net: str) -> _Graph:
+    """The net's pads, vias and track ends, joined where their copper
+    touches. Tracks count their length; a filled zone of the net joins what
+    lies on it in a straight line (an edge marked zone)."""
     nodes: list[_Node] = []
     edges: dict[int, list[tuple[int, float, bool]]] = {}
 
@@ -190,14 +213,14 @@ def _paths(board: Board, start: Pad, targets: list[Pad]) -> list[tuple[Pad, floa
 
     pads = [p for p in board.pads if p.net == net]
     pad_ids = {
-        (p.ref, p.number, p.x, p.y): add(_Node((p.x, p.y), p.layers, p.radius)) for p in pads
+        (p.ref, p.number, p.x, p.y): add(_Node((p.x, p.y), p.layers, p.radius, "pad")) for p in pads
     }
-    vias = [add(_Node((v.x, v.y), v.layers, v.radius)) for v in board.vias if v.net == net]
+    vias = [add(_Node((v.x, v.y), v.layers, v.radius, "via")) for v in board.vias if v.net == net]
     tracks = [t for t in board.tracks if t.net == net]
     ends: list[tuple[int, int]] = []
     for t in tracks:
-        a = add(_Node(t.start, frozenset({t.layer}), t.width / 2))
-        b = add(_Node(t.end, frozenset({t.layer}), t.width / 2))
+        a = add(_Node(t.start, frozenset({t.layer}), t.width / 2, "track"))
+        b = add(_Node(t.end, frozenset({t.layer}), t.width / 2, "track"))
         join(a, b, t.length)
         ends.append((a, b))
 
@@ -232,22 +255,63 @@ def _paths(board: Board, start: Pad, targets: list[Pad]) -> list[tuple[Pad, floa
     for x, a in enumerate(on_fill):
         for b in on_fill[x + 1 :]:
             join(a, b, math.dist(nodes[a].point, nodes[b].point), zone=True)
+    return _Graph(nodes, edges, pad_ids)
 
-    source = pad_ids[(start.ref, start.number, start.x, start.y)]
-    dist, zoned = _dijkstra(edges, source)
+
+def _paths(board: Board, start: Pad, targets: list[Pad]) -> list[tuple[Pad, float, bool]]:
+    """Each target pad the start pad's copper reaches: (pad, mm, whether the
+    shortest path crosses a zone)."""
+    graph = _graph(board, start.net)
+    source = graph.pad(start)
+    assert source is not None  # the start pad is on its own net
+    dist, zoned, _ = _dijkstra(graph.edges, source)
     found = []
     for pad in targets:
-        node = pad_ids.get((pad.ref, pad.number, pad.x, pad.y))
+        node = graph.pad(pad)
         if node is not None and node in dist:
             found.append((pad, dist[node], zoned[node]))
     return found
 
 
+def copper_path(board: Board, start: Pad, end: Pad) -> CopperPath | None:
+    """The shortest copper path from ``start`` to ``end`` on their net, with
+    the tracks and vias it runs through, or None when no copper joins them
+    (or they are on different nets). A board rework's cut or drilled via
+    is checked against it (``evidence.py``)."""
+    if start.net != end.net:
+        return None
+    graph = _graph(board, start.net)
+    source, target = graph.pad(start), graph.pad(end)
+    if source is None or target is None:
+        return None
+    dist, zoned, prev = _dijkstra(graph.edges, source)
+    if target not in dist:
+        return None
+    on_path = [target]
+    while on_path[-1] != source:
+        on_path.append(prev[on_path[-1]])
+    kinds = [graph.nodes[n].kind for n in on_path]
+    # A track segment is two track-end nodes in a row joined along copper;
+    # two touching track ends join at 0 mm, which isn't a segment.
+    tracks = sum(
+        1
+        for a, b in zip(on_path, on_path[1:], strict=False)
+        if graph.nodes[a].kind == graph.nodes[b].kind == "track"
+        and any(n == b and not z and mm > 1e-6 for n, mm, z in graph.edges[a])
+    )
+    return CopperPath(
+        mm=dist[target], tracks=tracks, vias=kinds.count("via"), through_zone=zoned[target]
+    )
+
+
 def _dijkstra(
     edges: dict[int, list[tuple[int, float, bool]]], source: int
-) -> tuple[dict[int, float], dict[int, bool]]:
+) -> tuple[dict[int, float], dict[int, bool], dict[int, int]]:
+    """Shortest distances from ``source``, whether each path crosses a zone,
+    and each node's predecessor on it."""
     dist = {source: 0.0}
     zoned = {source: False}
+    prev: dict[int, int] = {}
     queue = [(0.0, source)]
     while queue:
         d, node = heapq.heappop(queue)
@@ -258,8 +322,9 @@ def _dijkstra(
             if nd < dist.get(nxt, math.inf) - 1e-9:
                 dist[nxt] = nd
                 zoned[nxt] = zoned[node] or zone
+                prev[nxt] = node
                 heapq.heappush(queue, (nd, nxt))
-    return dist, zoned
+    return dist, zoned, prev
 
 
 def _to_segment(p: Point, a: Point, b: Point) -> tuple[float, float]:

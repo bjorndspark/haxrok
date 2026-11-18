@@ -1123,10 +1123,18 @@ async def test_a_sent_board_reaches_the_prompt_and_the_record_with_its_drc(tmp_p
         seen.append(user)
         return "1. L2 tied to VOUT."
 
+    structured: list[str] = []
+
+    async def structure(system: str, user: str) -> Analysis[Claim]:
+        structured.append(system)
+        return await _structure(system, user)
+
     recorder = record.FileRecorder(tmp_path, record.new_run_id())
-    model = service.Model(diagnose, _structure)
+    model = service.Model(diagnose, structure)
     events = [e["event"] async for e in service.stream(prepared, model, recorder=recorder)]
     assert "## Board (the .kicad_pcb" in seen[0]
+    # With a board the model may name rework on its tracks and vias.
+    assert structured == [prompt.STRUCTURE_BOARD]
     assert "KiCad DRC:\ndrc-1 [" in seen[0]
     assert "Layout facts:\n(none: " in seen[0]
     # The layout didn't change from the summary's, so no facts event for it.
@@ -1136,9 +1144,14 @@ async def test_a_sent_board_reaches_the_prompt_and_the_record_with_its_drc(tmp_p
     back = record.evidence_context(ctx).evidence
     assert sorted(back.drc) == ["drc-1", "drc-2"]
     assert back.layout == {}
-    # A run recorded before boards had neither key.
-    old = {k: v for k, v in ctx.items() if k not in ("drc", "layout")}
+    # The record keeps that a board was sent, never its copper.
+    assert back.board_sent and back.board is None
+    models = [line["data"] for line in _record(recorder.path) if line["kind"] == "model"]
+    assert models[-1]["prompt"] == "STRUCTURE_BOARD"
+    # A run recorded before boards had none of these keys.
+    old = {k: v for k, v in ctx.items() if k not in ("drc", "layout", "board_sent")}
     assert record.evidence_context(old).evidence.drc == {}
+    assert not record.evidence_context(old).evidence.board_sent
 
 
 async def test_a_board_that_doesnt_parse_costs_only_its_layout_facts(caplog):

@@ -11,6 +11,7 @@ import pathlib
 
 import pytest
 
+from app.features.debug.board import Board, Pad, Track, Via
 from app.features.debug.design import (
     Design,
     Node,
@@ -26,6 +27,7 @@ from app.features.debug.evidence import EvidenceContext, check, check_claim
 from app.features.debug.kicad import skip_reason
 from app.features.debug.schemas import (
     Analysis,
+    BoardRework,
     Cite,
     Claim,
     ConfirmStep,
@@ -35,6 +37,7 @@ from app.features.debug.schemas import (
     Hypothesis,
     LayoutFact,
     Reading,
+    ReworkStep,
     SetupChange,
 )
 
@@ -416,6 +419,131 @@ def _objects(node):
     elif isinstance(node, list):
         for v in node:
             yield from _objects(v)
+
+
+# --- board rework links ------------------------------------------------------------
+
+_BOTH = frozenset({"F.Cu", "B.Cu"})
+
+
+def _rework_board() -> Board:
+    """VDD from U2.12 along a front track to a via, then a back track to the
+    through-hole C1.1; U2.11 (/Power/SW1) has no copper."""
+    pads = [
+        Pad("U2", "12", "VDD", 0, 0, 0.3, frozenset({"F.Cu"})),
+        Pad("U2", "11", "/Power/SW1", 0, 2, 0.3, frozenset({"F.Cu"})),
+        Pad("C1", "1", "VDD", 10, 0, 0.5, _BOTH),
+    ]
+    return Board(
+        ("F.Cu", "B.Cu"),
+        {},
+        {"U2": "F.Cu", "C1": "F.Cu"},
+        pads,
+        tracks=[
+            Track((0, 0), (5, 0), 0.25, "F.Cu", "VDD"),
+            Track((5, 0), (10, 0), 0.25, "B.Cu", "VDD"),
+        ],
+        vias=[Via(5, 0, 0.3, "VDD", _BOTH)],
+    )
+
+
+def _board_ctx(ctx: EvidenceContext, *, sent: bool = True, board: Board | None = None):
+    return dataclasses.replace(ctx, board_sent=sent, board=board)
+
+
+def _with_rework(*links: BoardRework | None) -> Analysis[Claim]:
+    h = _hypothesis("h1", 1, ["s1"], [])
+    steps = [
+        ReworkStep(text=f"step {i}", practical=True, practical_note=None, board=link)
+        for i, link in enumerate(links)
+    ]
+    return _analysis(h.model_copy(update={"fix": Fix(schematic=[], rework=steps)}))
+
+
+def _link(action: str, a: str, b: str, net: str | None = "VDD") -> BoardRework:
+    return BoardRework(action=action, net=net, from_pad=a, to_pad=b)
+
+
+def _rework_result(ctx: EvidenceContext, *links: BoardRework | None):
+    checked = check(_with_rework(*links), ctx)
+    return checked.hypotheses[0].fix.rework, checked.problems
+
+
+def test_cut_and_drill_on_the_boards_copper_pass(ctx):
+    board_ctx = _board_ctx(ctx, board=_rework_board())
+    cut, drill, wire = (
+        _link("cut", "U2.12", "C1.1"),
+        _link("drill_via", "U2.12", "C1.1"),
+        _link("jumper", "U2.11", "C1.1", net=None),
+    )
+    rework, problems = _rework_result(board_ctx, cut, drill, wire)
+    assert [r.board for r in rework] == [cut, drill, wire]
+    assert problems == []
+
+
+def test_a_cut_with_no_track_between_the_pads_is_dropped_with_its_index(ctx):
+    # A via-in-pad join only: copper, but no track to cut and no via between.
+    board = _rework_board()
+    board = dataclasses.replace(board, tracks=[], vias=[Via(10, 0, 0.3, "VDD", _BOTH)])
+    board.pads[0] = Pad("U2", "12", "VDD", 10, 0, 0.3, _BOTH)
+    rework, problems = _rework_result(
+        _board_ctx(ctx, board=board), None, _link("cut", "U2.12", "C1.1")
+    )
+    assert [r.board for r in rework] == [None, None]
+    [p] = problems
+    assert (p.where, p.rework) == ("h1", 1)
+    assert p.message == "No track lies between U2.12 and C1.1 on VDD to cut."
+
+
+def test_drilling_a_via_that_isnt_on_the_path_is_rejected(ctx):
+    board = dataclasses.replace(
+        _rework_board(),
+        tracks=[Track((0, 0), (10, 0), 0.25, "F.Cu", "VDD")],
+        vias=[],
+    )
+    _, [p] = _rework_result(_board_ctx(ctx, board=board), _link("drill_via", "U2.12", "C1.1"))
+    assert p.message == "No via lies between U2.12 and C1.1 on VDD to drill out."
+
+
+@pytest.mark.parametrize(
+    ("link", "message"),
+    [
+        (
+            _link("jumper", "U2.99", "C1.1", net=None),
+            "The jumper names pad U2.99, which isn't on the board.",
+        ),
+        (
+            _link("cut", "U2.12", "C1.1", net="VBUS"),
+            "The track cut names net VBUS, which isn't in your schematic.",
+        ),
+        (
+            _link("cut", "U2.11", "C1.1"),
+            "The track cut is on VDD, but pad U2.11 is on /Power/SW1.",
+        ),
+        (
+            _link("cut", "U2.11", "C1.1", net="/Power/SW1"),
+            "The track cut is on /Power/SW1, but pad C1.1 is on VDD.",
+        ),
+    ],
+)
+def test_a_link_naming_the_wrong_pad_or_net_is_rejected(ctx, link, message):
+    _, [p] = _rework_result(_board_ctx(ctx, board=_rework_board()), link)
+    assert p.message == message
+
+
+def test_pads_with_no_copper_between_them_are_rejected(ctx):
+    board = dataclasses.replace(_rework_board(), tracks=[], vias=[])
+    _, [p] = _rework_result(_board_ctx(ctx, board=board), _link("cut", "U2.12", "C1.1"))
+    assert p.message == "No copper joins U2.12 and C1.1 on the board."
+
+
+def test_a_link_without_a_board_or_its_copper_is_rejected(ctx):
+    link = _link("drill_via", "U2.12", "C1.1")
+    _, [p] = _rework_result(_board_ctx(ctx, sent=False), link)
+    assert p.message == "The via isn't checked: no board was sent."
+    # A replayed run: the board was sent, but its copper isn't recorded.
+    _, [p] = _rework_result(_board_ctx(ctx, board=None), link)
+    assert p.message == "The via isn't checked: the board's copper isn't available."
 
 
 def test_model_output_schema_is_strict_mode_compatible():

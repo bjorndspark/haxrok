@@ -260,6 +260,10 @@ Used outdoors, so it may see -10 °C.`,
     },
     reworkOnBoard: "Rework on this board",
     hardByHandNote: (note: string) => `! Hard by hand: ${note}`,
+    boardAction: { cut: "cut the track", jumper: "add a wire", drill_via: "drill out the via" },
+    boardChecked: (action: string, from: string, to: string, net: string | null) =>
+      `✓ Checked on the board: ${action} between ${from} and ${to}${net ? ` on ${net}` : ""}`,
+    boardRejected: (reason: string) => `! Not on the board: ${reason}`,
     schematicChange: { review: "Schematic change", debug: "Next schematic revision" },
     unverified: {
       review: "Unverified: settle the issue with the checks above before changing the design.",
@@ -727,6 +731,10 @@ USB 5 V では動く: マイコンが起動する。
     },
     reworkOnBoard: "この基板の改造",
     hardByHandNote: (note: string) => `! 手作業では困難: ${note}`,
+    boardAction: { cut: "配線のカット", jumper: "ジャンパ線の追加", drill_via: "ビアの除去" },
+    boardChecked: (action: string, from: string, to: string, net: string | null) =>
+      `✓ 基板で確認済み: ${from} と ${to} の間${net ? ` (${net})` : ""}の${action}`,
+    boardRejected: (reason: string) => `! 基板と合いません: ${reason}`,
     schematicChange: { review: "回路図の変更", debug: "次の版の回路図" },
     unverified: {
       review: "未検証: 設計を変える前に、上の確認で問題を確かめてください。",

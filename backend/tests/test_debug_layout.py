@@ -5,7 +5,7 @@ functions, no model."""
 import pytest
 
 from app.features.debug import layout
-from app.features.debug.board import Board, Fill, Pad, Track, Zone
+from app.features.debug.board import Board, Fill, Pad, Track, Via, Zone
 from app.features.debug.design import Design, Node, Part
 from app.features.debug.schemas import DrcEntry, PowerRail, PowerTree, RailBudget
 
@@ -137,6 +137,49 @@ def test_a_rail_without_a_decoupling_capacitor_gives_no_fact() -> None:
         {"VIN": [Node("U1", "1", "VIN")], "GND": [Node("U1", "2", "GND")]},
     )
     assert layout.check(design, _ldo_board(), TREE) == []
+
+
+# --- copper paths (rework checks) --------------------------------------------------
+
+
+def _pad_of(board: Board, ref: str, number: str) -> Pad:
+    return next(p for p in board.pads if p.ref == ref and p.number == number)
+
+
+def test_copper_path_counts_the_tracks_it_runs_along() -> None:
+    # U1.1 → (5, 0) → along the vertical track to (5, 3) → C1.1.
+    tracks = [_track((0, 0), (5, 0)), _track((5, -3), (5, 3)), _track((5, 3), (10, 3))]
+    board = _ldo_board(tracks=tracks)
+    path = layout.copper_path(board, _pad_of(board, "U1", "1"), _pad_of(board, "C1", "1"))
+    assert path is not None
+    assert path.mm == pytest.approx(13.0)
+    assert (path.tracks, path.vias, path.through_zone) == (3, 0, False)
+
+
+def test_copper_path_through_a_via_to_the_back_layer() -> None:
+    both = frozenset({"F.Cu", "B.Cu"})
+    tracks = [_track((0, 0), (5, 0)), Track((5, 0), (10, 3), 0.25, "B.Cu", "VIN")]
+    board = _ldo_board(tracks=tracks, vias=[Via(5, 0, 0.3, "VIN", both)])
+    c1 = _pad_of(board, "C1", "1")
+    # C1.1 is a through-hole pad here, so the back-layer track reaches it.
+    board.pads[board.pads.index(c1)] = Pad("C1", "1", "VIN", 10, 3, 0.5, both)
+    path = layout.copper_path(board, _pad_of(board, "U1", "1"), _pad_of(board, "C1", "1"))
+    assert path is not None
+    assert (path.tracks, path.vias) == (2, 1)
+
+
+def test_copper_path_across_a_zone_has_no_track_to_cut() -> None:
+    board = _ldo_board(zones=[Zone("VIN", F, True)], fills=[_square("VIN", "F.Cu", -2, -2, 12, 5)])
+    path = layout.copper_path(board, _pad_of(board, "U1", "1"), _pad_of(board, "C1", "1"))
+    assert path is not None
+    assert (path.tracks, path.vias, path.through_zone) == (0, 0, True)
+
+
+def test_copper_path_is_none_between_nets_or_without_copper() -> None:
+    board = _ldo_board(tracks=[_track((0, 0), (10, 3))])
+    u1 = _pad_of(board, "U1", "1")
+    assert layout.copper_path(board, u1, _pad_of(board, "C1", "2")) is None
+    assert layout.copper_path(_ldo_board(), u1, _pad_of(board, "C1", "1")) is None
 
 
 # --- ground under a switching regulator -------------------------------------------------

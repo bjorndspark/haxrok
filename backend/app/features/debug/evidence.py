@@ -19,22 +19,33 @@ Rules for a claim with evidence other than ``none``:
 A claim that breaks a rule drops to ``none`` with ``downgraded=True`` and a
 reason. Outside claims, unknown symptom, hypothesis and pin references are
 removed or reported as ``Problem``s.
+
+A rework step's board link (a track cut, a jumper, a via drilled out) is
+checked against the board's copper: a cut needs a track and a drilled via a
+via of its net on the copper path between its two pads
+(``layout.copper_path``), a jumper both pads on the board. One that fails
+loses its link, keeps its text, and is reported as a ``Problem`` with the
+step's index.
 """
 
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from app.features.debug.board import Board, Pad
 from app.features.debug.design import PIN_MENTION, Design, normalize_pin
+from app.features.debug.layout import copper_path
 from app.features.debug.schemas import (
     EVIDENCE_CITE_KINDS,
     Analysis,
+    BoardRework,
     CheckedAnalysis,
     CheckedClaim,
     Cite,
     Claim,
     DrcEntry,
     ErcEntry,
+    Fix,
     Hypothesis,
     LayoutFact,
     Problem,
@@ -59,6 +70,10 @@ class EvidenceContext:
     datasheet_ids: frozenset[str] = frozenset()  # ds1… facts.FactReader, dv1… application
     drc: dict[str, DrcEntry] = field(default_factory=dict)  # drc-1… from the board's DRC
     layout: dict[str, LayoutFact] = field(default_factory=dict)  # pl1… from layout.check
+    # Whether the user sent a .kicad_pcb, and its copper when it was parsed.
+    # A replay has board_sent without the board: a run records no copper.
+    board_sent: bool = False
+    board: Board | None = None
 
 
 def check(analysis: Analysis[Claim], ctx: EvidenceContext) -> CheckedAnalysis:
@@ -94,11 +109,14 @@ def check(analysis: Analysis[Claim], ctx: EvidenceContext) -> CheckedAnalysis:
             confirm.append(step.model_copy(update={"readings": readings}))
         hypotheses.append(
             Hypothesis[CheckedClaim](
-                **h.model_dump(exclude={"claims", "explains", "does_not_explain", "confirm"}),
+                **h.model_dump(
+                    exclude={"claims", "explains", "does_not_explain", "confirm", "fix"}
+                ),
                 claims=claims,
                 explains=explains,
                 does_not_explain=not_explains,
                 confirm=confirm,
+                fix=_check_fix(h.id, h.fix, ctx, problems),
             )
         )
     return CheckedAnalysis(
@@ -271,3 +289,57 @@ def _check_setup(step_id: str, setup: list[SetupChange], design: Design) -> list
         elif change.to_pin and design.net_of(normalize_pin(change.to_pin)) is None:
             found.append(f"Setup connects {pin} to {change.to_pin}, which isn't in your schematic.")
     return [Problem(where=step_id, message=m) for m in found]
+
+
+def _check_fix(where: str, fix: Fix, ctx: EvidenceContext, problems: list[Problem]) -> Fix:
+    """``fix`` with each rework step's board link checked; a link that
+    fails is removed and reported with the step's index."""
+    rework = []
+    for i, step in enumerate(fix.rework):
+        failure = _board_failure(step.board, ctx) if step.board else None
+        if failure:
+            problems.append(Problem(where=where, message=failure, rework=i))
+            step = step.model_copy(update={"board": None})
+        rework.append(step)
+    return fix.model_copy(update={"rework": rework})
+
+
+def _board_failure(link: BoardRework, ctx: EvidenceContext) -> str | None:
+    """Why the board doesn't have what ``link`` names, or None if it does."""
+    what = {"cut": "track cut", "jumper": "jumper", "drill_via": "via"}[link.action]
+    if not ctx.board_sent:
+        return f"The {what} isn't checked: no board was sent."
+    if ctx.board is None:
+        return f"The {what} isn't checked: the board's copper isn't available."
+    ends = (normalize_pin(link.from_pad), normalize_pin(link.to_pad))
+    pads: list[list[Pad]] = [_pads(ctx.board, pad) for pad in ends]
+    for pad, found in zip(ends, pads, strict=True):
+        if not found:
+            return f"The {what} names pad {pad}, which isn't on the board."
+    if link.action == "jumper":
+        return None
+    net = ctx.design.resolve_net(link.net) if link.net else None
+    if net is None:
+        return f"The {what} names net {link.net}, which isn't in your schematic."
+    for pad, found in zip(ends, pads, strict=True):
+        if all(p.net != net for p in found):
+            return f"The {what} is on {link.net}, but pad {pad} is on {found[0].net}."
+    paths = [
+        path
+        for a in pads[0]
+        for b in pads[1]
+        if a.net == b.net == net and (path := copper_path(ctx.board, a, b))
+    ]
+    if not paths:
+        return f"No copper joins {ends[0]} and {ends[1]} on the board."
+    if link.action == "cut" and not any(p.tracks for p in paths):
+        return f"No track lies between {ends[0]} and {ends[1]} on {link.net} to cut."
+    if link.action == "drill_via" and not any(p.vias for p in paths):
+        return f"No via lies between {ends[0]} and {ends[1]} on {link.net} to drill out."
+    return None
+
+
+def _pads(board: Board, pin: str) -> list[Pad]:
+    """The board's pads for a REF.PIN (a part can repeat a pad number)."""
+    ref, _, number = pin.partition(".")
+    return [p for p in board.pads if p.ref == ref and p.number == number]
